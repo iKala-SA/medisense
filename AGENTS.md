@@ -47,3 +47,8 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Connector illustration now uses Medisense's atom emblem and document/message/calendar/hospital medallions, stored as public/assets/medisense-integrations-banner.png.
 - Rename sidebar recents to 最近項目; initialize empty and only populate from actual prototype chats. Clicking a recent chat restores its messages, selected Agent and model. No spaces or research shortcuts in this section. Session memory only.
 - Research list must be a borderless grid container; only report cards have borders.
+
+## Calendar demo direction
+- User selected daily timeline + right-hand suggestions from supplied Quick screenshot.
+- CalendarPanel supports Google Calendar / Outlook Calendar source selection, day navigation, synthetic event detail, focus-time insertion and connector-driven empty states. Default demo date 2026-10-26 Monday.
+- Authorization is simulated only; real embeds/feed adapters remain future work documented in CALENDAR-INTEGRATION.md. Never access the user's connected personal calendar to populate this product demo.

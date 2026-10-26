@@ -59,3 +59,10 @@ final result: blocked
 - Chat and its surrounding surfaces are white. Removed Flow from plus menu. Recents initialize empty and store only conversation sessions, with restore handlers.
 - New Medisense atom banner generated and installed as public/assets/medisense-integrations-banner.png; replaced previous third-party-symbol artwork.
 - Production build passed. Browser visual and interaction verification remain deferred; final result: blocked.
+
+## Embedded calendar demonstration
+- Source: user screenshot aed38f24, daily time grid left and suggested focus time right.
+- Replaced agenda list with a day view, all-day label, timed meeting, provider selector, previous/next/today controls, event detail, session-only focus-time action and connector empty state. Added Outlook Calendar to connector catalog.
+- Calendar source/date behavior checks: 6 passed. Production build and 4 Sites runtime tests passed. No calendar API or external iframe is connected.
+- Browser comparison remains deferred under the user's existing setting. Timeline, card proportions and responsive state need rendered QA; no visual pass is claimed.
+- final result: blocked
