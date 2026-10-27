@@ -24,6 +24,7 @@ export function signInWithGoogle(){
 }
 export const signOut=()=>auth?fbSignOut(auth):Promise.resolve();
 export async function idToken(){
+  if(PREVIEW)return 'preview-token'; // preview mode has no sign-in; requests are served by mocks or fail visibly
   const u=auth?.currentUser;
   if(!u)throw new Error('not signed in');
   return u.getIdToken();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ShareDialog, { ShareChip } from "../../live/ShareLive";
 import SkillsPanel from "../components/SkillsPanel";
 import { api } from "../api";
@@ -15,6 +15,7 @@ const estTokens = (s) => Math.ceil([...s].reduce((n, ch) => n + (ch.charCodeAt(0
 function Studio() {
   const { id } = useParams();
   const nav = useNavigate();
+  const loc = useLocation();
   const [agent, setAgent] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -90,7 +91,7 @@ function Studio() {
   return <div className="flex h-full flex-col">
       <section className="flex shrink-0 flex-wrap items-center gap-3 border-b border-hairline bg-white px-5 py-2.5">
         <nav className="flex items-center gap-1 text-sm text-on-surface-variant">
-          <button className="flex items-center gap-1 hover:text-primary" onClick={() => nav("/hub")}><Icon name="hub" className="text-[16px]" />Agent Hub</button>
+          <button className="flex items-center gap-1 hover:text-primary" onClick={() => loc.key !== "default" ? nav(-1) : nav("/hub")}><Icon name="hub" className="text-[16px]" />Agent Hub</button>
           <Icon name="chevron_right" className="text-[14px] text-outline-variant" />
           <span className="text-base font-bold text-on-surface">{agent.name}</span>
         </nav>

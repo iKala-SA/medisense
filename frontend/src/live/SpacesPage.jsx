@@ -1,3 +1,5 @@
+import '../bk/bk.css';
+import DocUploader from '../bk/components/DocUploader';
 import React,{useEffect,useState} from 'react';
 import {Plus,Trash,ArrowLeft,FolderSimple,FileText,PencilSimple} from '@phosphor-icons/react';
 import {api} from '../api';
@@ -29,7 +31,7 @@ function Picker({docs,have,onClose,onAdd}){
   </section></div>;
 }
 
-function Detail({space,me,notify,docs,onBack,onChanged,onDeleted}){
+function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc}){
   const [s,setS]=useState(space),[editing,setEditing]=useState(false),[sharing,setSharing]=useState(false),[picking,setPicking]=useState(false);
   const builder=isBuilder(me),edit=canEdit(s);
   const names=Object.fromEntries((docs||[]).map(d=>[d.id,d.name]));
@@ -48,6 +50,7 @@ function Detail({space,me,notify,docs,onBack,onChanged,onDeleted}){
     <div className="lv-w-meta"><span className="badge">{TYPE[s.type]||s.type}</span><span className="lv-w-role">{ROLE_LABEL[s.my_role]||s.my_role}</span><span className="muted small">擁有者 {s.owner_email||'—'} · 更新 {fmtDate(s.updated_at)}</span></div>
     <div className="page-heading" style={{marginTop:16}}><h3 style={{margin:0}}>文件（{s.documents_count??(ids||[]).length}）</h3>
       {edit&&builder&&<button className="btn primary" disabled={docs===null} onClick={()=>setPicking(true)}><Plus/>加入文件</button>}</div>
+    {edit&&builder&&<div className="bk" style={{margin:'0 0 14px'}}><DocUploader compact defaultDepartment={me.department||''} onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}/></div>}
     <div className="lt" style={{'--cols':'1fr 130px 44px'}}>
       <div className="lt-head"><span>文件</span><span>部門</span><span/></div>
       {(ids||[]).map(id=>{const d=(docs||[]).find(x=>x.id===id);return <div className="lt-row" key={id}><span><FileText size={15}/> {names[id]||<span className="muted">{id}</span>}</span><span className="muted small">{d?.department||'—'}</span>
@@ -70,7 +73,7 @@ export default function SpacesPage({me,notify}){
   useEffect(()=>{if(isBuilder(me))api.listDocs().then(d=>setDocs(d||[])).catch(e=>{setDocs([]);notify('載入文件庫失敗：'+errText(e))})},[]);// eslint-disable-line react-hooks/exhaustive-deps
   const put=n=>setItems(a=>(a||[]).map(x=>x.id===n.id?{...x,...n}:x));
 
-  if(open){const s=items.find(x=>x.id===open);if(s)return <Detail key={s.id} space={s} me={me} notify={notify} docs={isBuilder(me)?docs:null} onBack={()=>setOpen(null)} onChanged={put} onDeleted={id=>{setItems(a=>a.filter(x=>x.id!==id));setOpen(null)}}/>}
+  if(open){const s=items.find(x=>x.id===open);if(s)return <Detail key={s.id} space={s} me={me} notify={notify} docs={isBuilder(me)?docs:null} onBack={()=>setOpen(null)} onUploadedDoc={d=>setDocs(a=>[...(a||[]),d])} onChanged={put} onDeleted={id=>{setItems(a=>a.filter(x=>x.id!==id));setOpen(null)}}/>}
   const rows=(items||[]).filter(s=>match(s.name+(s.description||''),q));
   return <>
     <div className="page-heading"><h1>空間</h1><button className="btn primary" onClick={()=>setCreating(true)}><Plus/>建立空間</button></div>

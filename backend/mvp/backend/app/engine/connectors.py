@@ -5,8 +5,8 @@ which are secrets, which actions exist), `config` holds the non-secret fields, `
 fields to Secret Manager names. The canvas `tool` node references a connector id + action.
 
 Status of each type (decided 2026-10-24):
-  real now : mcp (Streamable HTTP), webhook, slack, teams, notion
-  catalog  : gmail / calendar / drive (needs an OAuth flow), his_fhir, pacs (nothing to connect to)
+  real now : mcp (Streamable HTTP), webhook, slack, teams, notion, calendar (per-user OAuth through Open Connector, read-only)
+  catalog  : gmail / drive (same gateway, next), his_fhir, pacs (nothing to connect to)
 """
 from __future__ import annotations
 
@@ -17,6 +17,8 @@ from typing import Any
 import httpx
 
 from . import deid
+from . import gateway_actions as ga
+from . import open_connector as oc
 
 TIMEOUT = 30.0
 MCP_PROTOCOL = "2025-06-18"
@@ -30,6 +32,23 @@ def _f(key: str, label: str, kind: str = "text", *, required: bool = False, hint
 
 def _a(id_: str, label: str, args: list[dict], *, write: bool = True) -> dict:
     return {"id": id_, "label": label, "args": args, "write": write}
+
+
+CALENDAR_ACTIONS = [
+    _a("list_calendars", "列出日曆", [], write=False),
+    _a("list_events", "列出事件", [{"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                   {"key": "timeMin", "label": "起（ISO 8601，預設現在）", "kind": "text"},
+                                   {"key": "timeMax", "label": "迄（ISO 8601）", "kind": "text"},
+                                   {"key": "maxResults", "label": "最多筆數（預設 10）", "kind": "text"},
+                                   {"key": "q", "label": "關鍵字", "kind": "text"}], write=False),
+    _a("get_event", "取得事件", [{"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                 {"key": "eventId", "label": "事件 ID", "kind": "text"}], write=False),
+    _a("find_free_slots", "找空檔", [{"key": "timeMin", "label": "起（ISO 8601）", "kind": "text"},
+                                     {"key": "timeMax", "label": "迄（ISO 8601）", "kind": "text"}], write=False),
+    _a("free_busy_query", "查忙碌時段", [{"key": "timeMin", "label": "起（ISO 8601）", "kind": "text"},
+                                         {"key": "timeMax", "label": "迄（ISO 8601）", "kind": "text"}], write=False),
+]
+CALENDAR_READ = [a["id"] for a in CALENDAR_ACTIONS if not a["write"]]
 
 
 TYPES: dict[str, dict] = {
@@ -106,12 +125,26 @@ TYPES: dict[str, dict] = {
                       options=[{"value": "gmail.send", "label": "gmail.send"}, {"value": "gmail.readonly", "label": "gmail.readonly"}])],
         "actions": [_a("send_email", "寄送郵件", [{"key": "to", "label": "收件人", "kind": "text"}, {"key": "subject", "label": "主旨", "kind": "text"}, {"key": "body", "label": "內容", "kind": "textarea"}])],
     },
+    "gateway": {
+        "label": "Open Connector 服務", "category": "gws", "protocol": "Open Connector（通用）", "icon": "extension", "badge": "通用",
+        "available": True, "hidden": True, "auth": "gateway",
+        "description": "由管理員在「全部服務」目錄中啟用的任何 Open Connector 服務；設定、許可與授權方式依服務而定。",
+        "fields": [], "actions": "dynamic",
+    },
     "calendar": {
-        "label": "Google Calendar 手術與會診排程", "category": "gws", "protocol": "OAuth 2.0 · Calendar API", "icon": "calendar_month", "badge": "GWS 官方認證",
-        "available": False, "coming": "需要院方 GCP OAuth 用戶端與使用者授權流程（下一階段）。",
-        "description": "自動預約臨床團隊跨科會診時間，偵測排班衝突。",
-        "fields": [_f("client_id", "OAuth Client ID", "text", section="credentials"), _f("client_secret", "OAuth Client Secret", "secret", section="credentials")],
-        "actions": [_a("create_event", "建立活動", [{"key": "title", "label": "標題", "kind": "text"}, {"key": "start", "label": "開始 (ISO)", "kind": "text"}, {"key": "end", "label": "結束 (ISO)", "kind": "text"}])],
+        "label": "Google Calendar", "category": "gws", "protocol": "OAuth 2.0 · 每位使用者各自授權", "icon": "calendar_month", "badge": "每人各自授權",
+        "available": True, "auth": "user_oauth", "oc_service": "googlecalendar",
+        "description": "讓 Agent 與工作台讀取使用者自己的 Google 日曆（目前唯讀）。每位使用者各自授權，只看得到自己的日曆；寫入動作尚未開放。",
+        "fields": [
+            _f("allowed_actions", "允許的讀取動作", "checkboxes", default=list(CALENDAR_READ), section="permissions",
+               hint="管理讀取許可：只有勾選的動作能被 Agent 呼叫。",
+               options=[{"value": a["id"], "label": f"{a['label']} · {a['id']}"} for a in CALENDAR_ACTIONS if not a["write"]]),
+            _f("write_actions", "寫入動作（建立、修改、刪除事件）", "checkboxes", default=[], section="permissions",
+               hint="管理寫入許可：尚未開放。開放後會強制放在核准節點之後。",
+               options=[{"value": "create_event", "label": "create_event · 建立事件（尚未開放）", "disabled": True},
+                        {"value": "patch_event", "label": "patch_event · 修改事件（尚未開放）", "disabled": True}]),
+        ],
+        "actions": [a for a in CALENDAR_ACTIONS if not a["write"]],
     },
     "drive": {
         "label": "Google Drive 文件病歷附檔庫", "category": "gws", "protocol": "Service Account · Drive API", "icon": "cloud", "badge": "GWS 官方認證",
@@ -140,6 +173,33 @@ CATEGORIES = [
     {"id": "gws", "label": "Google Workspace"}, {"id": "chat", "label": "協同通訊 (Slack / Teams)"},
     {"id": "his", "label": "醫療院內系統 (HIS/EMR)"}, {"id": "mcp", "label": "遠端 MCP / REST"}, {"id": "data", "label": "雲端與資料庫"},
 ]
+
+
+def is_user_oauth(type_: str) -> bool:
+    """Types whose credentials are each user's own OAuth grant, held by the Open Connector gateway."""
+    return TYPES.get(type_, {}).get("auth") == "user_oauth"
+
+
+def connector_mode(doc: dict) -> str | None:
+    """How users authenticate to a connector: user_oauth (each their own grant), shared (one admin-held credential), none."""
+    t = doc.get("type", "")
+    if is_user_oauth(t):
+        return "user_oauth"
+    if t == "gateway":
+        return ga.mode_of((doc.get("config") or {}).get("auth_mode", ""))
+    return None
+
+
+def connector_service(doc: dict) -> str | None:
+    """The Open Connector service behind a connector, if any."""
+    t = doc.get("type", "")
+    if t in TYPES and TYPES[t].get("oc_service"):
+        return TYPES[t]["oc_service"]
+    return (doc.get("config") or {}).get("service") if t == "gateway" else None
+
+
+def user_oauth_types() -> list[str]:
+    return [k for k in TYPES if is_user_oauth(k)]
 
 
 def secret_fields(type_: str) -> list[str]:
@@ -285,7 +345,15 @@ def test(type_: str, config: dict, secrets: dict) -> dict:
     t0 = time.perf_counter()
     try:
         tools: list[dict] | None = None
-        if type_ == "mcp":
+        if is_user_oauth(type_):
+            if not oc.configured():
+                raise RuntimeError("Open Connector 尚未設定（OPEN_CONNECTOR_URL / OPEN_CONNECTOR_TOKEN）")
+            if not oc.health():
+                raise RuntimeError("無法連到 Open Connector 閘道")
+            if not oc.oauth_client_ready(spec["oc_service"]):
+                raise RuntimeError("閘道尚未設定 Google OAuth 用戶端（client id / secret）")
+            msg = f"閘道正常，OAuth 用戶端已設定；目前 {len(oc.connected_apps(spec['oc_service']))} 位使用者已連線"
+        elif type_ == "mcp":
             c = _mcp(config, secrets)
             info = c.initialize()
             tools = c.list_tools()
@@ -326,11 +394,87 @@ def test(type_: str, config: dict, secrets: dict) -> dict:
         return {"ok": False, "message": f"{exc.__class__.__name__}: {exc}"[:400], "ms": int((time.perf_counter() - t0) * 1000)}
 
 
-def invoke(type_: str, config: dict, secrets: dict, action: str, args: dict, *, redact_pii: bool) -> str:
-    """Run one action. Called by the flow interpreter's `tool` node."""
+def test_gateway(config: dict, connector_id: str) -> dict:
+    """Admin 'test' for a generic connector: gateway reachable, OAuth client / shared credential present."""
+    t0 = time.perf_counter()
+    try:
+        service, mode = config["service"], ga.mode_of(config.get("auth_mode", ""))
+        if not oc.configured():
+            raise RuntimeError("Open Connector 尚未設定（OPEN_CONNECTOR_URL / OPEN_CONNECTOR_TOKEN）")
+        if not oc.health():
+            raise RuntimeError("無法連到 Open Connector 閘道")
+        if mode == "user_oauth":
+            if not oc.oauth_client_ready(service):
+                raise RuntimeError("閘道尚未設定此服務的 OAuth 用戶端")
+            msg = f"閘道正常，OAuth 用戶端已設定；目前 {len(oc.connected_apps(service))} 位使用者已連線"
+        elif mode == "shared":
+            mine = [a for a in oc.connected_apps(service) if a.get("alias") == oc.shared_name(connector_id)]
+            if not mine or mine[0].get("status") != "active":
+                raise RuntimeError("共用憑證連線不存在或已失效，請重新輸入憑證")
+            msg = "閘道正常，共用憑證有效"
+        else:
+            msg = "閘道正常（此服務無需授權）"
+        return {"ok": True, "message": msg, "ms": int((time.perf_counter() - t0) * 1000)}
+    except (oc.OpenConnectorError, RuntimeError, KeyError) as exc:
+        return {"ok": False, "message": f"{exc.__class__.__name__}: {exc}"[:400], "ms": int((time.perf_counter() - t0) * 1000)}
+
+
+def _int(v: Any, default: int) -> int:
+    try:
+        return max(1, min(int(str(v).strip()), 250))
+    except (TypeError, ValueError):
+        return default
+
+
+def _calendar_call(config: dict, action: str, args: dict, user_id: str | None) -> str:
+    """One read-only Google Calendar action as the *running user*, through the Open Connector gateway."""
+    if not user_id:
+        raise RuntimeError("需要使用者身分才能呼叫個人日曆")
+    allowed = config.get("allowed_actions") or CALENDAR_READ
+    if action not in CALENDAR_READ or action not in allowed:
+        raise RuntimeError(f"此連接器未允許動作 {action}（目前僅開放唯讀動作）")
+    cal = str(args.get("calendarId") or "primary")
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    clean = {k: v for k, v in args.items() if v not in ("", None)}
+    if action == "list_calendars":
+        payload = {"maxResults": _int(clean.get("maxResults"), 50)}
+    elif action == "list_events":
+        payload = {"calendarId": cal, "timeMin": clean.get("timeMin") or now, "maxResults": _int(clean.get("maxResults"), 10),
+                   "orderBy": "startTime", "singleEvents": True, **{k: clean[k] for k in ("timeMax", "q") if k in clean}}
+    elif action == "get_event":
+        if not clean.get("eventId"):
+            raise RuntimeError("get_event 需要 eventId")
+        payload = {"calendarId": cal, "eventId": clean["eventId"]}
+    elif action == "free_busy_query":
+        payload = {"items": [{"id": cal}], "timeMin": clean.get("timeMin") or now, "timeMax": clean.get("timeMax") or now}
+    else:  # find_free_slots
+        payload = {k: clean[k] for k in ("timeMin", "timeMax") if k in clean}
+    try:
+        out = oc.execute(f"googlecalendar.{action}", payload, user_id)
+    except oc.OpenConnectorError as exc:
+        if exc.not_connected:
+            raise RuntimeError("您尚未連線 Google Calendar，請先到「連接器」頁按「連線我的帳號」") from exc
+        raise RuntimeError(f"日曆閘道錯誤：{exc}") from exc
+    return json.dumps(out, ensure_ascii=False)[:8000]
+
+
+def invoke(type_: str, config: dict, secrets: dict, action: str, args: dict, *, redact_pii: bool, user_id: str | None = None,
+           connector_id: str | None = None) -> str:
+    """Run one action. Called by the flow interpreter's `tool` node. `user_id` is the signed-in user the flow runs as."""
     spec = TYPES[type_]
     if not spec["available"]:
         raise RuntimeError(spec["coming"])
+    if type_ == "gateway":
+        mode = ga.mode_of(config.get("auth_mode", ""))
+        if mode == "user_oauth" and not user_id:
+            raise RuntimeError("需要使用者身分才能呼叫個人授權的服務")
+        conn = oc.shared_name(connector_id) if mode == "shared" and connector_id else None
+        out = ga.call(config["service"], config, conn, user_id if mode == "user_oauth" else None, action, args)
+        return deid.deidentify(out) if redact_pii else out
+    if is_user_oauth(type_):
+        # Results carry personal data (titles, attendees): pseudonymize before the model sees them when the connector says so.
+        out = _calendar_call(config, action, args, user_id)
+        return deid.deidentify(out) if redact_pii else out
     if redact_pii:
         args = {k: deid.deidentify(v) if isinstance(v, str) else v for k, v in args.items()}
     if type_ == "mcp":

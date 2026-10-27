@@ -11,10 +11,14 @@ from .routers import (
     calendar,
     chat,
     connectors,
+    gateway_catalog,
+    gateway_connectors,
     groups,
     knowledge,
     model_registry,
     monitoring,
+    my_connectors,
+    oauth_proxy,
     routing,
     runs,
     schedules,
@@ -47,6 +51,10 @@ app.include_router(model_registry.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
 app.include_router(calendar.router)
+app.include_router(my_connectors.router)
+app.include_router(gateway_catalog.router)
+app.include_router(gateway_connectors.router)
+app.include_router(oauth_proxy.router)
 
 
 @app.get("/api/health")

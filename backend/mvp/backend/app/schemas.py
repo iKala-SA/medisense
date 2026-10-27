@@ -333,6 +333,7 @@ class ConnectorOut(BaseModel):
     status: Literal["unverified", "active", "error"] = "unverified"
     last_test: dict[str, Any] | None = None  # {ok, message, ms, at, tools?}
     agents_count: int = 0
+    share: Share = Field(default_factory=Share)  # who may connect their own account (per-user OAuth types)
     created_at: Any = None
     updated_at: Any = None
 

@@ -1,5 +1,6 @@
 import React,{useState} from 'react';
 import {ArrowLeft,ArrowUp,Sparkle} from '@phosphor-icons/react';
+import {Jelly} from './Jelly';
 import {ShareModal,ShareAction,ShareButton,emptyShare} from './ShareKit';
 
 const Count=({n,max})=><small className="ac-count">{n} / {max}</small>;
@@ -16,7 +17,7 @@ export function AgentCreate({creator,onCancel,onSave,backLabel='Agent',noun='Age
   return <div className="ac-page">
     <section className="ac-left">
       <button className="ac-back" onClick={onCancel}><ArrowLeft size={18}/>{backLabel}</button>
-      <div className="ac-chat">{chat.length===0?<p className="muted ac-hint"><Sparkle size={16}/> 用一段話描述你想建立的{noun}，我會幫你起草右側內容。</p>:chat.map((m,i)=><div key={i} className={'ac-msg '+(m.me?'me':'')}>{m.text}</div>)}</div>
+      <div className="ac-chat">{chat.length===0?<p className="muted ac-hint"><Jelly size={26}/> 用一段話描述你想建立的{noun}，我會幫你起草右側內容。</p>:chat.map((m,i)=>m.me?<div key={i} className="ac-msg me">{m.text}</div>:<div key={i} className="ac-reply"><Jelly size={30}/><div className="ac-msg">{m.text}</div></div>)}</div>
       <div className="ac-composer"><textarea aria-label={`描述你的 ${noun}`} placeholder={`描述你的 ${noun}`} rows={3} value={ask} onChange={e=>setAsk(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();draft()}}}/><button className="send" aria-label="產生草稿" disabled={!ask.trim()} onClick={draft}><ArrowUp size={18}/></button></div>
     </section>
     <form className="ac-card" onSubmit={e=>{e.preventDefault();if(valid)onSave({name:name.trim(),desc:desc.trim(),instr,share,...picked})}}>

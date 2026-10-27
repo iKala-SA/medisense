@@ -3,11 +3,13 @@ an admin edits credentials, tests, or deletes. Secret values go to Secret Manage
 from fastapi import APIRouter, Depends, HTTPException
 from google.cloud import firestore
 
-from .. import db
+from .. import db, sharing
 from ..auth import User, current_user, require_builder
 from ..engine import connectors as eng
+from ..engine import gateway_actions as ga
+from ..engine import open_connector as oc
 from ..engine import secrets as sm
-from ..schemas import ConnectorIn, ConnectorOut, ConnectorStats
+from ..schemas import ConnectorIn, ConnectorOut, ConnectorStats, Share
 
 # Run-only users never see connectors (Hub + chat only); tool nodes call them server-side.
 router = APIRouter(prefix="/api/connectors", tags=["connectors"], dependencies=[Depends(require_builder)])
@@ -63,9 +65,15 @@ def _check_type(type_: str) -> dict:
     return eng.TYPES[type_]
 
 
+def _admin_only_type(type_: str, user: User) -> None:
+    """Per-user OAuth connectors define what every user may be granted; only administrators manage them."""
+    if eng.is_user_oauth(type_) and user.role != "admin":
+        raise HTTPException(403, "只有管理員可以建立或修改個人授權類連接器（例如 Google Calendar）")
+
+
 @router.get("/types")
 def list_types(user: User = Depends(current_user)):
-    return {"categories": eng.CATEGORIES, "types": [{"id": k, **v} for k, v in eng.TYPES.items()]}
+    return {"categories": eng.CATEGORIES, "types": [{"id": k, **v} for k, v in eng.TYPES.items() if not v.get("hidden")]}
 
 
 @router.get("/stats", response_model=ConnectorStats)
@@ -76,7 +84,7 @@ def stats(user: User = Depends(current_user)):
     inv = sum(1 for _ in c.collection("audit").where(filter=firestore.FieldFilter("action", "==", "connector.invoke"))
               .where(filter=firestore.FieldFilter("at", ">=", start)).stream())
     return ConnectorStats(connected=sum(1 for d in docs if d.get("status") == "active"),
-                          available_types=sum(1 for t in eng.TYPES.values() if t["available"]),
+                          available_types=sum(1 for t in eng.TYPES.values() if t["available"] and not t.get("hidden")),
                           invocations_today=inv, mcp_nodes=sum(1 for d in docs if d.get("type") == "mcp" and d.get("status") == "active"))
 
 
@@ -90,12 +98,13 @@ def list_connectors(user: User = Depends(current_user)):
 @router.post("", response_model=ConnectorOut, status_code=201)
 def create_connector(body: ConnectorIn, user: User = Depends(current_user)):
     _check_type(body.type)
+    _admin_only_type(body.type, user)
     ref = db.client().collection("connectors").document()
     allowed = set(eng.secret_fields(body.type))
     # A secret sent in config by an older client is still stored as a secret, never as config.
     incoming = {**_legacy_secrets(body.type, body.config), **{k: v for k, v in body.secrets.items() if v}}
     stored = {k: sm.put(ref.id, k, v) for k, v in incoming.items() if k in allowed}
-    data = {"type": body.type, "label": body.label, "scope": body.scope, "config": _public(body.type, body.config), "secrets": stored,
+    data = {**sharing.share_fields(Share()), "type": body.type, "label": body.label, "scope": body.scope, "config": _public(body.type, body.config), "secrets": stored,
             "redact_pii": body.redact_pii, "audit_payloads": body.audit_payloads, "owner_uid": user.uid,
             "owner_email": user.email, "status": "unverified", "last_test": None, "created_at": db.now(), "updated_at": db.now()}
     ref.set(data)
@@ -112,6 +121,7 @@ def get_connector(connector_id: str, user: User = Depends(current_user)):
 def update_connector(connector_id: str, body: ConnectorIn, user: User = Depends(current_user)):
     snap = _load(connector_id)
     _editable(snap, user)
+    _admin_only_type((snap.to_dict() or {}).get("type", ""), user)
     cur = snap.to_dict() or {}
     if body.type != cur.get("type"):
         raise HTTPException(422, "connector type cannot be changed; create a new connector")
@@ -142,11 +152,23 @@ def test_connector(connector_id: str, user: User = Depends(current_user)):
     snap = _load(connector_id)
     _editable(snap, user)
     data = snap.to_dict() or {}
-    result = eng.test(data["type"], data.get("config") or {}, _secrets(data))
+    result = (eng.test_gateway(data.get("config") or {}, connector_id) if data["type"] == "gateway"
+              else eng.test(data["type"], data.get("config") or {}, _secrets(data)))
     result["at"] = db.now()
     snap.reference.update({"status": "active" if result["ok"] else "error", "last_test": result, "updated_at": db.now()})
     db.audit(user.uid, "connector.test", user.email, connector_id=connector_id, ok=result["ok"], message=result["message"])
     return result
+
+
+@router.put("/{connector_id}/share", response_model=ConnectorOut)
+def share_connector(connector_id: str, body: Share, user: User = Depends(current_user)):
+    """Who may connect their own account to this connector (per-user OAuth types). Owner or admin only."""
+    snap = _load(connector_id)
+    if not sharing.can_manage(user, snap.to_dict() or {}):
+        raise HTTPException(403, "only the owner or an admin can change sharing")
+    snap.reference.update({**sharing.share_fields(sharing.validate_share(body)), "updated_at": db.now()})
+    db.audit(user.uid, "connector.share", user.email, connector_id=connector_id, access=body.access, members=len(body.members))
+    return _out(snap.reference.get(), _usage())
 
 
 @router.get("/{connector_id}/actions")
@@ -154,6 +176,11 @@ def list_actions(connector_id: str, user: User = Depends(current_user)):
     """Static actions from the spec, or the MCP tool list captured by the last successful test."""
     data = _load(connector_id).to_dict() or {}
     spec = _check_type(data["type"])
+    if data["type"] == "gateway":  # the actions the admin allowed, args derived from each action's input schema
+        try:
+            return ga.describe(data.get("config") or {})
+        except oc.OpenConnectorError as exc:
+            raise HTTPException(502, f"連接器閘道錯誤：{exc}") from exc
     if spec["actions"] == "dynamic":
         tools = (data.get("last_test") or {}).get("tools") or []
         return [{"id": t["id"], "label": t["label"], "description": t.get("description", ""),
@@ -168,7 +195,13 @@ def delete_connector(connector_id: str, user: User = Depends(current_user)):
     _editable(snap, user)
     if (n := _usage().get(connector_id, 0)):
         raise HTTPException(409, f"{n} 個 Agent 仍使用此連接器，請先移除其工具節點")
-    for name in ((snap.to_dict() or {}).get("secrets") or {}).values():
+    doc = snap.to_dict() or {}
+    for name in (doc.get("secrets") or {}).values():
         sm.delete(name)
+    if doc.get("type") == "gateway" and eng.connector_mode(doc) == "shared":  # the one admin-held credential goes with it
+        try:
+            oc.delete_shared_connection(eng.connector_service(doc) or "", oc.shared_name(connector_id))
+        except oc.OpenConnectorError:
+            pass  # already gone, or gateway down: the connector record is what matters here
     snap.reference.delete()
     db.audit(user.uid, "connector.delete", user.email, connector_id=connector_id)

@@ -32,7 +32,8 @@ SUMMARY_CAP = 50000  # today's events read for the KPI tiles
 
 CATEGORY = {
     "agent.run": "inference", "agent.approve": "inference", "agent.reject": "inference",
-    "connector.invoke": "connector", "connector.test": "connector",
+    "connector.invoke": "connector", "connector.test": "connector", "connector.link_start": "connector", "connector.link": "connector",
+    "connector.unlink": "connector", "calendar.read": "connector", "connector.share": "access",
     "agent.create": "build", "agent.update": "build", "agent.publish": "build", "agent.unpublish": "build",
     "agent.publish_request": "build", "agent.publish_withdraw": "build", "agent.publish_approve": "build",
     "agent.publish_reject": "build",

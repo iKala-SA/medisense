@@ -26,6 +26,12 @@ export function saveBlob(b,filename){
 
 export const api={
   health:()=>fetch('/api/health').then(r=>r.json()),
+  gatewayCatalog:p=>call('/api/gateway-catalog?'+query(p||{})),
+  gatewayProvider:s=>call(`/api/gateway-catalog/${encodeURIComponent(s)}`),
+  gatewaySetup:s=>call(`/api/gateway-connectors/setup/${encodeURIComponent(s)}`),
+  previewScopes:b=>call('/api/gateway-connectors/preview-scopes',{method:'POST',body:body(b)}),
+  enableService:b=>call('/api/gateway-connectors',{method:'POST',body:body(b)}),
+  updateEnabledService:(id,b)=>call(`/api/gateway-connectors/${id}`,{method:'PUT',body:body(b)}),
   me:()=>call('/api/me'),
   modelGroups:()=>call('/api/models'),
   // agents
@@ -129,5 +135,13 @@ export const api={
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
   chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
-  calendarStatus:()=>call('/api/calendar/status')
+  calendarStatus:()=>call('/api/calendar/status'),
+  calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
+  calendarFreebusy:(from,to)=>call(`/api/calendar/freebusy?${query({from,to})}`),
+  // per-user OAuth connectors
+  myConnectors:()=>call('/api/my-connectors'),
+  myConnectorStatus:id=>call(`/api/my-connectors/${id}/status`),
+  connectMine:id=>call(`/api/my-connectors/${id}/connect`,{method:'POST'}),
+  disconnectMine:id=>call(`/api/my-connectors/${id}/connection`,{method:'DELETE'}),
+  shareConnector:(id,share)=>call(`/api/connectors/${id}/share`,{method:'PUT',body:body(share)})
 };

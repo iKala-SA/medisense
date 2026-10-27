@@ -1,0 +1,404 @@
+googlecalendar	Google Calendar	override
+one_password	1Password	override
+one_password_events	1Password Events API	override
+accuweather	AccuWeather	simple:accuweather
+activecampaign	ActiveCampaign	logos:active-campaign-icon
+adyen	Adyen	logos:adyen
+aftership	AfterShip	simple:aftership
+airbrake	Airbrake	logos:airbrake
+aircall	Aircall	simple:aircall
+airtable	Airtable	override
+algolia	Algolia	override
+aliyun_ack	Alibaba Cloud ACK	override
+aliyun_oss	Alibaba Cloud OSS	override
+aliyun_sls	Alibaba Cloud SLS	override
+aliyun_sts	Alibaba Cloud STS	override
+amplitude	Amplitude	logos:amplitude-icon
+anthropic	Anthropic	override
+anthropic_admin	Anthropic Admin	override
+apify	Apify	logos:apify-icon
+app_store_connect	App Store Connect	simple:appstore
+app_store_server	App Store Server API	override
+appcircle	Appcircle	logos:appcircle-icon
+apple_ads	Apple Ads	override
+apple_maps	Apple Maps	override
+apple_notary	Apple Notary	override
+appledb	AppleDB	override
+appveyor	AppVeyor	logos:appveyor
+arcgis_online	ArcGIS Online	simple:arcgis
+arxiv	arXiv	simple:arxiv
+asana	Asana	override
+auth0_management	Auth0 Management	override
+aws_s3	AWS S3	logos:aws-s3
+baidu_maps	Baidu Maps	override
+baidu_netdisk	Baidu Netdisk	override
+qianfan	Baidu Qianfan	override
+baremetrics	Baremetrics	simple:baremetrics
+baserow	Baserow	simple:baserow
+better_stack	Better Stack	simple:betterstack
+big_commerce	BigCommerce	simple:bigcommerce
+bilibili	Bilibili	simple:bilibili
+bing_webmaster	Bing Webmaster Tools	override
+bitbucket	Bitbucket	logos:bitbucket
+bitly	Bitly	simple:bitly
+bitrise	Bitrise	logos:bitrise-icon
+bitwarden	Bitwarden	simple:bitwarden
+blaze_meter_functional	BlazeMeter Functional	override
+blaze_meter_performance	BlazeMeter Performance	override
+blaze_meter_service_virtualization	BlazeMeter Service Virtualization	override
+bluesky	Bluesky	logos:bluesky
+booqable	Booqable	logos:booqable-icon
+box	Box	override
+brandfetch	Brandfetch	simple:brandfetch
+brave_search	Brave Search	override
+braze	Braze	logos:braze-icon
+brevo	Brevo	simple:brevo
+brex	Brex	simple:brex
+browserbase	Browserbase	logos:browserbase-icon
+browserstack	BrowserStack	logos:browserstack
+bugsnag	Bugsnag	logos:bugsnag-icon
+builder_io	Builder.io	logos:builder-io-icon
+buildkite	Buildkite	logos:buildkite-icon
+cal	Cal.com	simple:caldotcom
+calendly	Calendly	override
+canva	Canva	simple:canva
+canva_cn	Canva China	override
+chartmogul	ChartMogul	simple:chartmogul
+circleci	CircleCI	logos:circleci
+cisco_meraki	Cisco Meraki	override
+clerk	Clerk	logos:clerk-icon
+clickhouse	ClickHouse	simple:clickhouse
+clickup	ClickUp	override
+clickup_mcp	ClickUp MCP	override
+clockify	Clockify	simple:clockify
+cloudflare_browser_rendering	Cloudflare Browser Run	override
+cloudflare_dns	Cloudflare DNS	override
+cloudflare_docs	Cloudflare Docs	logos:cloudflare-icon
+cloudflare_email_routing	Cloudflare Email Routing	override
+cloudflare_mcp	Cloudflare MCP	logos:cloudflare-icon
+cloudflare_r2	Cloudflare R2	override
+cloudflare_worker	Cloudflare Worker	override
+cloudinary	Cloudinary	logos:cloudinary-icon
+cockroach_labs	Cockroach Labs	simple:cockroachlabs
+coda	Coda	logos:coda-icon
+codacy	Codacy	logos:codacy
+codemagic	Codemagic	simple:codemagic
+coderabbit	CodeRabbit	logos:coderabbit-icon
+cohere	Cohere	logos:cohere-icon
+coinbase	Coinbase	simple:coinbase
+coinmarketcap	CoinMarketCap	simple:coinmarketcap
+confluence	Confluence	override
+contentful	Contentful	logos:contentful
+contentful_graphql	Contentful GraphQL	override
+contentstack_content_delivery	Contentstack Content Delivery	override
+contentstack_content_management	Contentstack Content Management	override
+convex	Convex	simple:convex
+coolify	Coolify	simple:coolify
+cratedb_cloud	CrateDB Cloud	simple:cratedb
+crowdin	Crowdin	simple:crowdin
+crunchbase	Crunchbase	simple:crunchbase
+cursor	Cursor	logos:cursor-icon
+customerio	Customer.io	logos:customerio-icon
+daily	Daily	logos:daily-icon
+databricks	Databricks	logos:databricks-icon
+datadog	Datadog	override
+deepgram	Deepgram	logos:deepgram-icon
+deepl	DeepL	simple:deepl
+deepseek	DeepSeek	logos:deepseek-icon
+delighted	Delighted	logos:delighted-icon
+descript	Descript	logos:descript-icon
+devto	Dev.to	simple:devdotto
+devin	Devin	logos:devin
+digital_ocean	DigitalOcean	logos:digital-ocean-icon
+discord	Discord	override
+discordbot	Discord Bot	override
+discourse	Discourse	logos:discourse-icon
+docker_hub	Docker Hub	override
+dokploy	Dokploy	logos:dokploy
+dovetail	Dovetail	logos:dovetail-icon
+dropbox	Dropbox	override
+dropbox_sign	Dropbox Sign	override
+dynatrace	Dynatrace	logos:dynatrace-icon
+elasticsearch	Elasticsearch	logos:elasticsearch
+elevenlabs	ElevenLabs	logos:elevenlabs-icon
+eraser	Eraser	logos:eraser-icon
+erpnext	ERPNext	simple:erpnext
+exa	Exa	logos:exa-icon
+excel	Excel	override
+fathom	Fathom Analytics	simple:fathom
+favro	Favro	simple:favro
+figma	Figma	override
+fillout	Fillout	simple:fillout
+firecrawl	Firecrawl	logos:firecrawl-icon
+fomo	Fomo	logos:fomo-icon
+formbricks	Formbricks	simple:formbricks
+formspree	Formspree	simple:formspree
+formstack	Formstack	simple:formstack
+foursquare	Foursquare	simple:foursquare
+front	Front	override
+gemini	Gemini	override
+ghost	Ghost	logos:ghost
+giphy	GIPHY	simple:giphy
+gitea	Gitea	simple:gitea
+gitee	Gitee	simple:gitee
+github	GitHub	override
+gitlab	GitLab	override
+gmail	Gmail	override
+google_address_validation	Google Address Validation	override
+googleads	Google Ads	override
+google_analytics	Google Analytics	override
+google_bigquery	Google BigQuery	override
+googlechat	Google Chat	override
+googledocs	Google Docs	override
+googledrive	Google Drive	override
+googleforms	Google Forms	override
+google_maps	Google Maps	override
+googlemeet	Google Meet	override
+googlephotos	Google Photos	override
+google_search_console	Google Search Console	override
+googlesheets	Google Sheets	override
+googleslides	Google Slides	override
+googletasks	Google Tasks	override
+grafana	Grafana	override
+greenhouse	Greenhouse	simple:greenhouse
+groqcloud	GroqCloud	logos:groq
+gumroad	Gumroad	simple:gumroad
+hackerrank_work	HackerRank Work	override
+hashnode	Hashnode	logos:hashnode-icon
+haveibeenpwned	Have I Been Pwned	simple:haveibeenpwned
+helpscout	Help Scout	logos:helpscout-icon
+helpscout_docs	Help Scout Docs	logos:helpscout-icon
+home_assistant	Home Assistant	simple:homeassistant
+honeybadger	Honeybadger	simple:honeybadger
+hotjar	Hotjar	logos:hotjar-icon
+hubspot	HubSpot	override
+huggingface	Hugging Face	override
+indeed	Indeed	simple:indeed
+influxdb_cloud	InfluxDB Cloud	logos:influxdb-icon
+instagram	Instagram	override
+instatus	Instatus	simple:instatus
+intercom	Intercom	override
+invoice_ninja	Invoice Ninja	simple:invoiceninja
+itunes_search	iTunes Search API	override
+jina_ai	Jina AI	override
+jira	Jira	override
+kaggle	Kaggle	simple:kaggle
+kagi	Kagi Universal Summarizer	simple:kagi
+karakeep	Karakeep	simple:karakeep
+keeper_scim	Keeper SCIM	override
+kustomer	Kustomer	logos:kustomer
+laravel_cloud	Laravel Cloud	logos:laravel
+lemon_squeezy	Lemon Squeezy	simple:lemonsqueezy
+lifx	LIFX	simple:lifx
+line	LINE	simple:line
+linear	Linear	override
+linear_mcp	Linear MCP	override
+linkedin	LinkedIn	override
+listmonk	Listmonk	simple:listmonk
+loops	Loops	simple:loops
+freepik	Magnific (Freepik)	simple:freepik
+mailchimp	Mailchimp	override
+mailgun	Mailgun	logos:mailgun-icon
+mailjet	Mailjet	logos:mailjet-icon
+mailtrap	Mailtrap	simple:mailtrap
+make	Make	simple:make
+mapbox	Mapbox	logos:mapbox-icon
+mattermost	Mattermost	logos:mattermost-icon
+mautic	Mautic	logos:mautic-icon
+mcdonalds_cn	McDonald's China	override
+mcdonalds_cn_mcp	McDonald's China MCP	override
+meituan	Meituan	simple:meituan
+mendeley	Mendeley	simple:mendeley
+meta	Meta	logos:meta-icon
+metabase	Metabase	logos:metabase
+mezmo	Mezmo	simple:mezmo
+microsoft_teams	Microsoft Teams	override
+microsoft_teams_bot	Microsoft Teams Bot	override
+minimax	MiniMax	logos:minimax-icon
+mintlify	Mintlify	simple:mintlify
+miro	Miro	logos:miro-icon
+mistral_ai	Mistral AI	logos:mistral-ai-icon
+mixmax	Mixmax	logos:mixmax
+mixpanel	Mixpanel	logos:mixpanel
+monday	Monday	logos:monday-icon
+mongo_db_atlas_administration	MongoDB Atlas Administration	override
+monica_crm	Monica CRM	override
+mqtt	MQTT	simple:mqtt
+mumble	Mumble	simple:mumble
+n8n	n8n	logos:n8n-icon
+nasa	NASA	simple:nasa
+neon	Neon	logos:neon-icon
+netlify	Netlify	logos:netlify-icon
+new_relic	New Relic	logos:new-relic-icon
+next_dns	NextDNS	simple:nextdns
+ngrok	ngrok	logos:ngrok
+nocodb	NocoDB	logos:nocodb
+notion	Notion	override
+notion_mcp	Notion MCP	override
+novu	Novu	simple:novu
+npm	npm	logos:npm-icon
+ntfy	ntfy	simple:ntfy
+octopus_deploy	Octopus Deploy	logos:octopus-deploy
+odoo	Odoo	simple:odoo
+okta	Okta	override
+one_drive	OneDrive	override
+onesignal_rest_api	OneSignal	logos:onesignal
+onlyoffice_docspace	ONLYOFFICE DocSpace	override
+openai	OpenAI	override
+opencage	OpenCage	simple:opencage
+openrouter	OpenRouter	logos:openrouter-icon
+opensea	OpenSea	simple:opensea
+opsgenie	Opsgenie	logos:opsgenie
+oracle_cloud	Oracle Cloud Infrastructure	logos:oracle
+orcid	ORCID	simple:orcid
+outline	Outline	simple:outline
+outlook	Outlook	override
+outlook_calendar	Outlook Calendar	override
+paddle	Paddle	simple:paddle
+pagerduty	PagerDuty	override
+paperless_ngx	Paperless-ngx	simple:paperlessngx
+parsehub	ParseHub	logos:parsehub
+payhip	Payhip	simple:payhip
+paypal	PayPal	override
+perplexity	Perplexity	logos:perplexity-icon
+pexels	Pexels	simple:pexels
+pi_hole	Pi-hole	simple:pihole
+pinboard	Pinboard	simple:pinboard
+pinecone	Pinecone	logos:pinecone-icon
+pingdom	Pingdom	logos:pingdom
+pipedrive	Pipedrive	override
+pivotal_tracker	Pivotal Tracker	logos:pivotal-tracker
+plane	Plane	simple:plane
+planetscale	PlanetScale	logos:planetscale
+plasmic	Plasmic	logos:plasmic
+plausible_analytics	Plausible Analytics	simple:plausibleanalytics
+posthog	PostHog	logos:posthog-icon
+postiz	Postiz	simple:postiz
+postman	Postman	override
+prerender	Prerender	logos:prerender-icon
+productboard	Productboard	logos:productboard-icon
+pubmed	PubMed	simple:pubmed
+pushbullet	Pushbullet	logos:pushbullet
+qase	Qase	simple:qase
+qdrant	Qdrant Cloud	logos:qdrant-icon
+qlty	Qlty	simple:qlty
+quickbooks	QuickBooks Online	override
+qwen	Qwen	logos:qwen-icon
+railway	Railway	logos:railway
+razorpay	Razorpay	simple:razorpay
+readme	ReadMe	simple:readme
+reddit	Reddit	logos:reddit-icon
+remove_bg	remove.bg	simple:removedotbg
+render	Render	simple:render
+replicate	Replicate	simple:replicate
+resend	Resend	logos:resend-icon
+retell_ai	Retell AI	override
+revenuecat	RevenueCat	simple:revenuecat
+roboflow	Roboflow	simple:roboflow
+rocket_chat	Rocket.Chat	logos:rocket-chat-icon
+rollbar	Rollbar	logos:rollbar-icon
+runscope	Runscope	logos:runscope
+salesforce	Salesforce	override
+sanity	Sanity	logos:sanity
+saucelabs	Sauce Labs	logos:saucelabs
+scopus	Scopus	simple:scopus
+securityscorecard	SecurityScorecard	simple:securityscorecard
+segment	Segment	logos:segment-icon
+semantic_scholar	Semantic Scholar	simple:semanticscholar
+semrush	Semrush	simple:semrush
+sendgrid	SendGrid	logos:sendgrid-icon
+sentry	Sentry	override
+shopee	Shopee	simple:shopee
+shopify	Shopify	override
+shopify_partner	Shopify Partner	override
+shopify_storefront	Shopify Storefront	override
+shortcut	Shortcut	logos:shortcut-icon
+similarweb_digitalrank_api	Similarweb	simple:similarweb
+simple_analytics	Simple Analytics	simple:simpleanalytics
+simplelocalize	SimpleLocalize	simple:simplelocalize
+slack	Slack	override
+slackbot	Slack Bot	override
+smugmug	SmugMug	simple:smugmug
+snyk	Snyk	override
+solarwinds_service_desk	SolarWinds Service Desk	override
+sonarcloud	SonarQube Cloud	logos:sonarcloud-icon
+speechmatics	Speechmatics	logos:speechmatics-icon
+splunk_http_event_collector	Splunk HTTP Event Collector	override
+spotify	Spotify	logos:spotify-icon
+square	Square	logos:square
+stabilityai	Stability AI	logos:stability-ai-icon
+stack_overflow_for_teams	Stack Internal	logos:stackoverflow-icon
+statamic	Statamic	simple:statamic
+statista	Statista	simple:statista
+statuspage	Statuspage	logos:statuspage
+statuspal	StatusPal	simple:statuspal
+storyblok	Storyblok	logos:storyblok-icon
+strava	Strava	simple:strava
+stripe	Stripe	override
+sumup	SumUp	simple:sumup
+supabase	Supabase	override
+survey_monkey	SurveyMonkey	simple:surveymonkey
+swaggerhub	SwaggerHub	override
+taiga	Taiga	logos:taiga
+tailscale	Tailscale	logos:tailscale
+tavily	Tavily	logos:tavily
+telegram	Telegram Bot	override
+telnyx	Telnyx	logos:telnyx
+terraform	Terraform	logos:terraform-icon
+ticket_tailor	Ticket Tailor	simple:tickettailor
+ticketmaster	Ticketmaster	simple:ticketmaster
+ticktick	TickTick	simple:ticktick
+tidb	TiDB Cloud	simple:tidb
+tiktok_business	TikTok Business	override
+tiktok_business_mcp	TikTok for Business MCP	override
+todoist	Todoist	logos:todoist-icon
+together_ai	Together AI	logos:togetherai-icon
+toggl	Toggl Track	simple:toggl
+tomtom	TomTom	simple:tomtom
+trello	Trello	override
+trilium	TriliumNext Notes	simple:trilium
+tripadvisor	Tripadvisor	simple:tripadvisor
+turso	Turso	simple:turso
+twilio	Twilio	override
+typeform	Typeform	logos:typeform-icon
+umami	Umami	simple:umami
+unsplash	Unsplash	simple:unsplash
+upstash_redis	Upstash Redis	override
+v2ex	V2EX	simple:v2ex
+vapi	Vapi	logos:vapi-icon
+vercel	Vercel	logos:vercel-icon
+vimeo	Vimeo	logos:vimeo-icon
+virustotal	VirusTotal	simple:virustotal
+vonage	Vonage	simple:vonage
+vtex	VTEX	simple:vtex
+vultr	Vultr	logos:vultr-icon
+wakatime	WakaTime	logos:wakatime
+walmart_marketplace	Walmart Marketplace	override
+wappalyzer	Wappalyzer	simple:wappalyzer
+webex	Webex	simple:webex
+webflow	Webflow	logos:webflow
+weixin_official_account	WeChat Official Account	override
+weixin_store	WeChat Store	override
+wandb	Weights & Biases	logos:wandb-icon
+weread	WeRead	simple:weread
+what3words	what3words	simple:what3words
+whatsapp	WhatsApp	override
+wise	Wise	simple:wise
+woocommerce	WooCommerce	logos:woocommerce-icon
+wordpress	WordPress	logos:wordpress-icon
+workos	WorkOS	logos:workos-icon
+wufoo	Wufoo	logos:wufoo
+twitter	X (Twitter)	override
+x_ai	xAI	logos:x-ai
+xata	Xata	logos:xata-icon
+xero	Xero	override
+xiaohongshu_store	Xiaohongshu Store	override
+yelp	Yelp	simple:yelp
+youtube	YouTube	override
+zendesk	Zendesk	override
+zeplin	Zeplin	logos:zeplin
+zerotier	ZeroTier	simple:zerotier
+zhihu	Zhihu	simple:zhihu
+zoom	Zoom	override
+zotero	Zotero	simple:zotero
+zyte_api	Zyte API	simple:zyte

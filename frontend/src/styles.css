@@ -285,3 +285,9 @@ h1,h2{letter-spacing:-.02em}
 .admin-back:hover{background:#ebebee}
 .admin-side-title{display:flex;align-items:center;gap:10px;padding:0 10px;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#16161a}
 .admin-side-title svg{color:#23945f}
+/* Model replies carry the jellyfish */
+.jelly-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}.jelly-head h3{margin:0}
+.ac-reply{display:flex;gap:10px;align-items:flex-start;align-self:flex-start;max-width:96%}.ac-reply .ac-msg{max-width:none}
+.bk .jelly{display:inline-block;position:relative}
+/* The header stays fixed above scrolling content, so it needs an opaque (slightly frosted) background */
+.shell .quick-topbar{background:rgba(251,251,251,.94)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}

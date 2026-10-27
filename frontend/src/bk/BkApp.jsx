@@ -28,7 +28,7 @@ export default function BkApp({me,initial='/hub',go,notify}){
         <Route path="/monitoring" element={gate(role==='admin',<Monitoring/>)}/>
         <Route path="/audit" element={<Out to="稽核記錄" go={go}/>}/>
         <Route path="/connectors/*" element={<Out to="Connectors" go={go}/>}/>
-        <Route path="/knowledge" element={<Out to="Library" go={go}/>}/>
+        <Route path="/knowledge" element={<Out to="空間" go={go}/>}/>
         <Route path="/access/*" element={<Out to="Users" go={go}/>}/>
         <Route path="*" element={<Navigate to="/hub" replace/>}/>
       </Routes>

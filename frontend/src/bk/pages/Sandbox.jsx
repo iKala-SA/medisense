@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { Jelly } from "../../Jelly";
 import { ErrorBox, Icon, Spinner, fmtTime } from "../components/ui";
 import { currentName, currentUid } from "../mock";
 const SUGGESTIONS = ["\u8ACB\u6458\u8981\u91CD\u9EDE\u4E26\u5217\u51FA\u6CE8\u610F\u4E8B\u9805", "\u8F49\u70BA\u53F0\u8A9E\u7E41\u9AD4\u901A\u4FD7\u9577\u8F29\u8A9E\u610F", "\u4F9D\u9662\u5167\u6307\u5F15\u5217\u51FA\u5F15\u7528\u4F86\u6E90"];
 function Sandbox({ role }) {
   const { id } = useParams();
   const nav = useNavigate();
+  const loc = useLocation();
   const [params] = useSearchParams();
   const admin = role === "admin";
   const [agent, setAgent] = useState(null);
@@ -99,7 +101,7 @@ function Sandbox({ role }) {
   if (!agent) return <div className="grid h-full place-items-center">{err ? <ErrorBox msg={err} /> : <Spinner />}</div>;
   return <div className="flex h-full flex-col">
       <section className="flex shrink-0 flex-wrap items-center gap-4 border-b border-hairline bg-white px-5 py-3">
-        <button className="btn-ghost px-2" onClick={() => nav(editable ? `/studio/${agent.id}` : role === "user" ? "/hub" : "/sandbox")}><Icon name="arrow_back" /></button>
+        <button className="btn-ghost px-2" onClick={() => loc.key !== "default" ? nav(-1) : nav("/hub")}><Icon name="arrow_back" /></button>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="flex flex-wrap items-center gap-2 text-lg font-bold">{agent.name}
             <span className="chip">沙盒驗證階段 {agent.status === "published" ? `(v${agent.version} \u5DF2\u767C\u5E03)` : "(\u8349\u7A3F)"}</span></p>
@@ -158,7 +160,7 @@ function Sandbox({ role }) {
                   <span className="mb-1 font-mono text-[10px] text-outline">{currentName() ?? "\u6211"} · {m.at.toLocaleTimeString("zh-TW")}</span>
                   <div className="max-w-[80%] whitespace-pre-wrap rounded-xl rounded-tr-sm bg-primary-dark px-4 py-3 text-sm text-white">{m.content}</div>
                 </div> : <div key={i} className="flex gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-tint font-mono text-[11px] font-semibold text-primary">AI</span>
+                  <Jelly size={34} />
                   <div className="min-w-0 flex-1">
                     <p className="mb-1 flex items-center gap-2 text-xs"><b>{agent.name}</b>
                       {m.citations?.length ? <span className="chip">RAG 驗證已完成 · {m.citations.length} 段</span> : null}
@@ -188,7 +190,7 @@ function Sandbox({ role }) {
                   </div>
                 </div>
   )}
-            {busy && <div className="flex items-center gap-2 text-xs text-on-surface-variant"><Spinner />推論中…</div>}
+            {busy && <div className="flex items-center gap-3 text-xs text-on-surface-variant" role="status"><Jelly size={48} animated />推論中…</div>}
             <div ref={bottom} />
           </div>
 

@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     # Shared secret for POST /api/schedules/tick (one Cloud Scheduler job drives every schedule). Empty = tick disabled.
     scheduler_token: str = ""
 
+    # Open Connector (oomol-lab/open-connector, pinned release): the OAuth + action gateway behind per-user connectors
+    # such as Google Calendar. Internal service; the token is its admin/runtime bearer. Empty URL = feature off.
+    open_connector_url: str = ""
+    open_connector_token: str = ""
+    # Set to the service URL when it sits behind Cloud Run IAM; a Google ID token is then sent as X-Serverless-Authorization.
+    open_connector_iam_audience: str = ""
+    # One platform-wide Google OAuth app reused by every Google service enabled through the gateway (empty = the wizard asks).
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+
     @property
     def allowed_domain_list(self) -> list[str]:
         return [d.strip().lower() for d in self.allowed_domains.split(",") if d.strip()]

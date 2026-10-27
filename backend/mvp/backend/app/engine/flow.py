@@ -135,7 +135,7 @@ def invoke_connector(connector_id: str, action: str, args: dict, *, agent_id: st
     try:
         secret_values = {k: secrets.get(name) for k, name in (data.get("secrets") or {}).items()}
         result = connectors.invoke(data["type"], data.get("config") or {}, secret_values, action, args,
-                                   redact_pii=bool(data.get("redact_pii", True)))
+                                   redact_pii=bool(data.get("redact_pii", True)), user_id=user_id, connector_id=connector_id)
         ok, err = True, ""
     except Exception as exc:  # noqa: BLE001 - any driver/network failure becomes a visible step result
         result, ok, err = f"[連接器錯誤] {exc.__class__.__name__}: {exc}"[:1000], False, str(exc)[:300]

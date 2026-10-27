@@ -95,6 +95,7 @@ def test_chat_attachment_upload(fs, as_user, monkeypatch):
                                   files={"file": ("n.txt", b"hello")}).status_code == 403
 
 
-def test_calendar_status(as_user):
+def test_calendar_status(fs, as_user):
+    # No calendar connector exists yet: an honest "not connected" with the reason (full flow: tests/test_open_connector.py).
     r = as_user(BUILDER).get("/api/calendar/status").json()
-    assert r["connected"] is False and "consent" in r["reason"]
+    assert r["connected"] is False and r["connector_id"] is None and r["reason"]
