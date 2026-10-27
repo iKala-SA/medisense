@@ -679,6 +679,7 @@ class LitellmRenderOut(BaseModel):
     requested_by: str = ""
     requested_at: Any = None
     secrets: list[dict[str, str]] = Field(default_factory=list)  # [{secret, env}] to mount on the LiteLLM service
+    run_url: str = ""  # GitHub Actions run of the deploy (config/litellm_deploy only)
 
 
 # ------------------------------------------------------------------ sessions + chat

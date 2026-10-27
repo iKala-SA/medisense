@@ -45,6 +45,13 @@ def required_secrets(models: list[dict]) -> list[dict[str, str]]:
     return [{"secret": k, "env": v} for k, v in sorted(seen.items())]
 
 
+def missing_groups(models: list[dict]) -> list[str]:
+    """Groups agents rely on that have no enabled member. Deploying with any of these missing would leave
+    agents that pick the group without a model, so apply refuses (sovereign is optional: it fails closed)."""
+    have = {m.get("group") for m in models if m.get("enabled", True) and m.get("litellm_model")}
+    return [g for g in ("fast", "reasoning", "budget") if g not in have]
+
+
 def render(models: list[dict]) -> str:
     enabled = [m for m in models if m.get("enabled", True) and m.get("litellm_model")]
     by_group: dict[str, list[dict]] = {g: [] for g in GROUP_ORDER}

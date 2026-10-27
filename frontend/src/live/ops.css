@@ -26,7 +26,7 @@
 .lv-o-groupdesc div{font-size:12px;line-height:1.6}
 .lv-o-status{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .lv-o-status i{width:7px;height:7px;border-radius:50%;background:#bbb}
-.lv-o-status.ok i{background:#2f9e5b}.lv-o-status.warn i{background:#d9962b}
+.lv-o-status.ok i{background:#2f9e5b}.lv-o-status.warn i{background:#d9962b}.lv-o-status.bad i{background:#c4473a}
 .lv-o-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lv-o-mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow-wrap:anywhere}
 .lv-o-sub{display:block;font-size:11px;color:var(--muted);margin-top:3px}

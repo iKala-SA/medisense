@@ -1,5 +1,5 @@
-import React,{useState,useMemo} from 'react';
-import {Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise} from '@phosphor-icons/react';
+import React,{useState,useMemo,useEffect} from 'react';
+import {Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise,ArrowSquareOut} from '@phosphor-icons/react';
 import {api} from '../api';
 import {Toggle,ListToolbar,Empty} from '../ListKit';
 import {errText,useOnce,fmtTime} from './pkit';
@@ -9,6 +9,8 @@ const GROUPS=['fast','reasoning','budget','sovereign'];
 const chainText=f=>f.models?.length&&f.models.join()!==f.name?`${f.name}（${f.models.join('、')}）`:f.name;
 const blank={name:'',provider:'',litellm_model:'',group:'fast',deploy:'cloud',enabled:true,secret_name:'',api_base:'',input_price_per_m:0,output_price_per_m:0,notes:''};
 const pick=m=>Object.fromEntries(Object.keys(blank).map(k=>[k,m[k]??blank[k]]));
+const DEPLOY_LABEL={dispatched:'已送出',queued:'排隊中',deploying:'部署中',deployed:'已部署',failed:'失敗'};
+const deployDone=d=>!d||d.status==='deployed'||d.status==='failed';
 
 export function LiveGroupTable({groups,failed}){
   if(groups===null)return <div className="lv-o-loading">載入中…</div>;
@@ -46,7 +48,7 @@ function Editor({init,onClose,onSave}){
     <div className="lv-o-form2">
       <div className="field"><label>名稱</label>{inp('name',{autoFocus:true,placeholder:'例如：Gemini 2.5 Flash'})}</div>
       <div className="field"><label>供應商</label>{inp('provider',{placeholder:'例如：vertex_ai、vllm'})}</div>
-      <div className="field"><label>LiteLLM 模型字串</label>{inp('litellm_model',{placeholder:'例如：vertex_ai/gemini-2.5-flash'})}</div>
+      <div className="field"><label>LiteLLM 模型字串</label>{inp('litellm_model',{placeholder:'例如：vertex_ai/gemini-2.5-flash'})}<span className="lv-o-help">開源／自架模型（vLLM、Ollama 等 OpenAI 相容 API）請用 <span className="lv-o-mono">openai/&lt;模型名稱&gt;</span>，並填 API 位址。</span></div>
       <div className="field"><label>部署位置</label><select value={f.deploy} onChange={e=>set('deploy',e.target.value)}><option value="cloud">雲端</option><option value="onprem">地端</option></select></div>
       <div className="field"><label>模型群組</label><select value={f.group} onChange={e=>set('group',e.target.value)}>{GROUPS.map(g=><option key={g} value={g} disabled={(f.deploy==='onprem')!==(g==='sovereign')}>{g}</option>)}</select><span className="lv-o-help">地端僅能用 sovereign；雲端不可用 sovereign。</span></div>
       <div className="field"><label>API 位址（api_base）{f.deploy==='onprem'&&' *'}</label>{inp('api_base',{placeholder:'http://vllm.internal:8000/v1'})}</div>
@@ -64,7 +66,7 @@ function Editor({init,onClose,onSave}){
 function CodePanel({title,data}){
   return <section className="panel lv-o-card" style={{marginBottom:16}}>
     <h3>{title}</h3>
-    <p className="muted small">版本 v{data.version??'—'}{data.status?` · ${data.status}`:''}{data.requested_by?` · ${data.requested_by}`:''}{data.requested_at?` · ${fmtTime(data.requested_at)}`:''}</p>
+    <p className="muted small">版本 v{data.version??'—'}{data.status?` · ${DEPLOY_LABEL[data.status]||data.status}`:''}{data.requested_by?` · ${data.requested_by}`:''}{data.requested_at?` · ${fmtTime(data.requested_at)}`:''}{data.run_url&&<> · <a href={data.run_url} target="_blank" rel="noreferrer">GitHub Actions 執行紀錄 <ArrowSquareOut size={11}/></a></>}</p>
     <pre className="lv-o-code" aria-label="LiteLLM config.yaml（唯讀）">{data.yaml}</pre>
     <b style={{fontSize:13}}>需掛載的 Secret</b>
     {data.secrets?.length?<div className="lt" style={{'--cols':'1fr 1fr',marginTop:8}}><div className="lt-head"><span>Secret 名稱</span><span>環境變數</span></div>{data.secrets.map((s,i)=><div className="lt-row" key={i}><span className="lv-o-mono">{s.secret}</span><span className="lv-o-mono">{s.env}</span></div>)}</div>:<p className="muted small">無需額外掛載的 Secret。</p>}
@@ -75,37 +77,43 @@ export default function ModelRegistryPage({me,notify}){
   const admin=me?.role==='admin';
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false);
   const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('registry');
-  const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[applied,setApplied]=useState(null),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
+  const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}
-    if(admin)load();
+    if(admin){load();api.litellmDeploy().then(setDeploy).catch(()=>{})}
   });
+  // Follow the GitHub Actions run until it finishes.
+  useEffect(()=>{
+    if(deployDone(deploy))return;
+    const t=setTimeout(async()=>{try{const d=await api.litellmDeploy();setDeploy(d);if(d?.status==='deployed')notify(`LiteLLM 已更新為 v${d.version}`);else if(d?.status==='failed')notify('LiteLLM 部署失敗，請查看執行紀錄')}catch{setDeploy(d=>({...d}))}},10000);
+    return()=>clearTimeout(t);
+  },[deploy]);
   const shown=useMemo(()=>(items||[]).filter(m=>(tab==='全部'||(tab==='雲端'?m.deploy==='cloud':m.deploy==='onprem'))&&(!search.trim()||[m.name,m.provider,m.litellm_model,m.group].some(s=>(s||'').toLowerCase().includes(search.trim().toLowerCase())))),[items,tab,search]);
   const heading=<div className="page-heading"><h1><Cpu/>模型</h1>{admin&&view==='registry'&&<button className="btn primary" onClick={()=>setEditing({...blank})}><Plus/>新增模型</button>}</div>;
   if(!admin)return <div className="lv-o">{heading}<p className="subtitle">各模型群組目前使用的模型與備援順序（即時、唯讀）。模型登錄與編輯僅限管理員。</p><LiveGroupTable groups={groups} failed={gfail}/></div>;
 
   async function save(f){
     if(editing.id)await api.updateModelEntry(editing.id,f);else await api.createModelEntry(f);
-    notify(editing.id?'已更新模型':'已新增模型');setEditing(null);await load();
+    notify((editing.id?'已更新模型':'已新增模型')+'，設定檔已更新（尚未套用到 LiteLLM）');setEditing(null);await load();setLast(undefined);
   }
   async function toggle(m,v){
-    try{await api.updateModelEntry(m.id,{...pick(m),enabled:v});setItems(a=>a.map(x=>x.id===m.id?{...x,enabled:v}:x))}catch(e){notify('更新失敗：'+errText(e))}
+    try{await api.updateModelEntry(m.id,{...pick(m),enabled:v});setItems(a=>a.map(x=>x.id===m.id?{...x,enabled:v}:x));setLast(undefined)}catch(e){notify('更新失敗：'+errText(e))}
   }
   async function remove(){
-    try{await api.deleteModelEntry(del.id);notify('已刪除模型');setDel(null);await load()}catch(e){notify('刪除失敗：'+errText(e));setDel(null)}
+    try{await api.deleteModelEntry(del.id);notify('已刪除模型，設定檔已更新（尚未套用到 LiteLLM）');setDel(null);await load();setLast(undefined)}catch(e){notify('刪除失敗：'+errText(e));setDel(null)}
   }
   async function apply(){
-    setBusy('apply');
-    try{const r=await api.applyModelRegistry();setApplied(r);notify('已渲染 LiteLLM 設定（尚未部署）')}catch(e){notify('套用失敗：'+errText(e))}finally{setBusy('')}
+    setConfirmApply(false);setBusy('apply');
+    try{const r=await api.applyModelRegistry();setDeploy(r);notify(`已送出部署 v${r.version}，LiteLLM 約需數分鐘更新`)}catch(e){notify('套用失敗：'+errText(e))}finally{setBusy('')}
   }
   async function showLast(){
     setBusy('last');
-    try{const r=await api.renderedModelConfig();setLast(r);if(!r)notify('尚未渲染過任何設定')}catch(e){notify('無法取得上次渲染：'+errText(e))}finally{setBusy('')}
+    try{const r=await api.renderedModelConfig();setLast(r);if(!r)notify('尚未產生任何設定檔')}catch(e){notify('無法取得設定檔：'+errText(e))}finally{setBusy('')}
   }
   const price=m=>`${m.input_price_per_m??0} / ${m.output_price_per_m??0}`;
   return <div className="lv-o">{heading}
-    <p className="subtitle">管理 LiteLLM 可用的模型登錄。登錄內容會渲染成 LiteLLM 設定檔，部署由維運人員執行。</p>
+    <p className="subtitle">管理 LiteLLM 可用的模型登錄（雲端或地端／自架開源模型）。儲存後會更新 LiteLLM 設定檔；按「套用到 LiteLLM」才會重新部署。</p>
     <div className="lv-o-viewtabs"><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>模型登錄</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
     {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:<>
       <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋名稱、供應商、模型" tabs={['全部','雲端','地端']} tab={tab} onTab={setTab}/>
@@ -123,14 +131,15 @@ export default function ModelRegistryPage({me,notify}){
       </div>}
       <p className="lv-o-help" style={{marginTop:6}}>價格單位為每百萬 token（USD），僅在內建價格表查無該模型時用於成本估算。</p>
       <h2 style={{fontSize:16,margin:'26px 0 10px'}}>套用到 LiteLLM</h2>
-      <div className="lv-o-banner"><Warning size={16}/><div><b>此按鈕只會「渲染」設定，不會部署任何東西。</b>渲染結果存於後端；需由維運人員執行 <span className="lv-o-mono">infra/09-apply-litellm-config.sh</span> 才會真正更新 LiteLLM。</div></div>
-      <div className="inline" style={{marginBottom:16}}><button className="btn primary" disabled={!!busy} onClick={apply}><UploadSimple/>{busy==='apply'?'渲染中…':'套用到 LiteLLM'}</button><button className="btn" disabled={!!busy} onClick={showLast}><ClockCounterClockwise/>{busy==='last'?'讀取中…':'查看上次渲染'}</button></div>
-      {applied&&<CodePanel title="本次渲染結果" data={applied}/>}
-      {last===null&&<p className="muted small">尚未渲染過任何設定。</p>}
-      {last&&<CodePanel title="上次渲染結果" data={last}/>}
+      <div className="lv-o-banner"><Warning size={16}/><div><b>此按鈕會重新部署 LiteLLM。</b>透過 GitHub Actions 執行 <span className="lv-o-mono">infra/09-apply-litellm-config.sh</span>：重建映像檔、更新 Cloud Run，並把 <span className="lv-o-mono">litellm/config.yaml</span> 提交到 main。fast、reasoning、budget 每組至少需一個啟用的模型。</div></div>
+      <div className="inline" style={{marginBottom:16}}><button className="btn primary" disabled={!!busy||!deployDone(deploy)} onClick={()=>setConfirmApply(true)}><UploadSimple/>{busy==='apply'?'送出中…':!deployDone(deploy)?'部署中…':'套用到 LiteLLM'}</button><button className="btn" disabled={!!busy} onClick={showLast}><ClockCounterClockwise/>{busy==='last'?'讀取中…':'查看目前設定檔'}</button></div>
+      {deploy&&<section className="panel lv-o-card" style={{marginBottom:16}}><h3>最近一次部署</h3><p className="small"><span className={'lv-o-status '+(deploy.status==='deployed'?'ok':deploy.status==='failed'?'bad':'warn')}><i/>{DEPLOY_LABEL[deploy.status]||deploy.status}</span> · v{deploy.version} · {deploy.requested_by}{deploy.requested_at?` · ${fmtTime(deploy.requested_at)}`:''}{deploy.run_url&&<> · <a href={deploy.run_url} target="_blank" rel="noreferrer">GitHub Actions 執行紀錄 <ArrowSquareOut size={11}/></a></>}</p></section>}
+      {last===null&&<p className="muted small">尚未產生任何設定檔。</p>}
+      {last&&<CodePanel title="目前設定檔（下次套用的內容）" data={last}/>}
     </>}
     <div className="notice"><Info/>金鑰內容不會經過此頁；登錄只記錄 Secret Manager 的名稱。</div>
     {editing&&<Editor init={editing} onClose={()=>setEditing(null)} onSave={save}/>}
-    {del&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setDel(null)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除"><h2>刪除模型</h2><p>確定要刪除「{del.name}」？此動作無法復原；需重新套用並部署後才會反映於 LiteLLM。</p><div className="modal-actions"><button className="btn" onClick={()=>setDel(null)}>取消</button><button className="btn primary" onClick={remove}>刪除</button></div></div></div>}
+    {confirmApply&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setConfirmApply(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認套用"><h2>套用到 LiteLLM</h2><p>將以目前的模型登錄重新部署 LiteLLM（約數分鐘）。部署期間進行中的請求可能短暫失敗；新設定會提交到 GitHub main。確定要套用嗎？</p><div className="modal-actions"><button className="btn" onClick={()=>setConfirmApply(false)}>取消</button><button className="btn primary" onClick={apply}>套用並部署</button></div></div></div>}
+    {del&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setDel(null)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除"><h2>刪除模型</h2><p>確定要刪除「{del.name}」？此動作無法復原；需按「套用到 LiteLLM」後才會反映於 LiteLLM。</p><div className="modal-actions"><button className="btn" onClick={()=>setDel(null)}>取消</button><button className="btn primary" onClick={remove}>刪除</button></div></div></div>}
   </div>;
 }

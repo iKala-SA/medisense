@@ -38,6 +38,9 @@ export ADMIN_EMAILS="esther.shih@ikala.ai,paggie.chen@ikala.ai"
 export MONTHLY_BUDGET_USD="5000"
 export USD_TWD_RATE="32"
 
+# 套用到 LiteLLM: the backend dispatches .github/workflows/litellm-apply.yml in this repo (infra/10 sets it up).
+export GITHUB_REPO="iKala-SA/medisense"
+
 # Knowledge: Vertex AI RAG Engine. asia-east1 is a Preview region for RAG Engine (checked 2026-10-24).
 export RAG_ENABLED="true"
 export RAG_LOCATION="asia-east1"

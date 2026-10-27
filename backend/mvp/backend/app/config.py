@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # Shared secret for POST /api/schedules/tick (one Cloud Scheduler job drives every schedule). Empty = tick disabled.
     scheduler_token: str = ""
 
+    # 套用到 LiteLLM: POST /api/model-registry/apply dispatches this GitHub Actions workflow, which runs
+    # infra/09-apply-litellm-config.sh and commits litellm/config.yaml. Token = fine-grained PAT with Actions: write
+    # on the repo only, mounted from Secret Manager. Empty repo or token = deploy disabled (render still works).
+    github_repo: str = ""  # owner/name, e.g. iKala-SA/medisense
+    github_ref: str = "main"
+    litellm_apply_workflow: str = "litellm-apply.yml"
+    github_dispatch_token: str = ""
+
     @property
     def allowed_domain_list(self) -> list[str]:
         return [d.strip().lower() for d in self.allowed_domains.split(",") if d.strip()]

@@ -13,6 +13,14 @@ LITELLM_URL="$(gcloud run services describe "$LITELLM_SERVICE" --region "$REGION
 # Export it before deploying (e.g. export SCHEDULER_TOKEN="$(openssl rand -hex 24)"); empty disables the tick endpoint.
 if [ -z "${SCHEDULER_TOKEN:-}" ]; then echo "warning: SCHEDULER_TOKEN is empty; schedules will not run automatically" >&2; fi
 
+# 套用到 LiteLLM: mount the workflow-dispatch token once infra/10-litellm-apply-cicd.sh has created it.
+SECRETS="LITELLM_API_KEY=litellm-master-key:latest"
+if gcloud secrets describe github-dispatch-token --project "$PROJECT_ID" >/dev/null 2>&1; then
+  SECRETS="${SECRETS},GITHUB_DISPATCH_TOKEN=github-dispatch-token:latest"
+else
+  echo "warning: secret github-dispatch-token missing; 套用到 LiteLLM will return 503 (run infra/10-litellm-apply-cicd.sh)" >&2
+fi
+
 # Private Google Access on the default subnet so VPC-egress traffic can still hit *.googleapis.com
 gcloud compute networks subnets update default --region "$REGION" --enable-private-ip-google-access >/dev/null
 
@@ -24,8 +32,8 @@ gcloud run deploy "$BACKEND_SERVICE" \
   --allow-unauthenticated \
   --network default --subnet default --vpc-egress all-traffic \
   --cpu 1 --memory 2Gi --min-instances 0 --max-instances 5 --concurrency 40 --timeout 300 \
-  --set-env-vars "^|^GOOGLE_CLOUD_PROJECT=${PROJECT_ID}|REGION=${REGION}|LITELLM_BASE_URL=${LITELLM_URL}|FIRESTORE_DATABASE=${FIRESTORE_DATABASE}|UPLOAD_BUCKET=${UPLOAD_BUCKET}|ALLOWED_DOMAINS=${ALLOWED_DOMAINS}|DLP_INSPECT_TEMPLATE=${DLP_INSPECT_TEMPLATE}|RAG_ENABLED=${RAG_ENABLED}|RAG_LOCATION=${RAG_LOCATION}|RAG_EMBEDDING_MODEL=${RAG_EMBEDDING_MODEL}|ADMIN_EMAILS=${ADMIN_EMAILS}|MONTHLY_BUDGET_USD=${MONTHLY_BUDGET_USD}|USD_TWD_RATE=${USD_TWD_RATE}|SCHEDULER_TOKEN=${SCHEDULER_TOKEN:-}" \
-  --set-secrets "LITELLM_API_KEY=litellm-master-key:latest"
+  --set-env-vars "^|^GOOGLE_CLOUD_PROJECT=${PROJECT_ID}|REGION=${REGION}|LITELLM_BASE_URL=${LITELLM_URL}|FIRESTORE_DATABASE=${FIRESTORE_DATABASE}|UPLOAD_BUCKET=${UPLOAD_BUCKET}|ALLOWED_DOMAINS=${ALLOWED_DOMAINS}|DLP_INSPECT_TEMPLATE=${DLP_INSPECT_TEMPLATE}|RAG_ENABLED=${RAG_ENABLED}|RAG_LOCATION=${RAG_LOCATION}|RAG_EMBEDDING_MODEL=${RAG_EMBEDDING_MODEL}|ADMIN_EMAILS=${ADMIN_EMAILS}|MONTHLY_BUDGET_USD=${MONTHLY_BUDGET_USD}|USD_TWD_RATE=${USD_TWD_RATE}|SCHEDULER_TOKEN=${SCHEDULER_TOKEN:-}|GITHUB_REPO=${GITHUB_REPO:-}" \
+  --set-secrets "$SECRETS"
 
 BACKEND_URL="$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format='value(status.url)')"
 echo "backend deployed: $BACKEND_URL"

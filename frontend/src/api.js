@@ -122,6 +122,7 @@ export const api={
   deleteModelEntry:id=>call(`/api/model-registry/${id}`,{method:'DELETE'}),
   applyModelRegistry:()=>call('/api/model-registry/apply',{method:'POST'}),
   renderedModelConfig:()=>call('/api/model-registry/rendered'),
+  litellmDeploy:()=>call('/api/model-registry/deploy'),
   // sessions + chat
   listSessions:(limit=30,cursor='')=>call(`/api/sessions?${query({limit,cursor})}`),
   getSession:id=>call(`/api/sessions/${id}`),
