@@ -77,5 +77,57 @@ export const api={
   preregisterUser:(email,role,department)=>call('/api/users',{method:'POST',body:body({email,role,department})}),
   updateUser:(email,patch)=>call(`/api/users/${encodeURIComponent(email)}`,{method:'PATCH',body:body(patch)}),
   cancelPreregistration:email=>call(`/api/users/${encodeURIComponent(email)}`,{method:'DELETE'}),
-  usersCsv:()=>blob('/api/users/export.csv')
+  usersCsv:()=>blob('/api/users/export.csv'),
+  // sharing
+  directory:(q='')=>call(`/api/directory?${query({q})}`),
+  listGroups:()=>call('/api/groups'),
+  createGroup:g=>call('/api/groups',{method:'POST',body:body(g)}),
+  updateGroup:(id,g)=>call(`/api/groups/${id}`,{method:'PUT',body:body(g)}),
+  deleteGroup:id=>call(`/api/groups/${id}`,{method:'DELETE'}),
+  shareAgent:(id,share)=>call(`/api/agents/${id}/share`,{method:'PUT',body:body(share)}),
+  // skills
+  listSkills:()=>call('/api/skills'),
+  createSkill:s=>call('/api/skills',{method:'POST',body:body(s)}),
+  getSkill:id=>call(`/api/skills/${id}`),
+  updateSkill:(id,s)=>call(`/api/skills/${id}`,{method:'PUT',body:body(s)}),
+  setSkillEnabled:(id,enabled)=>call(`/api/skills/${id}/enabled`,{method:'PATCH',body:body({enabled})}),
+  shareSkill:(id,share)=>call(`/api/skills/${id}/share`,{method:'PUT',body:body(share)}),
+  deleteSkill:id=>call(`/api/skills/${id}`,{method:'DELETE'}),
+  // schedules
+  listSchedules:()=>call('/api/schedules'),
+  createSchedule:s=>call('/api/schedules',{method:'POST',body:body(s)}),
+  getSchedule:id=>call(`/api/schedules/${id}`),
+  updateSchedule:(id,s)=>call(`/api/schedules/${id}`,{method:'PUT',body:body(s)}),
+  setScheduleEnabled:(id,enabled)=>call(`/api/schedules/${id}/enabled`,{method:'PATCH',body:body({enabled})}),
+  runScheduleNow:id=>call(`/api/schedules/${id}/run-now`,{method:'POST'}),
+  shareSchedule:(id,share)=>call(`/api/schedules/${id}/share`,{method:'PUT',body:body(share)}),
+  deleteSchedule:id=>call(`/api/schedules/${id}`,{method:'DELETE'}),
+  // spaces
+  listSpaces:()=>call('/api/spaces'),
+  createSpace:s=>call('/api/spaces',{method:'POST',body:body(s)}),
+  getSpace:id=>call(`/api/spaces/${id}`),
+  updateSpace:(id,s)=>call(`/api/spaces/${id}`,{method:'PUT',body:body(s)}),
+  addSpaceDocs:(id,document_ids)=>call(`/api/spaces/${id}/documents`,{method:'POST',body:body({document_ids})}),
+  removeSpaceDoc:(id,docId)=>call(`/api/spaces/${id}/documents/${docId}`,{method:'DELETE'}),
+  shareSpace:(id,share)=>call(`/api/spaces/${id}/share`,{method:'PUT',body:body(share)}),
+  deleteSpace:id=>call(`/api/spaces/${id}`,{method:'DELETE'}),
+  // routing rules (admin)
+  getRouting:()=>call('/api/routing'),
+  saveRouting:r=>call('/api/routing',{method:'PUT',body:body(r)}),
+  testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),
+  // model registry (admin)
+  listModelRegistry:()=>call('/api/model-registry'),
+  createModelEntry:m=>call('/api/model-registry',{method:'POST',body:body(m)}),
+  updateModelEntry:(id,m)=>call(`/api/model-registry/${id}`,{method:'PUT',body:body(m)}),
+  deleteModelEntry:id=>call(`/api/model-registry/${id}`,{method:'DELETE'}),
+  applyModelRegistry:()=>call('/api/model-registry/apply',{method:'POST'}),
+  renderedModelConfig:()=>call('/api/model-registry/rendered'),
+  // sessions + chat
+  listSessions:(limit=30,cursor='')=>call(`/api/sessions?${query({limit,cursor})}`),
+  getSession:id=>call(`/api/sessions/${id}`),
+  renameSession:(id,title)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({title})}),
+  deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
+  chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
+  chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
+  calendarStatus:()=>call('/api/calendar/status')
 };

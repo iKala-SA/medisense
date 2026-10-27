@@ -4,8 +4,8 @@ import {ShareModal,ShareAction,ShareButton,emptyShare} from './ShareKit';
 
 const Count=({n,max})=><small className="ac-count">{n} / {max}</small>;
 
-export function AgentCreate({creator,onCancel,onSave,backLabel='Agent',noun='Agent',selects,status='草稿',instrLabel='指示'}){
-  const [name,setName]=useState(''),[desc,setDesc]=useState(''),[instr,setInstr]=useState(''),[picked,setPicked]=useState(()=>Object.fromEntries(selects.map(x=>[x.key,x.default]))),[ask,setAsk]=useState(''),[share,setShare]=useState(emptyShare),[sharing,setSharing]=useState(false),[chat,setChat]=useState([]);
+export function AgentCreate({creator,onCancel,onSave,backLabel='Agent',noun='Agent',selects,status='草稿',instrLabel='指示',initial,shareDialog:ShareDlg=ShareModal}){
+  const [name,setName]=useState(initial?.name||''),[desc,setDesc]=useState(initial?.desc||''),[instr,setInstr]=useState(initial?.instr||''),[picked,setPicked]=useState(()=>Object.fromEntries(selects.map(x=>[x.key,x.default]))),[ask,setAsk]=useState(''),[share,setShare]=useState(()=>initial?.share||emptyShare()),[sharing,setSharing]=useState(false),[chat,setChat]=useState([]);
   const valid=name.trim()&&desc.trim();
   function draft(){
     const t=ask.trim();if(!t)return;
@@ -27,6 +27,6 @@ export function AgentCreate({creator,onCancel,onSave,backLabel='Agent',noun='Age
       <textarea id="ac-instr" className="ac-instr" maxLength={50000} placeholder={`描述你希望這個${noun}做什麼`} value={instr} onChange={e=>setInstr(e.target.value)}/>
       <Count n={instr.length} max={50000}/>
     </form>
-    {sharing&&<ShareModal title={name} value={share} owner={creator} onClose={()=>setSharing(false)} onDone={v=>{setShare(v);setSharing(false)}}/>}
+    {sharing&&<ShareDlg title={name} value={share} owner={creator} onClose={()=>setSharing(false)} onDone={v=>{setShare(v);setSharing(false)}}/>}
   </div>;
 }

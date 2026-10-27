@@ -8,7 +8,7 @@ import {Loading,Kpi,Delta} from './shared';
 import './admin.css';
 
 const RANGES=[['today','今日'],['7d','近 7 天'],['month','本月'],['custom','自訂區間']];
-const SERIES=['#6046d7','#9a86ea','#2a8f9c','#c27c1e','#d15f8b','#8d8799'];
+const SERIES=['#23945f','#6bdca7','#2a8f9c','#c27c1e','#d15f8b','#8d8799'];
 const PAGE=10;
 const shift=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const rangeDates=r=>{
@@ -124,10 +124,10 @@ export default function MonitoringPage({me,notify}){
       <div className="lv-card"><h2>每日 Token 消耗趨勢</h2><p className="lv-sub">{s.range_from} ～ {s.range_to}：依實際服務模型堆疊，滑鼠移至長條可查看當日費用（USD）。</p>
         {s.requests===0?<Empty text="此期間尚無模型呼叫。"/>:<div className="lv-chart"><ResponsiveContainer width="100%" height="100%">
           <BarChart data={chart} margin={{top:8,right:8,left:0,bottom:0}} barCategoryGap="30%">
-            <CartesianGrid vertical={false} stroke="#efedf5"/>
+            <CartesianGrid vertical={false} stroke="#edf5f1"/>
             <XAxis dataKey="date" tick={{fontSize:11,fill:'#73737c'}} axisLine={false} tickLine={false}/>
             <YAxis tickFormatter={fmtTokens} tick={{fontSize:11,fill:'#73737c'}} axisLine={false} tickLine={false} width={56}/>
-            <Tooltip cursor={{fill:'#f6f4fc'}} content={<Tip/>}/>
+            <Tooltip cursor={{fill:'#f4fcf8'}} content={<Tip/>}/>
             <Legend iconType="square" iconSize={10} wrapperStyle={{fontSize:12}}/>
             {(s.models||[]).map((m,i)=><Bar key={m} dataKey={m} stackId="t" isAnimationActive={false} fill={SERIES[i%SERIES.length]} radius={i===s.models.length-1?[3,3,0,0]:0}/>)}
           </BarChart></ResponsiveContainer></div>}
@@ -135,7 +135,7 @@ export default function MonitoringPage({me,notify}){
 
       <div className="lv-card"><div className="lv-filters" style={{justifyContent:'space-between',marginBottom:12}}>
         <div><h2>Agent 用量排行 <span className="lv-chip">{shown.length} 個</span></h2><p className="lv-sub" style={{margin:0}}>點選表頭排序（請求、Token、花費、延遲、降級為伺服器端排序）。</p></div>
-        <label className="search" style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #e4e3eb',borderRadius:7,padding:'0 10px',height:36,flex:'0 1 300px'}}><MagnifyingGlass size={15}/><input aria-label="搜尋 Agent" style={{border:0,outline:0,flex:1,padding:0}} value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋 Agent、建立者、科別或模型"/></label></div>
+        <label className="search" style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #e3ebe7',borderRadius:7,padding:'0 10px',height:36,flex:'0 1 300px'}}><MagnifyingGlass size={15}/><input aria-label="搜尋 Agent" style={{border:0,outline:0,flex:1,padding:0}} value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋 Agent、建立者、科別或模型"/></label></div>
         {rows===null?<Loading/>:shown.length===0?<Empty text="沒有符合條件的 Agent。"/>:<div className="lv-table-wrap"><table className="lv-table"><thead><tr>
           <th>#</th>{COLS.map(c=>{const on=c.server?(!clientSort&&sort===c.k):clientSort?.k===c.k;return <th key={c.k} className={'sortable '+(c.r?'r ':'')+(on?'on':'')} onClick={()=>onSort(c)}>{c.label}{on&&(!c.server&&clientSort?.dir===-1?<CaretUp size={11}/>:<CaretDown size={11}/>)}</th>})}</tr></thead>
           <tbody>{pageRows.map((r,i)=><tr key={r.agent_id}>

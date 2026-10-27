@@ -4,8 +4,10 @@ import {getAuth,GoogleAuthProvider,signInWithPopup,signOut as fbSignOut} from 'f
 // Mock mode (the default) keeps the prototype self-contained: no Firebase config, no backend.
 // Set VITE_MOCK_API=0 together with the VITE_FIREBASE_* values to use the real platform.
 export const MOCK=import.meta.env.VITE_MOCK_API!=='0';
+// Preview: live pages with in-memory mock data and no sign-in (design review). npm run dev:preview
+export const PREVIEW=import.meta.env.VITE_BK_PREVIEW==='1';
 
-const app=MOCK?null:initializeApp({
+const app=(MOCK||PREVIEW)?null:initializeApp({
   apiKey:import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId:import.meta.env.VITE_FIREBASE_PROJECT_ID,

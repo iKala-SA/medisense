@@ -1,0 +1,15 @@
+.lv-w-role{font-size:11px;color:#7c6e89;background:#edf9f3;border-radius:10px;padding:2px 8px;white-space:nowrap}
+.lv-w-ok{color:#1d7a43}.lv-w-bad{color:#a02323}
+.lv-w-note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.lv-w-form{max-width:760px;background:#fff;border:1px solid #ebf0ee;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.lv-w-form .field input,.lv-w-form .field select,.lv-w-form .field textarea{width:100%}
+.lv-w-form .inline{display:flex;gap:12px}.lv-w-form .inline>.field{flex:1}
+.lv-w-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.lv-w-bar .grow{flex:1}
+.lv-w-back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:#253a30;cursor:pointer;font-size:14px;padding:0}
+.lv-w-docs{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;border:1px solid #ebf0ee;border-radius:10px;padding:8px}
+.lv-w-doc{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;font-size:13px}
+.lv-w-doc:hover{background:#f5fdf9}.lv-w-doc small{margin-left:auto;color:var(--muted)}
+.lv-w-doc input{width:auto!important}
+.lv-w-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+@media(max-width:640px){.lv-w-form .inline{flex-direction:column}}

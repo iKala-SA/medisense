@@ -138,7 +138,7 @@ export default function AuditPage({me,notify,initialQuery}){
 
     <div className="lv-filters"><div className="lv-seg">{TABS.map(([id,l])=><button key={id||'all'} className={(tab===id?'on ':'')+(id==='alerts'?'alert':'')} onClick={()=>setTab(id)}>{l}</button>)}</div></div>
     <div className="lv-filters">
-      <label className="search" style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #e4e3eb',borderRadius:7,padding:'0 10px',height:36,background:'#fff'}}><MagnifyingGlass size={15}/><input aria-label="搜尋稽核記錄" style={{border:0,outline:0,flex:1,padding:0}} value={qInput} onChange={e=>setQInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&setQ(qInput.trim())} placeholder="搜尋操作者 e-mail、Agent、連接器、事件 ID 或內容"/></label>
+      <label className="search" style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #e3ebe7',borderRadius:7,padding:'0 10px',height:36,background:'#fff'}}><MagnifyingGlass size={15}/><input aria-label="搜尋稽核記錄" style={{border:0,outline:0,flex:1,padding:0}} value={qInput} onChange={e=>setQInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&setQ(qInput.trim())} placeholder="搜尋操作者 e-mail、Agent、連接器、事件 ID 或內容"/></label>
       <select aria-label="科別" value={department} onChange={e=>setDepartment(e.target.value)}><option value="">全院所有科別</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select>
       <select aria-label="狀態" value={severity} onChange={e=>setSeverity(e.target.value)}>{SEVERITIES.map(([id,l])=><option key={id} value={id}>{l}</option>)}</select>
       <select aria-label="日期區間" value={range} onChange={e=>setRange(e.target.value)}>{RANGES.map(([id,l])=><option key={id} value={id}>{l}</option>)}</select>
@@ -175,7 +175,7 @@ function EventRow({e,open,onToggle}){
       <td><SevPill s={e.severity}/></td>
       <td>{open?<CaretUp/>:<CaretDown/>}</td>
     </tr>
-    {open&&<tr><td colSpan={7} style={{background:'#fcfbfe'}}><div className="lv-detail">
+    {open&&<tr><td colSpan={7} style={{background:'#fbfefd'}}><div className="lv-detail">
       <dl className="lv-dl">
         <dt>事件 ID</dt><dd className="lv-mono">{e.id}</dd>
         <dt>發生時間</dt><dd>{fmtDateTime(e.at)}</dd>

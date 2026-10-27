@@ -24,7 +24,7 @@ export const ACTION_LABEL={
   'user.suspend':'暫停帳號','user.reactivate':'恢復帳號','user.update':'更新帳號資料'
 };
 export const AUDIT_CATEGORIES={
-  inference:{label:'Agent 推論',color:'#6046d7'},
+  inference:{label:'Agent 推論',color:'#23945f'},
   connector:{label:'連接器調用',color:'#2a8f9c'},
   build:{label:'建置與知識',color:'#c27c1e'},
   access:{label:'帳號、金鑰與匯出',color:'#b3261e'},

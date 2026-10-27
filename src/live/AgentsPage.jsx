@@ -2,9 +2,9 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {Cube,Plus,CaretRight,MagnifyingGlass} from '@phosphor-icons/react';
 import {api} from '../api';
 import {AgentCreate} from '../AgentCreate';
-import {ShareButton,ShareModal} from '../ShareKit';
+import {ShareChip,ShareDialog} from './ShareLive';
 import AgentDetail from './AgentDetail';
-import {errText,shareAgent,MODEL_GROUP_IDS,defaultFlow,defaultRouting,statusBadges,canEditAgent} from './kit';
+import {errText,MODEL_GROUP_IDS,defaultFlow,defaultRouting,statusBadges,canEditAgent} from './kit';
 import './agents.css';
 
 const AUTO='自動路由';
@@ -44,7 +44,7 @@ export default function AgentsPage({me,notify}){
 
   if(view.kind==='create'){
     if(groups===null)return <div className="lv-state"><span className="lv-spin"/>載入模型群組…</div>;
-    return <AgentCreate creator={me.name||me.email} backLabel="所有 Agent" noun="Agent" status="草稿"
+    return <AgentCreate creator={me.name||me.email} backLabel="所有 Agent" noun="Agent" status="草稿" shareDialog={ShareDialog}
       selects={[{key:'model',label:'模型群組',options:[AUTO,...groups],default:AUTO}]}
       onCancel={()=>setView({kind:'list'})} onSave={create}/>;
   }
@@ -68,12 +68,12 @@ export default function AgentsPage({me,notify}){
       <div className="lv-badges">{statusBadges(a).map(b=><span key={b} className={'badge '+cls(b)}>{b}</span>)}</div>
       <div className="lv-owner" style={{marginTop:8}}>負責人 {a.owner_email||'—'}</div>
       <div className="card-bottom"><span className="small muted">v{a.version} · {a.model_group}</span>
-        {canEditAgent(a,me)?<ShareButton share={a.share} label={'分享 '+a.name} onClick={()=>setSharing(a.id)}/>:null}
+        {canEditAgent(a,me)?<ShareChip share={a.share} label={'分享 '+a.name} onClick={()=>setSharing(a.id)}/>:null}
         <button className="text-button" onClick={()=>setView({kind:'detail',id:a.id})}>{canEditAgent(a,me)?'開啟':'對話'}<CaretRight/></button></div>
     </section>)}</div>}
-    {sharingAgent&&<ShareModal title={sharingAgent.name} value={sharingAgent.share} owner={me.name||me.email} onClose={()=>setSharing(null)}
+    {sharingAgent&&<ShareDialog title={sharingAgent.name} value={sharingAgent.share} owner={me.name||me.email} onClose={()=>setSharing(null)}
       onDone={async v=>{
-        try{await shareAgent(sharingAgent.id,v);patchLocal({id:sharingAgent.id,share:v});notify('已更新分享設定');setSharing(null)}
+        try{const r=await api.shareAgent(sharingAgent.id,v);patchLocal({id:sharingAgent.id,share:r?.share||v});notify('已更新分享設定');setSharing(null)}
         catch(e){notify('分享設定失敗：'+errText(e))}
       }}/>}
   </>;

@@ -88,7 +88,7 @@ export default function Canvas({flow,onChange,onSelect,selectedId,readOnly}){
       onNodesChange={readOnly?undefined:onNodesChange} onEdgesChange={readOnly?undefined:onEdgesChange} onConnect={readOnly?undefined:onConnect}
       onNodeClick={(_,n)=>onSelect(flow.nodes.find(x=>x.id===n.id)||null)} onPaneClick={()=>onSelect(null)}
       fitView fitViewOptions={{padding:0.3,maxZoom:1}} deleteKeyCode={readOnly?null:['Backspace','Delete']} proOptions={{hideAttribution:true}}>
-      <Background gap={18} color="#e4e1ee"/><Controls position="bottom-right" showInteractive={false}/>
+      <Background gap={18} color="#e1eee8"/><Controls position="bottom-right" showInteractive={false}/>
     </ReactFlow>
   </div>;
 }

@@ -1,16 +1,3 @@
-import {idToken} from '../firebase';
-
-// Local API addition: the backend share endpoint is not in src/api.js yet.
-export async function shareAgent(id,share){
-  const res=await fetch(`/api/agents/${id}/share`,{method:'PUT',headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},
-    body:JSON.stringify({access:share.access,role:share.role,members:(share.members||[]).map(({type,id,name,role})=>({type,id,name:name||'',role}))})});
-  if(!res.ok){
-    let d=await res.text();try{d=JSON.parse(d).detail??d}catch{/* plain text */}
-    throw new Error(`${res.status} ${typeof d==='string'?d:JSON.stringify(d)}`);
-  }
-  return res.status===204?null:res.json().catch(()=>null);
-}
-
 export const errText=e=>String(e?.message||e).replace(/^Error:\s*/,'');
 export const fmtTime=t=>{if(!t)return '—';const d=new Date(typeof t==='object'&&t.seconds?t.seconds*1000:t);return isNaN(d)?'—':d.toLocaleString('zh-TW',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})};
 

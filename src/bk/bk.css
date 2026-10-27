@@ -1,0 +1,69 @@
+@tailwind components;
+@tailwind utilities;
+
+/* Minimal scoped reset (Tailwind preflight is off so the rest of the app keeps its own base styles). */
+.bk{color:#1c1c20;font-family:Inter,'Noto Sans TC',system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;font-size:14px}
+.bk *,.bk ::before,.bk ::after{box-sizing:border-box;border:0 solid #eaf0ed}
+.bk h1,.bk h2,.bk h3,.bk h4,.bk h5,.bk h6{font-size:inherit;font-weight:inherit;margin:0;letter-spacing:normal;color:inherit}
+.bk p,.bk figure,.bk blockquote,.bk dl,.bk dd{margin:0;line-height:inherit}
+.bk ul,.bk ol{list-style:none;margin:0;padding:0}
+.bk a{color:inherit;text-decoration:inherit}
+.bk button{background:transparent;border:0 solid;padding:0;color:inherit;font:inherit;cursor:pointer;filter:none}
+.bk button:hover:not(:disabled){filter:none}
+.bk button:disabled{cursor:default}
+.bk table{border-collapse:collapse;border-color:inherit}
+.bk img,.bk svg{display:block;vertical-align:middle}
+.bk small{font-size:inherit}
+.bk hr{margin:0}
+
+@layer components {
+  .bk input, .bk textarea, .bk select { @apply w-full rounded border border-hairline bg-white px-3 py-1.5 text-sm text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary; }
+  .bk input[type=checkbox], .bk input[type=radio], .bk input[type=range] { @apply w-auto p-0; }
+  .bk textarea { resize: vertical; line-height: 1.6; }
+  .bk select { @apply pr-8; }
+  .bk button { @apply select-none; }
+  .bk ::-webkit-scrollbar { width: 8px; height: 8px; }
+  .bk ::-webkit-scrollbar-thumb { @apply rounded-full bg-outline-variant; }
+}
+
+@layer components {
+  .bk .icon { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; font-size: 20px; }
+  .bk .icon-fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+  .bk .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50 bg-primary text-white hover:bg-primary-hover; }
+  .bk .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50 border border-primary bg-white text-primary hover:bg-primary-tint; }
+  .bk .btn-ghost { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50 text-tertiary hover:bg-surface-container; }
+  .bk .btn-soft { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50 bg-surface-container-high text-on-surface-variant hover:bg-surface-variant; }
+  .bk .btn-danger { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50 border border-error/30 bg-white text-error hover:bg-error-container/40; }
+  .bk .card { @apply rounded-lg border border-hairline bg-white shadow-card; }
+  .bk .chip { @apply inline-flex items-center gap-1 rounded-full border border-chip-border bg-chip-bg px-2 py-0.5 font-mono text-[11px] font-medium text-primary; }
+  .bk .pill { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold; }
+  .bk .label { @apply mb-1 mt-3 block text-xs font-semibold text-on-surface-variant; }
+  .bk .mono { @apply font-mono text-[11px] text-outline; }
+  .bk .section-title { @apply flex items-center gap-2 text-base font-bold text-on-surface; }
+  .bk .switch { @apply relative inline-block h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-outline-variant p-0 transition-colors checked:bg-primary disabled:cursor-default disabled:opacity-50; }
+  .bk .switch::after { content: ""; @apply absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-card transition-transform; }
+  .bk .switch:checked::after { transform: translateX(1.25rem); }
+}
+
+/* React Flow (Clinical Jade -> Medisense purple) */
+.bk .react-flow__node { font-family: inherit; }
+.bk .react-flow__handle { width: 10px; height: 10px; background: #23945f; border: 2px solid #fff; }
+.bk .react-flow__edge-path { stroke: #5cd99f; stroke-width: 1.5; }
+.bk .react-flow__controls { box-shadow: 0px 4px 16px rgba(35, 148, 95, 0.08); border: 1px solid #eaf0ed; border-radius: 6px; overflow: hidden; }
+.bk .react-flow__controls-button { border-bottom: 1px solid #eaf0ed; }
+.bk .react-flow__attribution { display: none; }
+.bk .flow-node { @apply min-w-[220px] rounded-lg border border-hairline bg-white text-xs shadow-card; }
+.bk .flow-node.selected { @apply border-primary shadow-float; }
+.bk .flow-node .head { @apply flex items-center gap-2 rounded-t-lg border-b border-hairline bg-primary-tint px-3 py-2 font-semibold text-on-surface; }
+.bk .flow-node .body { @apply px-3 py-2 text-on-surface-variant; }
+.bk .flow-node .kind { @apply ml-auto font-mono text-[10px] uppercase tracking-wide text-tertiary; }
+.bk .flow-node.llm .head, .bk .flow-node.structured_output .head { @apply bg-primary-dark text-white; }
+.bk .flow-node.llm .kind, .bk .flow-node.structured_output .kind { @apply text-primary-fixed; }
+.bk .flow-node.pii_mask .kind { @apply text-error; }
+
+/* The app's global sidebar rules target bare `aside` / `nav`; neutralise them inside the ported pages. */
+.shell .bk aside{position:static;inset:auto;width:auto;display:block;flex-direction:initial;background:transparent!important;border:0!important;padding:0;z-index:auto;height:auto}
+.shell .bk nav{display:flex;flex-direction:row;gap:0;margin:0}
+.shell .bk nav button{height:auto;padding:0;border-radius:0;font-size:inherit;font-weight:inherit;color:inherit;gap:.25rem;white-space:normal;margin:0}
+.shell .bk nav button:hover{background:transparent}
+.shell .bk nav button>svg{width:auto;height:auto}

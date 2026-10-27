@@ -21,7 +21,7 @@ export default function NodeInspector({node,onChange,onDelete,knowledgeCount,eff
       <Field label="檢索查詢（模板）"><input value={s('query','{{input}}')} onChange={e=>set('query',e.target.value)}/></Field>
       <p className="lv-hint">可用 {'{{input}}'}、{'{{last}}'}、{'{{節點id}}'}；未被提示詞引用時會自動附加到系統提示。</p>
       <Field label="取回段落數 top_k"><input type="number" min={1} max={20} value={Number(node.data.top_k??5)} onChange={e=>set('top_k',Number(e.target.value))}/></Field>
-      <p className="lv-hint" style={{color:knowledgeCount?'#6046d7':'#8a5a00'}}>{knowledgeCount?`已掛載 ${knowledgeCount} 份知識文件`:'尚未掛載知識文件（請至「設定」分頁掛載）'}</p>
+      <p className="lv-hint" style={{color:knowledgeCount?'#23945f':'#8a5a00'}}>{knowledgeCount?`已掛載 ${knowledgeCount} 份知識文件`:'尚未掛載知識文件（請至「設定」分頁掛載）'}</p>
     </>}
     {(t==='llm'||t==='structured_output')&&<Field label="提示詞"><textarea rows={4} className="lv-mono" value={s('prompt','{{input}}')} onChange={e=>set('prompt',e.target.value)}/></Field>}
     {t==='structured_output'&&<Field label="JSON Schema"><textarea rows={6} className="lv-mono" value={s('schema','{}')} onChange={e=>set('schema',e.target.value)}/></Field>}
