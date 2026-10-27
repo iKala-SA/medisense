@@ -1,0 +1,591 @@
+<!DOCTYPE html><html lang="zh-TW" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#bdc9c6", "on-secondary-fixed-variant": "#005046", "on-secondary-fixed": "#00201b", "surface-dim": "#d6dbd9", "surface-variant": "#dfe3e2", "surface-bright": "#f6faf9", "on-secondary": "#ffffff", "surface-tint": "#006a60", "inverse-surface": "#2c3131", "surface-container-low": "#f0f4f3", "on-surface-variant": "#3e4947", "on-tertiary-fixed": "#00201c", "secondary-fixed-dim": "#86d5c5", "on-surface": "#181d1c", "inverse-on-surface": "#edf2f0", "tertiary-fixed": "#c5eae2", "tertiary-fixed-dim": "#aacec7", "tertiary-container": "#577973", "surface-container": "#eaefed", "surface-container-lowest": "#ffffff", "secondary-fixed": "#a2f2e1", "on-primary": "#ffffff", "surface": "#f6faf9", "error": "#ba1a1a", "primary-fixed": "#95f3e4", "on-error-container": "#93000a", "surface-container-high": "#e5e9e7", "secondary-container": "#a2f2e1", "background": "#f6faf9", "inverse-primary": "#79d7c8", "on-background": "#181d1c", "on-tertiary-fixed-variant": "#2b4d47", "on-primary-fixed-variant": "#005048", "secondary": "#0b6a5d", "on-secondary-container": "#187163", "on-tertiary": "#ffffff", "error-container": "#ffdad6", "on-primary-container": "#dffff8", "on-error": "#ffffff", "tertiary": "#3e605a", "primary-container": "#0e8074", "primary-fixed-dim": "#79d7c8", "on-tertiary-container": "#e1fff8", "outline": "#6e7977", "surface-container-highest": "#dfe3e2", "on-primary-fixed": "#00201c", "primary": "#00655b" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter-desktop": "1.5rem", "space-sm": "0.5rem", "gutter": "1rem", "space-md": "1rem", "space-xl": "2.5rem", "margin-desktop": "2rem", "margin": "1rem", "space-lg": "1.5rem", "space-xs": "0.25rem" }, "fontFamily": { "headline-xl": [ "Manrope" ], "label-sm": [ "JetBrains Mono" ], "headline-md": [ "Manrope" ], "body-sm": [ "Manrope" ], "body-lg": [ "Manrope" ], "headline-sm": [ "Manrope" ], "label-lg": [ "JetBrains Mono" ], "label-md": [ "JetBrains Mono" ], "headline-lg-mobile": [ "Manrope" ], "headline-lg": [ "Manrope" ], "headline-xl-mobile": [ "Manrope" ], "body-md": [ "Manrope" ] }, "fontSize": { "headline-xl": [ "36px", { "lineHeight": "44px", "fontWeight": "700" } ], "label-sm": [ "10px", { "lineHeight": "14px", "fontWeight": "500" } ], "headline-md": [ "22px", { "lineHeight": "28px", "fontWeight": "600" } ], "body-sm": [ "12px", { "lineHeight": "16px", "fontWeight": "400" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "headline-sm": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "label-lg": [ "13px", { "lineHeight": "18px", "fontWeight": "500" } ], "label-md": [ "11px", { "lineHeight": "16px", "fontWeight": "500" } ], "headline-lg-mobile": [ "22px", { "lineHeight": "30px", "fontWeight": "600" } ], "headline-lg": [ "28px", { "lineHeight": "36px", "fontWeight": "600" } ], "headline-xl-mobile": [ "28px", { "lineHeight": "36px", "fontWeight": "700" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(14,128,116,0.06)]"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md min-w-[320px]"><img alt="TCVHG-logo.jpeg" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1W-1CZ_ughQoA9y9nB_V72JcPchA06b03QmFd3H_cKaTffcVpd7XnBHS6nIVUtvfXgzbNYjuZtCHaOZ4Bh-O5xM0x9O8EftvACO8D7_vBNSqaThmNfKyUjbU-j5Wg53u_s9y9geNbbfItx_5ayYOM30wahm9bVgxMVxd47LvbU3IQppq8EhgfDbiDD1MGTY-_O7hAr0r5hurWxoGxfbgKs_-RBFiC_byUajbs1ITASPxZIY4Bt_bVjZjEY6GHgazuFg6FuAqrYl"><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-primary leading-tight">中榮 智慧 Agent 工作台</span><span class="font-label-sm text-label-sm text-tertiary tracking-normal uppercase">TCVGH AI Agent Builder Hub</span></div></div><div class="flex-1 max-w-xl mx-auto hidden md:flex items-center gap-space-sm"><div class="flex items-center bg-surface-container-low rounded-xl px-space-md py-space-xs w-full shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="material-symbols-outlined text-outline text-[20px] mr-space-sm">search</span><input class="bg-transparent border-0 outline-none w-full text-on-surface placeholder:text-outline font-body-sm text-body-sm" placeholder="搜尋院內臨床 Agent、醫療提示詞範本或 API 工具庫..." type="text"><span class="font-label-sm text-label-sm text-tertiary bg-surface-container px-space-xs py-0.5 rounded-lg border border-outline-variant">⌘K</span></div><div class="relative flex items-center bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="material-symbols-outlined text-primary text-[18px] mr-space-xs">local_hospital</span><select class="bg-transparent border-0 outline-none text-on-surface font-label-md text-label-md cursor-pointer pr-space-xs"><option value="dmec">智慧醫療創新中心</option><option value="im">內科部</option><option value="sur">外科部</option><option value="nur">護理部</option><option value="rad">放射線部</option><option value="phr">藥劑部</option></select></div></div><div class="flex items-center gap-space-md justify-end"><div class="hidden xl:flex items-center gap-space-xs bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Vertex AI / Cloud Run 連線正常</span></div><div class="flex items-center gap-space-xs"><button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span></button><button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">help_outline</span></button></div><div class="flex items-center gap-space-sm pl-space-sm border-l border-outline-variant/40"><div class="flex flex-col text-right hidden sm:flex"><div class="flex items-center justify-end gap-space-xs"><span class="font-body-sm text-body-sm font-semibold text-on-surface">Dr. 林志豪</span><span class="font-label-sm text-label-sm text-primary bg-secondary-container/40 px-1 py-0.5 rounded">GWS SSO</span></div><span class="font-label-sm text-label-sm text-outline">chlin@vghtc.gov.tw</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><aside class="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(14,128,116,0.04)] z-40 flex flex-col justify-between py-space-md"><div class="flex flex-col gap-space-xs px-space-md"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">院區智能總覽</div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl transition-colors bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]" data-path="agent-hub" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-body-md text-body-md">Agent Hub / 我的工作台</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="agent-studio" href="#"><span class="material-symbols-outlined text-[20px]">account_tree</span><span class="font-body-md text-body-md">Agent Studio 工作流建置</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="testing-deployment-sandbox" href="#"><span class="material-symbols-outlined text-[20px]">rocket_launch</span><span class="font-body-md text-body-md">沙盒測試與發布中心</span></a></nav><div class="pt-space-md px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">治理與臨床指引</div><div class="flex flex-col gap-space-xs"><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="clinical-knowledge-base" href="#"><span class="material-symbols-outlined text-[20px]">menu_book</span><span class="font-body-md text-body-md">院內指引與醫學知識庫</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="governance-audit-logs" href="#"><span class="material-symbols-outlined text-[20px]">shield</span><span class="font-body-md text-body-md">資安審計與推論軌跡</span></a></div></div><div class="px-space-md flex flex-col gap-space-xs"><div class="px-space-sm py-space-xs text-center"><span class="font-label-sm text-label-sm text-outline">臺中榮民總醫院 資訊室 智慧醫療維運</span></div></div></aside><div class="pl-64"><main class="relative pt-16 bg-surface min-h-[calc(100vh)]"><div class="flex flex-col w-full">
+<!-- Top Ambient Glow & Welcome Header Banner -->
+<section class="relative overflow-hidden bg-surface-container-low px-gutter-desktop py-space-xl">
+<div class="absolute -top-24 -right-16 w-96 h-96 rounded-full bg-secondary-container/40 blur-3xl pointer-events-none"></div>
+<div class="absolute top-1/2 left-1/4 w-64 h-64 rounded-full bg-primary-fixed/20 blur-2xl pointer-events-none"></div>
+<div class="relative z-10 max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-label-md font-semibold">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+            中榮 智慧臨床 Agent 平台 v2.4
+          </span>
+<span class="font-label-sm text-label-sm text-outline">GCP Asia-East1 (Changhua) Secure Zone</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight">
+          歡迎，林醫師 (Dr. Lin)
+        </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant leading-relaxed">
+          院內跨科團隊已建構 <strong class="text-primary font-semibold">142 個專科臨床代理人</strong>。利用臨床安全提示詞、院內指引檢索增強 (RAG) 與 Google Cloud Vertex AI，加速全院無紙化與高精準度醫療協作。
+        </p>
+</div>
+<div class="flex flex-wrap items-center gap-space-sm">
+<a class="inline-flex items-center gap-space-xs px-space-lg py-space-md bg-primary-container hover:bg-primary text-on-primary font-headline-sm text-headline-sm rounded-xl shadow-md transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0" data-path="agent-studio" href="#">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+<span class="">+ 建立新 Agent</span>
+</a>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-md bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant font-body-md text-body-md rounded-xl shadow-sm transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px] text-primary">auto_stories</span>
+<span class="">查看院內提示詞典範庫</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Quick Stats Metrics Strip -->
+<section class="max-w-7xl mx-auto w-full px-gutter-desktop -mt-6 z-20">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-md">
+<!-- Metric 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-shadow flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">我的專屬 Agent</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-headline-lg text-headline-lg font-bold text-on-surface">8</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">組配置</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">含 3 個跨科協作</span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[26px]">smart_toy</span>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-shadow flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">已發布臨床上線</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-headline-lg text-headline-lg font-bold text-secondary">5</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">個 Production</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline mt-0.5">3 個處於沙盒驗證</span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[26px]">verified</span>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-shadow flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">今日全院呼叫量</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-headline-lg text-headline-lg font-bold text-on-surface">1,840</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">次</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">平均響應 1.12 秒</span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center text-primary">
+<!-- Inline Sparkline SVG Chart -->
+<svg class="w-10 h-7 text-primary" fill="none" viewBox="0 0 60 30">
+<path d="M0 24 L10 20 L20 22 L30 14 L40 16 L50 6 L60 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+<path d="M0 24 L10 20 L20 22 L30 14 L40 16 L50 6 L60 8 V30 H0 Z" fill="currentColor" fill-opacity="0.12"></path>
+</svg>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-shadow flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">GCP 資源與隱私審計</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">99.98%</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">正常</span>
+</div>
+<span class="font-body-sm text-body-sm text-outline mt-0.5">PHIS / HIPAA 稽核通過</span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[26px]">cloud_done</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Interactive Search & Filtering Station -->
+<section class="max-w-7xl mx-auto w-full px-gutter-desktop mt-space-lg flex flex-col gap-space-md">
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col gap-space-md">
+<!-- Search Bar -->
+<div class="relative flex items-center bg-surface-container-low rounded-xl px-space-md py-space-sm focus-within:ring-2 focus-within:ring-primary focus-within:bg-surface-container-lowest transition-all">
+<span class="material-symbols-outlined text-outline text-[24px] mr-space-sm">search</span>
+<input class="bg-transparent border-0 outline-none w-full text-on-surface placeholder:text-outline font-body-lg text-body-lg" id="agentSearchInput" placeholder="搜尋 Agent 名稱、專科代碼、臨床關鍵字 (例如: 門診處方助理、急診檢傷分類、出院病歷、ICD-10...)" type="text">
+<div class="flex items-center gap-space-xs ml-space-sm shrink-0">
+<span class="hidden sm:inline-block font-label-sm text-label-sm text-tertiary bg-surface-container px-2 py-1 rounded-lg">⌘K 快捷搜尋</span>
+<button class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</div>
+<!-- Filter Chips & Sorting Rail -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs">
+<div class="flex flex-wrap items-center gap-space-xs" id="filterChipsContainer">
+<button class="filter-chip active-filter px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-primary-container text-on-primary-container shadow-sm transition-all" data-filter="all" type="button">
+            全部 (All) <span class="ml-1 opacity-80 font-normal">142</span>
+</button>
+<button class="filter-chip px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all" data-filter="my" type="button">
+            我的 Agent (My Agents) <span class="ml-1 opacity-80 font-normal">8</span>
+</button>
+<button class="filter-chip px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all" data-filter="clinical" type="button">
+            臨床診療 (Clinical) <span class="ml-1 opacity-80 font-normal">64</span>
+</button>
+<button class="filter-chip px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all" data-filter="admin" type="button">
+            行政與衛教 (Admin &amp; Education) <span class="ml-1 opacity-80 font-normal">38</span>
+</button>
+<button class="filter-chip px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all" data-filter="consultation" type="button">
+            跨科會診 (Consultation) <span class="ml-1 opacity-80 font-normal">25</span>
+</button>
+<button class="filter-chip px-space-md py-1.5 rounded-full font-label-md text-label-md font-semibold bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-all" data-filter="gcp" type="button">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-secondary mr-1"></span>已部署於 GCP (Cloud Run) <span class="ml-1 opacity-80 font-normal">96</span>
+</button>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant">
+<span class="font-label-sm text-label-sm text-outline hidden md:inline">排序依據:</span>
+<select class="bg-surface-container-low border-0 outline-none text-on-surface font-label-md text-label-md px-space-sm py-1.5 rounded-xl cursor-pointer">
+<option>最近更新時間 (預設)</option>
+<option>今日呼叫次數 (最高優先)</option>
+<option>專科部別 (A-Z)</option>
+<option>模型世代 (Gemini 1.5 Pro / MedLM)</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Agent Cards Bento Grid -->
+<main class="max-w-7xl mx-auto w-full px-gutter-desktop mt-space-lg mb-space-xl">
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-space-xs">
+<h2 class="font-headline-md text-headline-md text-on-surface">專科 Agent 總覽工作區</h2>
+<span class="font-label-sm text-label-sm text-tertiary bg-secondary-fixed/50 px-2 py-0.5 rounded-md">6 組精選臨床工作流</span>
+</div>
+<div class="flex items-center gap-space-xs text-outline font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px]">info</span>
+<span class="">點擊「進入編輯」可開啟視覺化節點工作台 (Agent Studio)</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-lg" id="agentCardsGrid">
+<!-- Card 1: Cardiology Discharge Summary -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="clinical my gcp">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">cardiology</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-primary">心臟內科 (CV)</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">CARD-801</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">負責醫師: 林志豪</span>
+</div>
+</div>
+<!-- Status Badge -->
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> ACTIVE
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              心臟內科出院病歷智慧整理 Agent
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              自動綜整冠狀動脈攝影紀錄、心導管介入處置 (PCI) 數據與心臟超音波報告，標準化轉譯為中榮 ICD-10 規範之出院摘記與長處方追蹤提醒。
+            </p>
+<!-- Metadata Pills -->
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/30 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                MedLM / Gemini 1.5 Pro
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">library_books</span>
+                中榮心臟科指引 v4.1 (RAG)
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">cloud</span>
+                Cloud Run: PROD
+              </span>
+</div>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">2 小時前更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-semibold rounded-lg shadow-xs transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 2: Outpatient Patient Education Bot -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="admin gcp">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center text-tertiary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">record_voice_over</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-tertiary">護理部 / 門診中心</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">NUR-104</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">共同維運: 衛教室團隊</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> ACTIVE
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              門診衛教即時問答助手
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              針對門診高齡慢性病患與家屬，以淺白易懂的語意回答服藥時鐘、血糖自我監測與衛教單張諮詢，支援台語與國語雙向語音提示。
+            </p>
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/30 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">bolt</span>
+                Gemini 1.5 Flash
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">menu_book</span>
+                院內衛教手冊 v3.2
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">cloud</span>
+                Cloud Run API 容器
+              </span>
+</div>
+</div>
+</div>
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">4 小時前更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-semibold rounded-lg shadow-xs transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 3: ER Triage Assistant -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="clinical gcp">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">emergency</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-primary">急診醫學部 (EM)</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">ER-023</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">負責小組: 急診資訊核心組</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> ACTIVE
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              急診檢傷流病快速比對 Agent
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              結合 TTAS 五級檢傷分類、即時生命徵象儀器讀數與當週流行病學監測 (如流感、登革熱)，提供檢傷護理師與值班醫師二線警訊判讀。
+            </p>
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/30 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                Gemini 1.5 Pro + RAG
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">local_pharmacy</span>
+                TTAS 檢傷準則手冊
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">hub</span>
+                HIS 直連 API
+              </span>
+</div>
+</div>
+</div>
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">昨天 18:20 更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-semibold rounded-lg shadow-xs transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 4: Radiology Report Formatter -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="clinical consultation">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">radiology</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-primary">放射線部 (RAD)</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">RAD-302</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">測試負責: 吳主治醫師</span>
+</div>
+</div>
+<!-- Status Badge: Testing -->
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> TESTING (SANDBOX)
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              放射科影像報告結構化工具
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              解析胸腔 X 光與腹部 CT 之口述自由文字速記，自動轉化為 RSNA RadLex 標準結構化關鍵字，並提取關鍵測量數值與 BI-RADS 評估碼。
+            </p>
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/30 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                Gemini 1.5 Pro
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">dataset</span>
+                RadLex 4.8 專科辭典
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">developer_board</span>
+                PACS 內測介接中
+              </span>
+</div>
+</div>
+</div>
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">3 天前更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-surface-container-high hover:bg-primary-container text-on-surface hover:text-on-primary font-body-sm text-body-sm font-semibold rounded-lg transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 5: DM Shared Care Tracker -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="clinical my consultation gcp">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[24px]">vital_signs</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-primary">新陳代謝科 (ENDO)</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">DM-509</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">負責醫師: 林志豪</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> ACTIVE
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              糖尿病共同照護追蹤助理
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              串聯檢驗科 HbA1c 數據、眼底鏡檢查紀錄與腎病變 eGFR 數值，自動生成個案管理師專用之追蹤照護清單與預警回診提醒信。
+            </p>
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-secondary-fixed/30 text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                Gemini 1.5 Pro
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">assignment_turned_in</span>
+                糖尿病共同照護指引
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">cloud</span>
+                Cloud Run 伺服器
+              </span>
+</div>
+</div>
+</div>
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">5 天前更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-semibold rounded-lg shadow-xs transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+<!-- Card 6: Infection Control Sentinel -->
+<article class="agent-card bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group overflow-hidden" data-category="admin my">
+<div>
+<!-- Header Banner -->
+<div class="p-space-md bg-surface-container-low/60 flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-outline shadow-xs">
+<span class="material-symbols-outlined text-[24px]">coronavirus</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md font-semibold text-on-surface-variant">感染管制中心 (ICC)</span>
+<span class="font-label-sm text-label-sm bg-surface-container px-1.5 py-0.2 rounded text-outline">ICC-018</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">草稿起草: 林志豪</span>
+</div>
+</div>
+<!-- Status Badge: Draft -->
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span> DRAFT (草稿)
+            </span>
+</div>
+<!-- Body Content -->
+<div class="p-space-md flex flex-col gap-space-sm">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">
+              院內感染管制感控通報 Agent
+            </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
+              全院各病房多重抗藥性菌株 (MDRO) 陽性培養通報監控，自動交叉比對抗生素管制清單與法定傳染病疾管署通報格式。
+            </p>
+<div class="flex flex-wrap gap-1.5 pt-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">psychology</span>
+                Gemini 1.5 Flash
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+                中榮感控標準作業手冊
+              </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container-low text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">pending</span>
+                尚未綁定正式 API
+              </span>
+</div>
+</div>
+</div>
+<div class="px-space-md py-space-sm bg-surface-container-lowest border-t-0 flex items-center justify-between mt-space-xs">
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-outline">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span class="">1 週前更新</span>
+</div>
+<a class="inline-flex items-center gap-1 px-space-md py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm font-semibold rounded-lg transition-colors" data-path="agent-studio" href="#">
+<span class="">進入編輯</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</article>
+</div>
+</main>
+<!-- Bottom Institutional Guidance Callout -->
+<section class="max-w-7xl mx-auto w-full px-gutter-desktop mb-space-xl">
+<div class="bg-gradient-to-r from-surface-container-low via-surface-container to-surface-container-low rounded-xl p-space-lg flex flex-col md:flex-row items-center justify-between gap-space-md shadow-sm">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[28px]">security</span>
+</div>
+<div class="flex flex-col">
+<h4 class="font-headline-sm text-headline-sm text-on-surface">臨床 AI 代理人安全治理承諾</h4>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">
+            所有在工作台訓練與發布之代理人，皆受中榮倫理委員會 (IRB) 指引規範與 GCP Vertex AI 隱私邊界隔離保護，病患去識別化遮蔽率達 100%。
+          </p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<a class="inline-flex items-center gap-1 px-space-md py-space-sm bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm font-medium rounded-xl transition-colors" data-path="governance-audit-logs" href="#">
+<span class="material-symbols-outlined text-[18px] text-primary">description</span>
+<span class="">稽核軌跡報告</span>
+</a>
+<a class="inline-flex items-center gap-1 px-space-md py-space-sm bg-primary-container hover:bg-primary text-on-primary font-body-sm text-body-sm font-medium rounded-xl shadow-xs transition-colors" data-path="clinical-knowledge-base" href="#">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span class="">臨床驗證手冊</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Client-side Interactive Search & Filtering Logic -->
+<script>
+    (function initAgentHub() {
+      const searchInput = document.getElementById('agentSearchInput');
+      const filterChips = document.querySelectorAll('.filter-chip');
+      const cards = document.querySelectorAll('.agent-card');
+
+      let currentFilter = 'all';
+      let currentQuery = '';
+
+      function applyFilters() {
+        const query = currentQuery.toLowerCase().trim();
+
+        cards.forEach(card => {
+          const categories = (card.getAttribute('data-category') || '').split(' ');
+          const text = card.textContent.toLowerCase();
+
+          const matchesCategory = (currentFilter === 'all') || categories.includes(currentFilter);
+          const matchesSearch = (!query) || text.includes(query);
+
+          if (matchesCategory && matchesSearch) {
+            card.style.display = 'flex';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      }
+
+      filterChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          filterChips.forEach(c => {
+            c.classList.remove('bg-primary-container', 'text-on-primary-container', 'shadow-sm');
+            c.classList.add('bg-surface-container-low', 'text-on-surface-variant');
+          });
+
+          chip.classList.remove('bg-surface-container-low', 'text-on-surface-variant');
+          chip.classList.add('bg-primary-container', 'text-on-primary-container', 'shadow-sm');
+
+          currentFilter = chip.getAttribute('data-filter');
+          applyFilters();
+        });
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          currentQuery = e.target.value;
+          applyFilters();
+        });
+
+        // ⌘K focus trigger
+        window.addEventListener('keydown', (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+          }
+        });
+      }
+    })();
+  </script>
+</div></main></div>
+
+</body></html>

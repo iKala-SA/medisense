@@ -1,0 +1,35 @@
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+service-account*.json
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# draw.io backups
+*.drawio.bkp
+*.drawio.dtmp

@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { @apply bg-surface text-on-surface font-sans antialiased; margin: 0; overscroll-behavior: none; }
+  input, textarea, select { @apply w-full rounded border border-hairline bg-white px-3 py-1.5 text-sm text-on-surface outline-none transition-colors placeholder:text-outline focus:border-primary; }
+  textarea { resize: vertical; }
+  select { @apply pr-8; }
+  button { @apply select-none; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { @apply rounded-full bg-outline-variant; }
+}
+
+@layer components {
+  .icon { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; }
+  .icon-fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-50; }
+  .btn-primary { @apply btn bg-primary text-white hover:bg-primary-hover; }
+  .btn-secondary { @apply btn border border-primary bg-white text-primary hover:bg-primary-tint; }
+  .btn-ghost { @apply btn text-tertiary hover:bg-surface-container; }
+  .btn-soft { @apply btn bg-surface-container-high text-on-surface-variant hover:bg-surface-variant; }
+  .btn-danger { @apply btn border border-error/30 bg-white text-error hover:bg-error-container/40; }
+  .card { @apply rounded-lg border border-hairline bg-white shadow-card; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border border-chip-border bg-chip-bg px-2 py-0.5 font-mono text-[11px] font-medium text-primary; }
+  .pill { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold; }
+  .label { @apply mb-1 mt-3 block text-xs font-semibold text-on-surface-variant; }
+  .mono { @apply font-mono text-[11px] text-outline; }
+  .section-title { @apply flex items-center gap-2 text-base font-bold text-on-surface; }
+  .nav-item { @apply flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container; }
+  .nav-item.active { @apply bg-primary-dark text-white; }
+  .switch { @apply relative inline-block h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-outline-variant transition-colors checked:bg-primary disabled:cursor-default disabled:opacity-50; }
+  .switch::after { content: ""; @apply absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-card transition-transform; }
+  .switch:checked::after { transform: translateX(1.25rem); }
+  .nav-group { @apply mb-2 mt-5 px-3 font-mono text-[10px] uppercase tracking-wider text-outline; }
+}
+
+/* React Flow */
+.react-flow__node { font-family: inherit; }
+.react-flow__handle { width: 10px; height: 10px; background: #0e8074; border: 2px solid #fff; }
+.react-flow__edge-path { stroke: #3a8b7d; stroke-width: 1.5; }
+.react-flow__controls { box-shadow: 0px 4px 16px rgba(14, 128, 116, 0.08); border: 1px solid #dce4e2; border-radius: 6px; overflow: hidden; }
+.react-flow__controls-button { border-bottom: 1px solid #dce4e2; }
+.react-flow__attribution { display: none; }
+.flow-node { @apply min-w-[220px] rounded-lg border border-hairline bg-white text-xs shadow-card; }
+.flow-node.selected { @apply border-primary shadow-float; }
+.flow-node .head { @apply flex items-center gap-2 rounded-t-lg border-b border-hairline bg-primary-tint px-3 py-2 font-semibold text-on-surface; }
+.flow-node .body { @apply px-3 py-2 text-on-surface-variant; }
+.flow-node .kind { @apply ml-auto font-mono text-[10px] uppercase tracking-wide text-tertiary; }
+.flow-node.llm .head, .flow-node.structured_output .head { @apply bg-primary-dark text-white; }
+.flow-node.llm .kind, .flow-node.structured_output .kind { @apply text-primary-fixed; }
+.flow-node.pii_mask .kind { @apply text-error; }

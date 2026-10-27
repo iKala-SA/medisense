@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW" style="width: 1280px; height: 1701px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_dashboard" name="shell-type"/>
+<title>中榮 智慧 Agent 工作台 - 院內指引與醫學知識庫</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}
+::-webkit-scrollbar{display:none;}
+</style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "on-surface": "#181d1c",
+        "on-tertiary-fixed": "#00201c",
+        "primary-container": "#0e8074",
+        "secondary-fixed": "#a2f2e1",
+        "on-primary-container": "#dffff8",
+        "surface-container-high": "#e5e9e7",
+        "tertiary-container": "#577973",
+        "secondary": "#0b6a5d",
+        "surface-container-lowest": "#ffffff",
+        "error-container": "#ffdad6",
+        "surface-container": "#eaefed",
+        "on-error": "#ffffff",
+        "on-tertiary-container": "#e1fff8",
+        "inverse-primary": "#79d7c8",
+        "on-primary-fixed": "#00201c",
+        "on-background": "#181d1c",
+        "surface-dim": "#d6dbd9",
+        "on-secondary-fixed": "#00201b",
+        "error": "#ba1a1a",
+        "on-secondary": "#ffffff",
+        "tertiary": "#3e605a",
+        "inverse-on-surface": "#edf2f0",
+        "background": "#f6faf9",
+        "surface": "#f6faf9",
+        "surface-container-highest": "#dfe3e2",
+        "surface-container-low": "#f0f4f3",
+        "on-secondary-fixed-variant": "#005046",
+        "primary-fixed-dim": "#79d7c8",
+        "on-primary": "#ffffff",
+        "surface-bright": "#f6faf9",
+        "primary": "#00655b",
+        "tertiary-fixed-dim": "#aacec7",
+        "secondary-container": "#a2f2e1",
+        "on-secondary-container": "#187163",
+        "on-surface-variant": "#3e4947",
+        "on-tertiary": "#ffffff",
+        "outline-variant": "#bdc9c6",
+        "on-primary-fixed-variant": "#005048",
+        "on-error-container": "#93000a",
+        "outline": "#6e7977",
+        "on-tertiary-fixed-variant": "#2b4d47",
+        "surface-variant": "#dfe3e2",
+        "primary-fixed": "#95f3e4",
+        "surface-tint": "#006a60",
+        "inverse-surface": "#2c3131",
+        "tertiary-fixed": "#c5eae2",
+        "secondary-fixed-dim": "#86d5c5"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.125rem",
+        "lg": "0.25rem",
+        "xl": "0.5rem",
+        "full": "0.75rem"
+      },
+      "spacing": {
+        "margin-desktop": "2rem",
+        "space-lg": "1.5rem",
+        "margin": "1rem",
+        "gutter-desktop": "1.5rem",
+        "space-sm": "0.5rem",
+        "space-xl": "2.5rem",
+        "space-md": "1rem",
+        "gutter": "1rem",
+        "space-xs": "0.25rem"
+      },
+      "fontFamily": {
+        "body-sm": ["Manrope"],
+        "headline-sm": ["Manrope"],
+        "headline-lg": ["Manrope"],
+        "headline-lg-mobile": ["Manrope"],
+        "headline-md": ["Manrope"],
+        "body-lg": ["Manrope"],
+        "body-md": ["Manrope"],
+        "headline-xl": ["Manrope"],
+        "label-lg": ["JetBrains Mono"],
+        "label-sm": ["JetBrains Mono"],
+        "label-md": ["JetBrains Mono"],
+        "headline-xl-mobile": ["Manrope"]
+      },
+      "fontSize": {
+        "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+        "headline-lg": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "30px", "fontWeight": "600"}],
+        "headline-md": ["22px", {"lineHeight": "28px", "fontWeight": "600"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+        "headline-xl": ["36px", {"lineHeight": "44px", "fontWeight": "700"}],
+        "label-lg": ["13px", {"lineHeight": "18px", "fontWeight": "500"}],
+        "label-sm": ["10px", {"lineHeight": "14px", "fontWeight": "500"}],
+        "label-md": ["11px", {"lineHeight": "16px", "fontWeight": "500"}],
+        "headline-xl-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}]
+      }
+    }
+  }
+};
+</script>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased">
+<svg aria-hidden="true" class="inline-defs-container" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(14,128,116,0.06)] border-b border-outline-variant/30">
+<div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-[320px]">
+<img alt="TCVHG-logo.jpeg" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXKBAUpN_I-nBQEhcF3R4R0fp5rMlZ3M52xRQfkTXNxOMea7hucjPkB9vwUEeYanoO7fmn-SP1gU_GM6ir3jmVXSImYo4TKRhXOlJHiIM92jTPbYqeeRz00V-FFCRiNVvZTO5ue9yQbTrd5tsivvopoFRLWacKYgOXLxdFfxhbs5cXMPM0kWo-culiMCv0NcRaIp5ZUNCe_QagrJOcaY1uxUICJymuW0DasN99unQiYi0gpWDKRpZg"/>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm tracking-tight text-primary leading-tight">中榮 智慧 Agent 工作台</span>
+<span class="font-label-sm text-label-sm text-tertiary tracking-normal uppercase">TCVGH AI Agent Builder Hub</span>
+</div>
+</div>
+<div class="flex-1 max-w-xl mx-auto hidden md:flex items-center gap-space-sm">
+<div class="flex items-center bg-surface-container-low rounded-xl px-space-md py-space-xs w-full shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+<span class="material-symbols-outlined text-outline text-[20px] mr-space-sm">search</span>
+<input class="bg-transparent border-0 outline-none w-full text-on-surface placeholder:text-outline font-body-sm text-body-sm" placeholder="搜尋院內臨床 Agent、醫療提示詞範本或 API 工具庫..." type="text"/>
+<span class="font-label-sm text-label-sm text-tertiary bg-surface-container px-space-xs py-0.5 rounded-lg border border-outline-variant">⌘K</span>
+</div>
+<div class="relative flex items-center bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+<span class="material-symbols-outlined text-primary text-[18px] mr-space-xs">local_hospital</span>
+<select class="bg-transparent border-0 outline-none text-on-surface font-label-md text-label-md cursor-pointer pr-space-xs">
+<option value="dmec">智慧醫療創新中心</option>
+<option value="im">內科部</option>
+<option value="sur">外科部</option>
+<option value="nur">護理部</option>
+<option value="rad">放射線部</option>
+<option value="phr">藥劑部</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-space-md justify-end">
+<div class="hidden xl:flex items-center gap-space-xs bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+<span class="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Vertex AI / Cloud Run 連線正常</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm pl-space-sm border-l border-outline-variant/40">
+<div class="flex flex-col text-right hidden sm:flex">
+<div class="flex items-center justify-end gap-space-xs">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Dr. 林志豪</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline">chlin@vghtc.gov.tw</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Sidebar -->
+<aside class="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(14,128,116,0.04)] z-40 flex flex-col justify-between py-space-md border-r border-outline-variant/20">
+<div class="flex flex-col gap-space-xs px-space-md overflow-y-auto">
+<div class="px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">院區智能總覽</div>
+<nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]">
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="agent-hub-directory" href="#">Agent Hub / 我的工作台</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="agent-studio-editing-page" href="#">Agent Studio 工作流建置</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="connectors" href="#">Connectors 連接器</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="sandbox-testing-and-hospital-deployment" href="#">沙盒測試與全院發布中心</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="agent-monitoring-and-cost" href="#">Agent 監控與成本</a>
+</nav>
+<div class="pt-space-md px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">系統管理與治理</div>
+<nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]">
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="clinical-guidelines-and-medical-knowledge-base" href="#">院內指引與醫學知識庫</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="governance-audit-logs" href="#">資安審計與推論軌跡</a>
+<a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="account-and-access-control" href="#">帳號與存取權限</a>
+</nav>
+</div>
+<div class="px-space-md flex flex-col gap-space-xs">
+<button class="w-full flex items-center justify-between px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" type="button">
+<span class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px]">keyboard_double_arrow_left</span>
+<span class="font-body-md text-body-md">收合側邊欄</span>
+</span>
+</button>
+<div class="px-space-sm py-space-xs text-center border-t border-outline-variant/30">
+<span class="font-label-sm text-label-sm text-outline">臺中榮民總醫院 資訊室 智慧醫療維運</span>
+</div>
+</div>
+</aside>
+<!-- Main Workspace Content -->
+<div class="pl-64">
+<main class="relative pt-16 bg-surface min-h-[calc(100vh)] pb-space-xl"><div class="flex flex-col w-full">
+<!-- Top Command & Breadcrumb Banner -->
+<div class="w-full px-gutter-desktop pt-space-lg pb-space-md flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-xs font-label-md text-label-md text-outline">
+<span class="hover:text-primary cursor-pointer transition-colors">系統管理與治理</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-semibold">帳號與存取權限</span>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-sm flex-wrap">
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">帳號與權限管理</h1>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-space-sm py-0.5 rounded-full font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+            GWS SSO / SAML 2.0 整合
+          </span>
+<span class="font-label-sm text-label-sm bg-surface-container-high text-on-surface-variant px-space-sm py-0.5 rounded-full font-medium">
+            全院 6,240 筆同仁名冊
+          </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+          基於 Google Workspace 企業目錄與醫療法規範的 RBAC 角色存取授權中心，保護全院 AI Agent 與機敏資料存取邊界。
+        </p>
+</div>
+<!-- Quick Actions -->
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container-lowest text-primary rounded-xl font-label-lg text-label-lg shadow-sm hover:bg-surface-container transition-all" id="btn-sync-gws" type="button">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+          同步 GWS 組織目錄
+        </button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm bg-surface-container-lowest text-on-surface-variant rounded-xl font-label-lg text-label-lg shadow-sm hover:bg-surface-container transition-all" id="btn-export-audit" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+          匯出稽核清冊 (CSV)
+        </button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm bg-primary text-on-primary rounded-xl font-label-lg text-label-lg shadow-sm hover:bg-primary-container transition-all" id="btn-add-staff" type="button">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+          新增同仁帳號
+        </button>
+</div>
+</div>
+</div>
+<!-- KPI Overview Cards -->
+<div class="w-full px-gutter-desktop py-space-sm">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md text-outline uppercase tracking-wider">全院總啟用帳號</span>
+<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+</div>
+</div>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">6,182</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">/ 6,240 人</span>
+</div>
+<div class="mt-space-sm flex items-center justify-between pt-space-xs">
+<span class="font-body-sm text-body-sm text-on-surface-variant">涵蓋醫護、醫事及行政研究</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">99.1% 已啟用</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md text-outline uppercase tracking-wider">系統管理員授權</span>
+<div class="w-8 h-8 rounded-lg bg-secondary-container/50 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+</div>
+</div>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">18</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">位同仁</span>
+</div>
+<div class="mt-space-sm flex items-center justify-between pt-space-xs">
+<span class="font-body-sm text-body-sm text-on-surface-variant">6 位超管 · 12 位專科管理員</span>
+<span class="font-label-sm text-label-sm text-outline">需季審查</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md text-outline uppercase tracking-wider">GWS 允許登入網域</span>
+<div class="w-8 h-8 rounded-lg bg-tertiary-fixed/60 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]">domain_verification</span>
+</div>
+</div>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">3</span>
+<span class="font-label-sm text-label-sm text-outline">個網域</span>
+</div>
+<div class="mt-space-sm flex items-center justify-between pt-space-xs">
+<span class="font-body-sm text-body-sm text-primary font-medium truncate max-w-[170px]">@vghtc.gov.tw (主要)</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">白名單生效</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md text-outline uppercase tracking-wider">MFA / FIDO2 金鑰合規率</span>
+<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+</div>
+</div>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-xl text-headline-xl text-primary font-bold tracking-tight">99.6%</span>
+<span class="font-label-sm text-label-sm text-outline">符合規範</span>
+</div>
+<div class="mt-space-sm flex items-center justify-between pt-space-xs">
+<span class="font-body-sm text-body-sm text-on-surface-variant">HIPAA / 醫療資通安防</span>
+<span class="font-label-sm text-label-sm text-outline">僅 24 人待補核</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Section A: Allowed Domains & SSO Security Policy -->
+<div class="w-full px-gutter-desktop pt-space-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md">
+<!-- Section Header -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">lock_person</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">
+              Google Workspace (GWS) 企業登入允許網域白名單與 SSO 策略
+            </h2>
+<p class="font-body-sm text-body-sm text-outline">
+              僅允許持有下列經白名單授權的 Google Workspace 網域同仁使用中榮 SSO 登入本 Agent 平台；未授權之帳號將由 Google SAML 驗證節點直接阻絕。
+            </p>
+</div>
+</div>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs bg-surface-container-low text-on-surface-variant hover:text-primary rounded-xl font-label-md text-label-md shadow-sm transition-colors" id="btn-add-domain" type="button">
+<span class="material-symbols-outlined text-[16px]">add_circle</span>
+          新增允許登入網域
+        </button>
+</div>
+<!-- Domain List Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-space-md">
+<!-- Domain 1 -->
+<div class="bg-surface rounded-xl p-space-md flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono font-bold">@vghtc.gov.tw</span>
+<span class="material-symbols-outlined text-primary text-[18px]">verified</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-block w-fit">
+                預設主要網域 (Default Primary)
+              </span>
+</div>
+<!-- Toggle (Locked on) -->
+<label class="relative inline-flex items-center cursor-not-allowed opacity-90" title="主要網域不可關閉">
+<input checked="" class="sr-only peer" disabled="" type="checkbox"/>
+<div class="w-9 h-5 bg-primary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-sm mb-space-sm">
+            臺中榮民總醫院全院公務、臨床醫療與行政同仁主要郵件網域，享有完整 HIS 與工作台存取層級。
+          </p>
+<div class="pt-space-sm flex items-center justify-between font-label-sm text-label-sm text-outline bg-surface-container-low/50 px-space-sm py-space-xs rounded-lg">
+<span>需強制 2FA / 院內金鑰</span>
+<span class="font-mono font-semibold text-on-surface">5,420 位已啟用</span>
+</div>
+</div>
+<!-- Domain 2 -->
+<div class="bg-surface rounded-xl p-space-md flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono font-bold">@vghtc.tw</span>
+<span class="material-symbols-outlined text-tertiary text-[18px]">check_circle</span>
+</div>
+<span class="font-label-sm text-label-sm text-tertiary bg-tertiary-fixed/60 px-2 py-0.5 rounded-full inline-block w-fit">
+                次要驗證網域 (Secondary Domain)
+              </span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-sm mb-space-sm">
+            智慧醫療創新中心、專案工程師、醫學研究部研究員與合作學研單位登入專用網域。
+          </p>
+<div class="pt-space-sm flex items-center justify-between font-label-sm text-label-sm text-outline bg-surface-container-low/50 px-space-sm py-space-xs rounded-lg">
+<span>限工作台與沙盒環境</span>
+<span class="font-mono font-semibold text-on-surface">642 位已啟用</span>
+</div>
+</div>
+<!-- Domain 3 -->
+<div class="bg-surface rounded-xl p-space-md flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono font-bold">@alumni.vghtc.gov.tw</span>
+<span class="material-symbols-outlined text-outline text-[18px]">shield</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline bg-surface-container-highest px-2 py-0.5 rounded-full inline-block w-fit">
+                受限合作網域 (Restricted)
+              </span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-sm mb-space-sm">
+            榮總體系退休顧問醫師、跨院兼任教授與外部遠距會診專家，僅具臨床指引與非 PHI 權限。
+          </p>
+<div class="pt-space-sm flex items-center justify-between font-label-sm text-label-sm text-outline bg-surface-container-low/50 px-space-sm py-space-xs rounded-lg">
+<span>唯讀模式 · 禁止呼叫正式 HIS</span>
+<span class="font-mono font-semibold text-on-surface">120 位已啟用</span>
+</div>
+</div>
+</div>
+<!-- Global SSO Policy Controls Bar -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">security_update_good</span>
+<span class="font-body-sm text-body-sm text-on-surface font-semibold">全院登入安全策略規範</span>
+</div>
+<div class="flex flex-wrap items-center gap-space-lg text-body-sm">
+<label class="flex items-center gap-space-xs cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface">強制 GWS 雙重要素驗證 (2FA/MFA)</span>
+</label>
+<label class="flex items-center gap-space-xs cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface">工作階段同時在線限制 (上限 2 台裝置)</span>
+</label>
+<label class="flex items-center gap-space-xs cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface">離職自動停權 (GWS Directory Webhook)</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Section B: Hospital Staff Directory & Role-Based Access Control -->
+<div class="w-full px-gutter-desktop pt-space-lg pb-space-xl">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm flex flex-col">
+<!-- Section Top Filters & Tabs -->
+<div class="p-space-lg flex flex-col gap-space-md">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">
+              全院同仁帳號與角色授權名冊 (RBAC Directory)
+            </h2>
+<p class="font-body-sm text-body-sm text-outline">
+              依專科職務授予 Agent Studio、沙盒測試、臨床指引審查與臨床 HIS MCP 連接權限。
+            </p>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-outline">狀態:</span>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-primary bg-primary/10 px-2 py-0.5 rounded-full font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+              GWS 自動同步於 4 分鐘前
+            </span>
+</div>
+</div>
+<!-- Filter Row -->
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<!-- Role Switcher Tabs -->
+<div class="flex items-center bg-surface-container-low p-1 rounded-xl gap-1 overflow-x-auto max-w-full">
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-lowest text-primary font-label-md text-label-md font-semibold shadow-sm whitespace-nowrap" type="button">
+              全部同仁 (6,182)
+            </button>
+<button class="px-space-md py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+              系統管理員 (18)
+            </button>
+<button class="px-space-md py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+              臨床一般同仁 (5,840)
+            </button>
+<button class="px-space-md py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+              專科審核員 (84)
+            </button>
+<button class="px-space-md py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+              學研/外部 (240)
+            </button>
+</div>
+<!-- Search & Selects -->
+<div class="flex items-center gap-space-sm flex-1 max-w-xl justify-end">
+<!-- Search -->
+<div class="flex items-center bg-surface-container-low px-space-md py-2 rounded-xl w-full max-w-xs shadow-inner">
+<span class="material-symbols-outlined text-outline text-[18px] mr-space-xs">search</span>
+<input class="bg-transparent border-0 outline-none w-full text-on-surface placeholder:text-outline font-body-sm text-body-sm" id="search-staff" placeholder="搜尋姓名、工號、信箱或科室..." type="text"/>
+</div>
+<!-- Dept Dropdown -->
+<select class="bg-surface-container-low text-on-surface font-label-md text-label-md py-2 px-space-sm rounded-xl border-0 cursor-pointer">
+<option value="">全部所屬部處</option>
+<option value="cardio">心臟血管中心</option>
+<option value="er">急診醫學部</option>
+<option value="pharm">藥劑部</option>
+<option value="rad">醫學影像中心</option>
+<option value="it">資訊室</option>
+<option value="nur">護理部</option>
+</select>
+<!-- Status Dropdown -->
+<select class="bg-surface-container-low text-on-surface font-label-md text-label-md py-2 px-space-sm rounded-xl border-0 cursor-pointer">
+<option value="">帳號狀態</option>
+<option value="active">正常啟用中</option>
+<option value="pending">待開通審查</option>
+<option value="suspended">已停權封鎖</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Data Table -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/70 text-outline font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-sm px-space-md font-semibold">同仁姓名與工號</th>
+<th class="py-space-sm px-space-md font-semibold">職稱與所屬科室</th>
+<th class="py-space-sm px-space-md font-semibold">GWS 登入信箱</th>
+<th class="py-space-sm px-space-md font-semibold">角色權限 (Role)</th>
+<th class="py-space-sm px-space-md font-semibold">存取權限範圍</th>
+<th class="py-space-sm px-space-md font-semibold">最後登入狀態</th>
+<th class="py-space-sm px-space-md font-semibold text-right">操作</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container">
+<!-- Row 1: 林志豪 醫師 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold font-mono">
+                    林
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">林志豪 醫師</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH7821</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">主治醫師</span>
+<span class="font-label-sm text-label-sm text-outline">心臟血管中心</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                chlin@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-primary/10 text-primary px-space-sm py-0.5 rounded-full font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  系統管理員 (Admin)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">Agent Studio、沙盒、HIS/PACS 連接器設定</span>
+<span class="font-label-sm text-label-sm text-outline truncate">具備心血管臨床模型部署審定權限</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">2 分鐘前 (現正線上)</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: 陳玉芬 護理長 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-secondary-container/60 flex items-center justify-center text-secondary font-bold font-mono">
+                    陳
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">陳玉芬 護理長</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH3019</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">護理長</span>
+<span class="font-label-sm text-label-sm text-outline">急診醫學部</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                yfchen@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-tertiary-fixed text-tertiary-container px-space-sm py-0.5 rounded-full font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                  專科審核員 (Auditor)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">急診 Agent 審核、臨床指引審定、沙盒測試</span>
+<span class="font-label-sm text-label-sm text-outline truncate">急診流程自動化審核專用席位</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">14:31 (10 分鐘前)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: 李俊德 藥師 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-outline font-bold font-mono">
+                    李
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">李俊德 藥師</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH4412</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">臨床藥師</span>
+<span class="font-label-sm text-label-sm text-outline">藥劑部</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                jtlee@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface-variant px-space-sm py-0.5 rounded-full font-medium">
+                  一般使用者 (User)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">抗生素與處方 Agent 呼叫、藥物交互作用沙盒</span>
+<span class="font-label-sm text-label-sm text-outline truncate">唯讀取藥典與處方 MCP 模組</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">14:04 (今日)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: 柯宛廷 主任 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold font-mono">
+                    柯
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">柯宛廷 主任</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH0218</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">部主任</span>
+<span class="font-label-sm text-label-sm text-outline">醫學影像中心</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                wtko@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-primary/10 text-primary px-space-sm py-0.5 rounded-full font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  系統管理員 (Admin)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">放射影像 Agent 管理、DICOM MCP 憑證、RBAC 授權</span>
+<span class="font-label-sm text-label-sm text-outline truncate">全影像專科授權與排程監督權</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">13:58 (今日)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: 張雅嵐 研發員 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary font-bold font-mono">
+                    張
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">張雅嵐 研發員</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH9120</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">高級分析師</span>
+<span class="font-label-sm text-label-sm text-outline">醫學研究部 (研發)</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                ylchang@vghtc.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface-variant px-space-sm py-0.5 rounded-full font-medium">
+                  一般使用者 (User)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">Agent Studio 工作流開發 (限沙盒與去識別化資料)</span>
+<span class="font-label-sm text-label-sm text-outline truncate">禁止接觸線上正式病患真實個資</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">14:28 (今日)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6: 王志偉 系統架構師 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold font-mono">
+                    王
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">王志偉 架構師</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH1104</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">資安主任架構師</span>
+<span class="font-label-sm text-label-sm text-outline">資訊室</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                cwwang@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-primary text-on-primary px-space-sm py-0.5 rounded-full font-bold">
+<span class="material-symbols-outlined text-[14px]">shield_person</span>
+                  超級管理員 (Super Admin)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">全院所有 Agent、GCP 連接器、資安與網域白名單管理</span>
+<span class="font-label-sm text-label-sm text-outline truncate">全域治理與 KMS 金鑰權限</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">14:19 (今日)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 7: 蔡欣慧 護理師 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-outline font-bold font-mono">
+                    蔡
+                  </div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface">蔡欣慧 護理師</span>
+<span class="font-label-sm text-label-sm font-mono text-outline">#VGH6623</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">護理師</span>
+<span class="font-label-sm text-label-sm text-outline">整形外科病房</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-label-md text-label-md text-on-surface font-mono">
+                hhtsai@vghtc.gov.tw
+              </td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm bg-surface-container text-on-surface-variant px-space-sm py-0.5 rounded-full font-medium">
+                  一般使用者 (User)
+                </span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col max-w-xs">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate">壓瘡傷口多模態 Agent 使用、衛教資料查詢</span>
+<span class="font-label-sm text-label-sm text-outline truncate">僅能取用病房已指派之照護工作流</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant">13:51 (今日)</span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="flex items-center justify-end gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg font-label-sm text-label-sm transition-colors" type="button">
+                    編輯權限
+                  </button>
+<button class="w-8 h-8 rounded-lg text-outline hover:text-on-surface flex items-center justify-center transition-colors" title="查閱稽核日誌" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="px-space-lg py-space-md flex flex-wrap items-center justify-between gap-space-md">
+<div class="font-label-sm text-label-sm text-outline">
+          顯示第 <span class="font-semibold text-on-surface">1</span> 至 <span class="font-semibold text-on-surface">7</span> 筆，全院共 <span class="font-semibold text-on-surface">6,182</span> 位同仁
+        </div>
+<div class="flex items-center gap-space-xs">
+<button class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-outline hover:text-on-surface disabled:opacity-40" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm font-semibold" type="button">
+            1
+          </button>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high font-label-sm text-label-sm text-on-surface" type="button">
+            2
+          </button>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high font-label-sm text-label-sm text-on-surface" type="button">
+            3
+          </button>
+<span class="text-outline px-1">...</span>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high font-label-sm text-label-sm text-on-surface" type="button">
+            884
+          </button>
+<button class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-outline hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal: 新增/邀請同仁帳號 (Hidden by default, triggered via JS) -->
+<div class="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden items-center justify-center p-space-md" id="modal-add-staff">
+<div class="bg-surface-container-lowest rounded-xl max-w-lg w-full p-space-lg shadow-xl flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">person_add</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">新增/邀請同仁帳號</h3>
+</div>
+<button class="text-outline hover:text-on-surface p-1 rounded-lg" id="modal-close">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-outline">
+        請輸入同仁之 GWS 電子郵件信箱。系統將直接調用臺中榮總 Active Directory 及 GWS SAML 權威目錄進行身份與科室核對。
+      </p>
+<div class="flex flex-col gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">GWS 帳號 (信箱)</label>
+<input class="bg-surface-container-low px-space-md py-2 rounded-xl text-body-sm outline-none focus:ring-1 focus:ring-primary" placeholder="dr.wang@vghtc.gov.tw" type="email"/>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">院內工號</label>
+<input class="bg-surface-container-low px-space-md py-2 rounded-xl text-body-sm outline-none font-mono" placeholder="#VGH8899" type="text"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">所屬專科</label>
+<select class="bg-surface-container-low px-space-md py-2 rounded-xl text-body-sm outline-none">
+<option>內科部</option>
+<option>外科部</option>
+<option>急診醫學部</option>
+<option>心臟血管中心</option>
+<option>護理部</option>
+<option>藥劑部</option>
+</select>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold">指派系統角色 (RBAC Role)</label>
+<div class="grid grid-cols-2 gap-space-xs mt-1">
+<label class="flex items-center gap-space-xs p-space-sm bg-surface-container-low rounded-xl cursor-pointer hover:bg-surface-container">
+<input checked="" class="text-primary focus:ring-primary" name="role_choice" type="radio"/>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">臨床一般使用者</span>
+<span class="font-label-sm text-label-sm text-outline">呼叫指派的臨床 Agent</span>
+</div>
+</label>
+<label class="flex items-center gap-space-xs p-space-sm bg-surface-container-low rounded-xl cursor-pointer hover:bg-surface-container">
+<input class="text-primary focus:ring-primary" name="role_choice" type="radio"/>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">專科審核員</span>
+<span class="font-label-sm text-label-sm text-outline">指引審查與沙盒驗證</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-space-sm mt-space-sm pt-space-sm border-t border-surface-container">
+<button class="px-space-md py-space-xs bg-surface-container hover:bg-surface-container-high rounded-xl text-on-surface-variant font-label-md text-label-md transition-colors" id="modal-cancel" type="button">
+          取消
+        </button>
+<button class="px-space-md py-space-xs bg-primary hover:bg-primary-container text-on-primary rounded-xl font-label-md text-label-md transition-colors" id="modal-submit" type="button">
+          發送 GWS 驗證並建立
+        </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function () {
+    const btnAddStaff = document.getElementById('btn-add-staff');
+    const modalAddStaff = document.getElementById('modal-add-staff');
+    const modalClose = document.getElementById('modal-close');
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalSubmit = document.getElementById('modal-submit');
+    const btnSyncGws = document.getElementById('btn-sync-gws');
+    const btnExportAudit = document.getElementById('btn-export-audit');
+
+    function openModal() {
+      if (modalAddStaff) {
+        modalAddStaff.classList.remove('hidden');
+        modalAddStaff.classList.add('flex');
+      }
+    }
+
+    function closeModal() {
+      if (modalAddStaff) {
+        modalAddStaff.classList.add('hidden');
+        modalAddStaff.classList.remove('flex');
+      }
+    }
+
+    if (btnAddStaff) btnAddStaff.addEventListener('click', openModal);
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (modalCancel) modalCancel.addEventListener('click', closeModal);
+    if (modalSubmit) {
+      modalSubmit.addEventListener('click', function () {
+        alert('已透過 Google Workspace SAML API 成功邀請並建立同仁帳號！');
+        closeModal();
+      });
+    }
+
+    if (btnSyncGws) {
+      btnSyncGws.addEventListener('click', function () {
+        const icon = btnSyncGws.querySelector('.material-symbols-outlined');
+        if (icon) icon.classList.add('animate-spin');
+        setTimeout(function () {
+          if (icon) icon.classList.remove('animate-spin');
+          alert('GWS 組織目錄同步成功：已同步 6,240 筆院內同仁資料，無異常帳號。');
+        }, 1200);
+      });
+    }
+
+    if (btnExportAudit) {
+      btnExportAudit.addEventListener('click', function () {
+        alert('正在生成「臺中榮總智慧Agent平台_全院帳號存取稽核清冊_' + new Date().toISOString().slice(0, 10) + '.csv」下載中...');
+      });
+    }
+  })();
+</script></main>
+</div>
+<div aria-hidden="true" data-snapdom-sandbox="true" id="snapdom-sandbox" style="position: absolute; left: -9999px; top: -9999px; width: 0px; height: 0px; overflow: hidden;"></div></body></html>

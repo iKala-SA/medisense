@@ -1,0 +1,109 @@
+# LiteLLM proxy config — the "model gateway & routing" box (column D) of the diagram.
+# Agents never name a vendor model. They pick a GROUP (fast / reasoning / budget / sovereign);
+# the router picks the primary and fails over down the chain. Swapping a model = editing this file.
+#
+# Live now (sandbox): Vertex AI Gemini via the Cloud Run service account (ADC, no API keys).
+# VERIFIED 2026-10-23: no Gemini model answers on the asia-east1 regional endpoint. Gemini 3 Flash /
+# 3.1 Pro are preview IDs on the `global` endpoint only; Gemini 2.5 is on global + US regions.
+# => VERTEX_LOCATION=global. Cloud models only ever see de-identified text (option B), so this is
+#    acceptable, but it must be stated to TCVGH: Gemini inference is not Taiwan-resident today.
+# Commented: on-prem vLLM (needs VPN), Azure OpenAI GPT-5.4 Data Zone, Bedrock cross-region.
+
+model_list:
+  # ---------- Vertex AI, asia-east1 (in-region) ----------
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: vertex_ai/gemini-3-flash-preview
+      vertex_project: os.environ/VERTEX_PROJECT
+      vertex_location: os.environ/VERTEX_LOCATION
+    model_info: { region: global, phi_ok_deidentified: true, capability_tier: fast }
+
+  - model_name: gemini-3.1-pro
+    litellm_params:
+      model: vertex_ai/gemini-3.1-pro-preview
+      vertex_project: os.environ/VERTEX_PROJECT
+      vertex_location: os.environ/VERTEX_LOCATION
+    model_info: { region: global, phi_ok_deidentified: true, capability_tier: reasoning }
+
+  # Known-good fallback.
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash
+      vertex_project: os.environ/VERTEX_PROJECT
+      vertex_location: os.environ/VERTEX_LOCATION
+    model_info: { region: global, capability_tier: fast }
+
+  # ---------- On-prem vLLM over HA VPN (1x H200). Enable when the tunnel exists. ----------
+  # - model_name: gpt-oss-20b
+  #   litellm_params:
+  #     model: openai/gpt-oss-20b
+  #     api_base: http://10.x.x.x:8000/v1          # private IP across the VPN
+  #     api_key: os.environ/ONPREM_VLLM_API_KEY
+  #     rpm: 60                                     # single-GPU capacity cap
+  #   model_info: { region: on-prem, sovereign: true, capability_tier: fast }
+  # - model_name: gpt-oss-120b
+  #   litellm_params: { model: openai/gpt-oss-120b, api_base: http://10.x.x.x:8001/v1, api_key: os.environ/ONPREM_VLLM_API_KEY, rpm: 30 }
+  #   model_info: { region: on-prem, sovereign: true, capability_tier: reasoning }
+  # - model_name: gemma-4-26b-a4b
+  #   litellm_params: { model: openai/gemma-4-26b-a4b, api_base: http://10.x.x.x:8002/v1, api_key: os.environ/ONPREM_VLLM_API_KEY, rpm: 60 }
+  #   model_info: { region: on-prem, sovereign: true, capability_tier: budget }
+
+  # ---------- Azure OpenAI, Data Zone deployment (outside Taiwan; de-identified text only) ----------
+  # - model_name: gpt-5.4
+  #   litellm_params:
+  #     model: azure/gpt-5.4                        # Azure deployment name
+  #     api_base: https://<resource>.openai.azure.com
+  #     api_key: os.environ/AZURE_OPENAI_API_KEY
+  #     api_version: "2025-04-01-preview"
+  #   model_info: { region: azure-data-zone, capability_tier: reasoning }
+
+  # ---------- Amazon Bedrock, cross-region inference (outside Taiwan; de-identified text only) ----------
+  # - model_name: claude-sonnet-4.6
+  #   litellm_params: { model: bedrock/apac.anthropic.claude-sonnet-4-6, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
+  #   model_info: { region: aws-cross-region, capability_tier: reasoning }
+  # - model_name: claude-haiku-4.5
+  #   litellm_params: { model: bedrock/apac.anthropic.claude-haiku-4-5, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
+  #   model_info: { region: aws-cross-region, capability_tier: budget }
+  # - model_name: nova-2-lite
+  #   litellm_params: { model: bedrock/apac.amazon.nova-2-lite-v1:0, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
+  #   model_info: { region: aws-cross-region, capability_tier: budget }
+
+  # ---------- GROUP ALIASES: what agents actually select ----------
+  # A group is just several entries sharing one model_name; the router load-balances across
+  # them and uses `fallbacks` below when one fails. Add the commented models to a group by
+  # giving them the same model_name once they are enabled.
+  - model_name: fast
+    litellm_params: { model: vertex_ai/gemini-3-flash-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
+  - model_name: reasoning
+    litellm_params: { model: vertex_ai/gemini-3.1-pro-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
+  - model_name: budget
+    litellm_params: { model: vertex_ai/gemini-3-flash-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
+  # sovereign has NO cloud member on purpose; until on-prem is connected it returns an error (fail closed).
+  # - model_name: sovereign
+  #   litellm_params: { model: openai/gpt-oss-120b, api_base: http://10.x.x.x:8001/v1, api_key: os.environ/ONPREM_VLLM_API_KEY }
+
+router_settings:
+  routing_strategy: simple-shuffle          # switch to latency-based-routing once Redis exists
+  num_retries: 2
+  timeout: 120
+  allowed_fails: 3
+  cooldown_time: 60
+  fallbacks:
+    - fast: [gemini-2.5-flash]              # later: [gpt-oss-20b, claude-haiku-4.5]
+    - reasoning: [fast]                     # later: [claude-sonnet-4.6, gpt-5.4, gpt-oss-120b]
+    - budget: [fast]                        # later: [nova-2-lite, claude-haiku-4.5]
+    # sovereign: intentionally absent -> never falls back to cloud
+  context_window_fallbacks:
+    - fast: [reasoning]
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  request_timeout: 120
+  # success_callback: ["gcs_bucket"]        # phase 2: ship spend logs to GCS -> BigQuery
+  # callbacks: ["model_armor"]             # phase 2: Model Armor guardrail hook
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # database_url: os.environ/DATABASE_URL  # phase 2: Cloud SQL -> virtual keys, per-agent budgets, spend UI
+  # store_model_in_db: true

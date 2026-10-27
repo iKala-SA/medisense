@@ -1,0 +1,430 @@
+<!DOCTYPE html><html lang="zh-TW" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#bdc9c6", "on-secondary-fixed-variant": "#005046", "on-secondary-fixed": "#00201b", "surface-dim": "#d6dbd9", "surface-variant": "#dfe3e2", "surface-bright": "#f6faf9", "on-secondary": "#ffffff", "surface-tint": "#006a60", "inverse-surface": "#2c3131", "surface-container-low": "#f0f4f3", "on-surface-variant": "#3e4947", "on-tertiary-fixed": "#00201c", "secondary-fixed-dim": "#86d5c5", "on-surface": "#181d1c", "inverse-on-surface": "#edf2f0", "tertiary-fixed": "#c5eae2", "tertiary-fixed-dim": "#aacec7", "tertiary-container": "#577973", "surface-container": "#eaefed", "surface-container-lowest": "#ffffff", "secondary-fixed": "#a2f2e1", "on-primary": "#ffffff", "surface": "#f6faf9", "error": "#ba1a1a", "primary-fixed": "#95f3e4", "on-error-container": "#93000a", "surface-container-high": "#e5e9e7", "secondary-container": "#a2f2e1", "background": "#f6faf9", "inverse-primary": "#79d7c8", "on-background": "#181d1c", "on-tertiary-fixed-variant": "#2b4d47", "on-primary-fixed-variant": "#005048", "secondary": "#0b6a5d", "on-secondary-container": "#187163", "on-tertiary": "#ffffff", "error-container": "#ffdad6", "on-primary-container": "#dffff8", "on-error": "#ffffff", "tertiary": "#3e605a", "primary-container": "#0e8074", "primary-fixed-dim": "#79d7c8", "on-tertiary-container": "#e1fff8", "outline": "#6e7977", "surface-container-highest": "#dfe3e2", "on-primary-fixed": "#00201c", "primary": "#00655b" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter-desktop": "1.5rem", "space-sm": "0.5rem", "gutter": "1rem", "space-md": "1rem", "space-xl": "2.5rem", "margin-desktop": "2rem", "margin": "1rem", "space-lg": "1.5rem", "space-xs": "0.25rem" }, "fontFamily": { "headline-xl": [ "Manrope" ], "label-sm": [ "JetBrains Mono" ], "headline-md": [ "Manrope" ], "body-sm": [ "Manrope" ], "body-lg": [ "Manrope" ], "headline-sm": [ "Manrope" ], "label-lg": [ "JetBrains Mono" ], "label-md": [ "JetBrains Mono" ], "headline-lg-mobile": [ "Manrope" ], "headline-lg": [ "Manrope" ], "headline-xl-mobile": [ "Manrope" ], "body-md": [ "Manrope" ] }, "fontSize": { "headline-xl": [ "36px", { "lineHeight": "44px", "fontWeight": "700" } ], "label-sm": [ "10px", { "lineHeight": "14px", "fontWeight": "500" } ], "headline-md": [ "22px", { "lineHeight": "28px", "fontWeight": "600" } ], "body-sm": [ "12px", { "lineHeight": "16px", "fontWeight": "400" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "headline-sm": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "label-lg": [ "13px", { "lineHeight": "18px", "fontWeight": "500" } ], "label-md": [ "11px", { "lineHeight": "16px", "fontWeight": "500" } ], "headline-lg-mobile": [ "22px", { "lineHeight": "30px", "fontWeight": "600" } ], "headline-lg": [ "28px", { "lineHeight": "36px", "fontWeight": "600" } ], "headline-xl-mobile": [ "28px", { "lineHeight": "36px", "fontWeight": "700" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(14,128,116,0.06)]"><div class="h-16 w-full px-gutter-desktop flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md min-w-[320px]"><img alt="TCVHG-logo.jpeg" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1W-1CZ_ughQoA9y9nB_V72JcPchA06b03QmFd3H_cKaTffcVpd7XnBHS6nIVUtvfXgzbNYjuZtCHaOZ4Bh-O5xM0x9O8EftvACO8D7_vBNSqaThmNfKyUjbU-j5Wg53u_s9y9geNbbfItx_5ayYOM30wahm9bVgxMVxd47LvbU3IQppq8EhgfDbiDD1MGTY-_O7hAr0r5hurWxoGxfbgKs_-RBFiC_byUajbs1ITASPxZIY4Bt_bVjZjEY6GHgazuFg6FuAqrYl"><div class="flex flex-col"><span class="font-headline-sm text-headline-sm tracking-tight text-primary leading-tight">中榮 智慧 Agent 工作台</span><span class="font-label-sm text-label-sm text-tertiary tracking-normal uppercase">TCVGH AI Agent Builder Hub</span></div></div><div class="flex-1 max-w-xl mx-auto hidden md:flex items-center gap-space-sm"><div class="flex items-center bg-surface-container-low rounded-xl px-space-md py-space-xs w-full shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="material-symbols-outlined text-outline text-[20px] mr-space-sm">search</span><input class="bg-transparent border-0 outline-none w-full text-on-surface placeholder:text-outline font-body-sm text-body-sm" placeholder="搜尋院內臨床 Agent、醫療提示詞範本或 API 工具庫..." type="text"><span class="font-label-sm text-label-sm text-tertiary bg-surface-container px-space-xs py-0.5 rounded-lg border border-outline-variant">⌘K</span></div><div class="relative flex items-center bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="material-symbols-outlined text-primary text-[18px] mr-space-xs">local_hospital</span><select class="bg-transparent border-0 outline-none text-on-surface font-label-md text-label-md cursor-pointer pr-space-xs"><option value="dmec">智慧醫療創新中心</option><option value="im">內科部</option><option value="sur">外科部</option><option value="nur">護理部</option><option value="rad">放射線部</option><option value="phr">藥劑部</option></select></div></div><div class="flex items-center gap-space-md justify-end"><div class="hidden xl:flex items-center gap-space-xs bg-surface-container-low px-space-sm py-space-xs rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.02)]"><span class="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Vertex AI / Cloud Run 連線正常</span></div><div class="flex items-center gap-space-xs"><button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span></button><button class="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">help_outline</span></button></div><div class="flex items-center gap-space-sm pl-space-sm border-l border-outline-variant/40"><div class="flex flex-col text-right hidden sm:flex"><div class="flex items-center justify-end gap-space-xs"><span class="font-body-sm text-body-sm font-semibold text-on-surface">Dr. 林志豪</span></div><span class="font-label-sm text-label-sm text-outline">chlin@vghtc.gov.tw</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><aside class="fixed left-0 top-16 bottom-0 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(14,128,116,0.04)] z-40 flex flex-col justify-between py-space-md"><div class="flex flex-col gap-space-xs px-space-md"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">院區智能總覽</div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]"><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="agent-hub-directory" href="#"><span class="material-symbols-outlined text-[20px]">hub</span><span class="font-body-md text-body-md">Agent Hub / 我的工作台</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="agent-studio-editing-page" href="#"><span class="material-symbols-outlined text-[20px]">account_tree</span><span class="font-body-md text-body-md">Agent Studio 工作流建置</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl transition-colors bg-primary-container text-on-primary-container font-semibold shadow-[0_2px_8px_rgba(14,128,116,0.12)]" data-path="connectors" href="#"><span class="material-symbols-outlined text-[20px]">cable</span><span class="font-body-md text-body-md">Connectors 連接器</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="test-gcp-deployment-sandbox" href="#"><span class="material-symbols-outlined text-[20px]">rocket_launch</span><span class="font-body-md text-body-md">沙盒測試與發布中心</span></a></nav><div class="pt-space-md px-space-sm py-space-xs font-label-sm text-label-sm text-outline uppercase tracking-wider">治理與臨床指引</div><div class="flex flex-col gap-space-xs"><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="clinical-knowledge-base" href="#"><span class="material-symbols-outlined text-[20px]">menu_book</span><span class="font-body-md text-body-md">院內指引與醫學知識庫</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" data-path="governance-audit-logs" href="#"><span class="material-symbols-outlined text-[20px]">shield</span><span class="font-body-md text-body-md">資安審計與推論軌跡</span></a></div></div><div class="px-space-md flex flex-col gap-space-xs"><button class="w-full flex items-center justify-between px-space-sm py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors" type="button"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[20px]">keyboard_double_arrow_left</span><span class="font-body-md text-body-md">收合側邊欄</span></span><span class="font-label-sm text-label-sm text-outline bg-surface-container px-space-xs py-0.5 rounded border border-outline-variant">⌘[</span></button><div class="px-space-sm py-space-xs text-center border-t border-outline-variant/30"><span class="font-label-sm text-label-sm text-outline">臺中榮民總醫院 資訊室 智慧醫療維運</span></div></div></aside><div class="pl-64"><main class="relative pt-16 bg-surface min-h-[calc(100vh)]"><div class="flex flex-col w-full">
+<!-- Top Navigation & Header Bar -->
+<div class="sticky top-16 z-30 bg-surface/95 backdrop-blur-md px-gutter-desktop py-space-sm shadow-[0_1px_6px_rgba(14,128,116,0.05)]">
+<div class="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+<!-- Breadcrumbs & Status -->
+<div class="flex flex-col gap-1 min-w-0">
+<div class="flex items-center gap-space-xs text-outline font-label-md text-label-md">
+<a class="flex items-center gap-1 hover:text-primary transition-colors text-outline" href="#">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+<span class="">返回連接器目錄</span>
+</a>
+<span class="">/</span>
+<span class="">院區智能總覽</span>
+<span class="">/</span>
+<span class="text-on-surface-variant">Connectors 連接器</span>
+<span class="">/</span>
+<span class="text-primary font-medium truncate">Slack 跨科急診警報 Bot (設定中)</span>
+</div>
+<div class="flex items-center gap-space-sm mt-0.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+</div>
+<div class="flex items-baseline gap-space-sm">
+<h1 class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">Slack 跨科會診急報與事件機器人</h1>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-secondary-container/60 text-secondary font-medium tracking-wide">MCP 2.0 PROTOCOL</span>
+</div>
+<div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm ml-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span class="">連線狀態：<strong class="text-primary font-semibold">待驗證 (Ping 16ms)</strong></span>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-space-sm self-end md:self-auto shrink-0">
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-primary font-body-sm text-body-sm transition-all active:scale-[0.98]" id="btn-test-connection" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">sensors</span>
+<span class="">測試端點連線 (Ping MCP)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-primary-container text-on-primary font-body-sm text-body-sm font-medium shadow-[0_2px_8px_rgba(14,128,116,0.25)] hover:bg-primary transition-all active:scale-[0.98]" id="btn-save-header" type="button">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="">儲存設定</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Main Canvas Container -->
+<div class="max-w-[1600px] w-full mx-auto px-gutter-desktop py-space-lg">
+<!-- Notice Banner -->
+<div class="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-[0_2px_12px_rgba(14,128,116,0.04)] flex items-start gap-space-md flex-col w-full">
+<div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
+<span class="material-symbols-outlined text-[20px]">verified_user</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-[15px] font-semibold text-on-surface">符合臺中榮總醫療資訊安全標準 (TCVGH Clinical AI Guardrail Certified)</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-semibold">ISO 27001 / HITRUST</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
+          此連接器之雙向 Webhook 與遠端 MCP 伺服器通道已透過中榮 VPC 專屬通道加密，並啟用全自動醫療實體辨識 (NER) 去識別化機制，確保任何推播或調用皆不含未遮蔽之病患身分與身分證號。
+        </p>
+</div>
+<div class="hidden lg:flex items-center gap-2 text-right">
+<span class="font-label-sm text-label-sm text-outline">安全性等級</span>
+<div class="flex gap-1">
+<span class="w-1.5 h-4 rounded-full bg-primary"></span>
+<span class="w-1.5 h-4 rounded-full bg-primary"></span>
+<span class="w-1.5 h-4 rounded-full bg-primary"></span>
+<span class="w-1.5 h-4 rounded-full bg-surface-container-high"></span>
+</div>
+</div>
+</div>
+<!-- Dual Column Workspace Grid -->
+<div class="grid grid-cols-1 gap-space-lg items-start flex flex-col w-full">
+<!-- Left Configuration Workspace (8 Cols) -->
+<div class="flex flex-col gap-space-lg">
+<!-- Section A: 基本資訊 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+<div class="flex items-center justify-between pb-space-sm mb-space-md bg-surface-container-lowest">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-4 rounded-full bg-primary inline-block"></span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">基本資訊 (Basic Settings)</h2>
+</div>
+<span class="font-label-sm text-label-sm text-outline">SECTION 01 / 04</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<div class="md:col-span-2 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+<span class="">連接器識別名稱 (Connector Label) <span class="text-error">*</span></span>
+<span class="font-label-sm text-label-sm text-outline">唯一識別碼</span>
+</label>
+<input class="w-full bg-surface-container-low text-on-surface px-space-md py-2.5 rounded-lg font-body-md text-body-md focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)] outline-none transition-all" type="text" value="Slack 跨科急診警報 Bot (醫療專用)">
+<span class="font-body-sm text-body-sm text-outline">建議標記科別與專用功能，便於沙盒追蹤。</span>
+</div>
+<div class="md:col-span-2 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium">適用情境與臨床呼叫範疇 (Clinical Scope)</label>
+<input class="w-full bg-surface-container-low text-on-surface px-space-md py-2.5 rounded-lg font-body-md text-body-md focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)] outline-none transition-all" type="text" value="急診重症、心導管室異常警報即時通知、會診值班專責呼叫">
+</div>
+<div class="md:col-span-2 flex flex-col gap-space-xs mt-1">
+<label class="font-label-md text-label-md text-on-surface font-medium">連接協定類型 (Protocol Architecture)</label>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm pt-1">
+<label class="cursor-pointer flex items-start gap-space-xs p-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors relative">
+<input checked="" class="mt-1 accent-primary" name="protocol_type" type="radio" value="mcp">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-primary">MCP Server</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Model Context Protocol 2.0 (推薦)</span>
+</div>
+</label>
+<label class="cursor-pointer flex items-start gap-space-xs p-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors relative">
+<input class="mt-1 accent-primary" name="protocol_type" type="radio" value="webhook">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-medium text-on-surface">Webhook / REST</span>
+<span class="font-label-sm text-label-sm text-outline">標準 HTTP JSON Payload 推播</span>
+</div>
+</label>
+<label class="cursor-pointer flex items-start gap-space-xs p-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors relative">
+<input class="mt-1 accent-primary" name="protocol_type" type="radio" value="oauth">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-medium text-on-surface">OAuth 2.0 Client</span>
+<span class="font-label-sm text-label-sm text-outline">雙向互動型工作區 Token 授權</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Section B: 伺服器與端點連線 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+<div class="flex items-center justify-between pb-space-sm mb-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-4 rounded-full bg-primary inline-block"></span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">伺服器與端點連線 (Server &amp; Endpoints)</h2>
+</div>
+<span class="font-label-sm text-label-sm text-outline">SECTION 02 / 04</span>
+</div>
+<div class="flex flex-col gap-space-md">
+<!-- Remote MCP URL -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">dns</span>
+<span class="">Remote MCP Server Host (遠端伺服器 URL) <span class="text-error">*</span></span>
+</label>
+<span class="font-label-sm text-label-sm text-primary bg-secondary-container/50 px-1.5 py-0.5 rounded">SSE 啟用</span>
+</div>
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container-low text-on-surface font-label-md text-label-md px-space-md py-2.5 rounded-lg pr-20 outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)]" type="text" value="https://mcp-slack-proxy.vghtc.internal:9080/sse">
+<button class="absolute right-2 px-2 py-1 text-on-surface-variant hover:text-primary rounded font-label-sm text-label-sm flex items-center gap-1" title="複製端點" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+<span class="">複製</span>
+</button>
+</div>
+<span class="font-body-sm text-body-sm text-outline">填入遠端 MCP 伺服器端點 (支援 SSE 串流協議或院內 VPC Stdio 轉發通道)。</span>
+</div>
+<!-- Webhook Push URL -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]">send</span>
+<span class="">Webhook URL (雙向推播網址)</span>
+</span>
+<span class="font-label-sm text-label-sm text-outline">Incoming Webhook</span>
+</label>
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container-low text-on-surface font-label-md text-label-md px-space-md py-2.5 rounded-lg pr-20 outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)]" type="text" value="https://hooks.slack.com/services/T01TCVGH/B06CARDIAC/xXyZ987123998124TCVGH982">
+<button class="absolute right-2 px-2 py-1 text-on-surface-variant hover:text-primary rounded font-label-sm text-label-sm flex items-center gap-1" title="複製 Webhook" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+<span class="">複製</span>
+</button>
+</div>
+<span class="font-body-sm text-body-sm text-outline">當 Agent 推理達到急診危急值門檻或主任核准後，自動發送加密 JSON Payload 至此 Slack 頻道。</span>
+</div>
+<!-- Readonly Callback URL -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-outline text-[18px]">call_received</span>
+<span class="">中榮 Gateway 監聽回調 URL (Callback URL)</span>
+</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">唯讀 (System Generated)</span>
+</label>
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container text-on-surface-variant font-label-md text-label-md px-space-md py-2.5 rounded-lg pr-20 outline-none cursor-not-allowed select-all" readonly="" type="text" value="https://agent-gateway.vghtc.gov.tw/api/v1/connectors/callback/slack-049">
+<button class="absolute right-2 px-2 py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface-variant rounded font-label-sm text-label-sm flex items-center gap-1" title="複製回調網址" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+<span class="">複製</span>
+</button>
+</div>
+<span class="font-body-sm text-body-sm text-outline">請至 Slack App 設定頁中的「Event Subscriptions」填入此回調網址以接收醫師回覆或按鈕互動。</span>
+</div>
+</div>
+</div>
+<!-- Section C: 授權憑證與安全性 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+<div class="flex items-center justify-between pb-space-sm mb-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-4 rounded-full bg-primary inline-block"></span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">授權憑證與安全性 (Credentials &amp; Security)</h2>
+</div>
+<span class="font-label-sm text-label-sm text-outline">SECTION 03 / 04</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Client ID -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium">Client ID / Application ID</label>
+<input class="w-full bg-surface-container-low text-on-surface font-label-md text-label-md px-space-md py-2.5 rounded-lg outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)]" type="text" value="tcvgh-agent-client-882390-slack">
+</div>
+<!-- Bot User OAuth Token with Mask toggle -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+<span class="">Bot User OAuth Token (憑證密鑰)</span>
+<span class="font-label-sm text-label-sm text-primary">AES-256 加密保存</span>
+</label>
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container-low text-on-surface font-label-md text-label-md px-space-md py-2.5 rounded-lg pr-12 outline-none focus:bg-surface-container-lowest focus:shadow-[0_0_0_2px_rgba(14,128,116,0.3)]" id="input-token" type="password" value="xoxb-REDACTED">
+<button class="absolute right-2.5 text-on-surface-variant hover:text-on-surface transition-colors p-1" id="toggle-token-eye" title="顯示 / 隱藏密鑰" type="button">
+<span class="material-symbols-outlined text-[20px]" id="eye-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Scopes checkboxes -->
+<div class="md:col-span-2 flex flex-col gap-space-xs mt-1">
+<label class="font-label-md text-label-md text-on-surface font-medium flex items-center justify-between">
+<span class="">院區授權範圍 (Requested OAuth Scopes)</span>
+<span class="font-label-sm text-label-sm text-outline">依最小權限原則 (Least Privilege) 授予</span>
+</label>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm pt-1">
+<!-- Scope 1 -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-xl bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+<input checked="" class="mt-1 accent-primary rounded" type="checkbox">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-primary font-semibold">chat:write</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">發送即時會診通報與警報推播訊息</span>
+</div>
+</label>
+<!-- Scope 2 -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-xl bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+<input checked="" class="mt-1 accent-primary rounded" type="checkbox">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-primary font-semibold">channels:read</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">讀取急診會診專屬頻道及醫護在線名冊</span>
+</div>
+</label>
+<!-- Scope 3 -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-xl bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors">
+<input checked="" class="mt-1 accent-primary rounded" type="checkbox">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-primary font-semibold">files:write</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">傳送出院病摘摘要與去識別化心電圖切片</span>
+</div>
+</label>
+<!-- Scope 4 (Unchecked for privacy) -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-xl bg-surface-container-low cursor-pointer hover:bg-surface-container transition-colors opacity-75">
+<input class="mt-1 accent-primary rounded" type="checkbox">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">users:read.email</span>
+<span class="font-body-sm text-body-sm text-outline">院方禁止：病歷個資及信箱反查保護</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Section D: 敏感資料去識別化與醫療審核閘道 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+<div class="flex items-center justify-between pb-space-sm mb-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-4 rounded-full bg-primary inline-block"></span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">醫療審核閘道與合規設定 (Healthcare Audit &amp; Guardrails)</h2>
+</div>
+<span class="font-label-sm text-label-sm text-outline">SECTION 04 / 04</span>
+</div>
+<div class="flex flex-col gap-space-md">
+<!-- Toggle 1: PII Masking -->
+<div class="flex items-center justify-between p-space-sm rounded-xl bg-surface-container-low">
+<div class="flex items-start gap-space-sm flex-col w-full">
+<span class="material-symbols-outlined text-primary text-[24px] mt-0.5">security</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md font-semibold text-on-surface">自動過濾病患個資 (PII Redaction Engine)</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-primary-container text-on-primary">強制啟用</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">發送給 Slack 機器人前，透過院內 BERT 模組強制將姓名、病歷號、身份證號替換為 [MASKED_PID] 識別標籤。</span>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" disabled="" type="checkbox">
+<div class="w-11 h-6 bg-primary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+</label>
+</div>
+<!-- Toggle 2: Audit Logs -->
+<div class="flex items-center justify-between p-space-sm rounded-xl bg-surface-container-low">
+<div class="flex items-start gap-space-sm flex-col w-full">
+<span class="material-symbols-outlined text-primary text-[24px] mt-0.5">history_edu</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md font-semibold text-on-surface">記錄所有 Webhook Payload 至中榮稽核日誌 (Audit Log)</span>
+<span class="font-label-sm text-label-sm text-outline">保留 180 天</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">所有 MCP 遠端函式調用與 Slack 回應均備份至中榮資安監控 SOC 平台供例行合規審查。</span>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" type="checkbox">
+<div class="w-11 h-6 bg-surface-container-high peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Inspector Sidebar (4 Cols) -->
+
+</div>
+</div>
+<!-- Bottom Floating Sticky Action Bar -->
+<div class="sticky bottom-0 z-30 bg-surface/95 backdrop-blur-md px-gutter-desktop py-space-sm mt-space-xl shadow-[0_-2px_12px_rgba(0,0,0,0.04)]">
+<div class="max-w-[1600px] mx-auto flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-body-sm text-body-sm transition-colors" type="button">
+          取消 (Cancel)
+        </button>
+<button class="px-space-md py-space-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-body-sm text-body-sm transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span>
+<span class="">還原預設值 (Reset)</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="hidden md:flex items-center gap-1.5 font-label-sm text-label-sm text-outline pr-2">
+<span class="material-symbols-outlined text-[16px]">cloud_done</span>
+<span class="">上次自動快照：2 分鐘前</span>
+</div>
+<button class="flex items-center gap-space-xs px-space-lg py-2.5 rounded-lg bg-primary-container text-on-primary font-body-sm text-body-sm font-semibold shadow-[0_2px_10px_rgba(14,128,116,0.3)] hover:bg-primary transition-all active:scale-[0.98]" id="btn-save-footer" type="button">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+<span class="">儲存設定並同步至 Agent (Save &amp; Sync Connector)</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Toast Notification Modal / Feedback Container (Hidden by default) -->
+<div class="fixed bottom-20 right-8 z-50 transform translate-y-8 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-space-sm px-space-md py-space-sm rounded-xl bg-inverse-surface text-inverse-on-surface shadow-xl" id="toast-notification">
+<span class="material-symbols-outlined text-primary-fixed text-[20px]" id="toast-icon">check_circle</span>
+<span class="font-body-sm text-body-sm" id="toast-message">端點測試成功：Slack MCP 節點響應 16ms</span>
+</div>
+</div>
+<script>
+  (function() {
+    // Password mask toggle
+    const toggleEye = document.getElementById('toggle-token-eye');
+    const tokenInput = document.getElementById('input-token');
+    const eyeIcon = document.getElementById('eye-icon');
+
+    if (toggleEye && tokenInput && eyeIcon) {
+      toggleEye.addEventListener('click', function() {
+        if (tokenInput.type === 'password') {
+          tokenInput.type = 'text';
+          eyeIcon.textContent = 'visibility_off';
+        } else {
+          tokenInput.type = 'password';
+          eyeIcon.textContent = 'visibility';
+        }
+      });
+    }
+
+    // Toast helper
+    const toast = document.getElementById('toast-notification');
+    const toastMsg = document.getElementById('toast-message');
+    const toastIcon = document.getElementById('toast-icon');
+
+    function showToast(message, isSuccess = true) {
+      if (!toast) return;
+      toastMsg.textContent = message;
+      toastIcon.textContent = isSuccess ? 'check_circle' : 'error';
+      toast.classList.remove('opacity-0', 'translate-y-8', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(function() {
+        toast.classList.add('opacity-0', 'translate-y-8', 'pointer-events-none');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3500);
+    }
+
+    // Ping Button Interaction
+    const pingBtn = document.getElementById('btn-run-ping');
+    const testConnBtn = document.getElementById('btn-test-connection');
+    const consoleBox = document.getElementById('log-console');
+
+    function triggerPingSimulation() {
+      if (consoleBox) {
+        consoleBox.innerHTML = `
+          <div class="flex items-center gap-1.5 text-secondary-fixed animate-pulse">
+            <span class="material-symbols-outlined text-[14px]">sync</span>
+            <span>發送即時 SSE Ping 至 https://mcp-slack-proxy.vghtc.internal:9080/sse ...</span>
+          </div>
+        `;
+      }
+
+      setTimeout(() => {
+        const timestamp = new Date().toLocaleTimeString();
+        if (consoleBox) {
+          consoleBox.innerHTML = `
+            <div class="flex items-center gap-1.5 text-primary-fixed font-semibold">
+              <span class="material-symbols-outlined text-[14px]">check</span>
+              <span>[200 OK] Slack MCP Proxy Received in 18ms (${timestamp})</span>
+            </div>
+            <div class="text-outline-variant pl-4">SSE Handshake OK · Tools registered: 4 · Auth: Validated</div>
+          `;
+        }
+        showToast('端點測試成功：Slack MCP 伺服器通訊正常 (18ms)');
+      }, 600);
+    }
+
+    if (pingBtn) pingBtn.addEventListener('click', triggerPingSimulation);
+    if (testConnBtn) testConnBtn.addEventListener('click', triggerPingSimulation);
+
+    // Save buttons
+    const saveHeaderBtn = document.getElementById('btn-save-header');
+    const saveFooterBtn = document.getElementById('btn-save-footer');
+
+    function triggerSave() {
+      showToast('設定已成功儲存，已同步至 3 個專科 Agent 執行緒！');
+    }
+
+    if (saveHeaderBtn) saveHeaderBtn.addEventListener('click', triggerSave);
+    if (saveFooterBtn) saveFooterBtn.addEventListener('click', triggerSave);
+  })();
+</script></main></div>
+
+
+</body></html>
