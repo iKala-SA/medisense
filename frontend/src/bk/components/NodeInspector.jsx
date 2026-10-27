@@ -23,7 +23,6 @@ function NodeInspector({ node, onChange, onDelete, knowledgeCount, effectiveGrou
       {node.type === "knowledge" && <>
         <Field label="檢索查詢（模板）" hint="可用 {{input}}、{{last}}、{{節點id}}。結果可在後續 LLM 提示詞以 {{此節點id}} 引用；若未引用會自動附加到系統提示。">
           <input value={s("query", "{{input}}")} onChange={(e) => set("query", e.target.value)} /></Field>
-        <Field label="取回段落數 top_k"><input type="number" min={1} max={20} value={Number(node.data.top_k ?? 5)} onChange={(e) => set("top_k", Number(e.target.value))} /></Field>
         <p className={`mt-2 flex items-center gap-1 text-xs ${knowledgeCount ? "text-primary" : "text-warning"}`}><Icon name={knowledgeCount ? "check_circle" : "warning"} className="text-[16px]" />
           {knowledgeCount ? `\u5DF2\u639B\u8F09 ${knowledgeCount} \u4EFD\u77E5\u8B58\u6587\u4EF6` : "\u6B64 Agent \u5C1A\u672A\u639B\u8F09\u77E5\u8B58\u6587\u4EF6\uFF08\u5DE6\u5074\u300C\u81E8\u5E8A\u77E5\u8B58\u5EAB\u8207\u898F\u7BC4\u639B\u8F09\u300D\uFF09"}</p>
       </>}

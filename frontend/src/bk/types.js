@@ -60,9 +60,8 @@ const toAgentIn = (a) => ({
   category: a.category,
   department: a.department,
   code: a.code,
-  model_group: a.model_group,
+  model_group: "auto",  // the admin routing rules pick the group (路由 page); agents no longer choose one
   temperature: a.temperature,
-  top_p: a.top_p,
   routing: a.routing,
   connectors: a.connectors,
   flow: a.flow,
@@ -76,15 +75,14 @@ const emptyAgent = () => ({
   category: "clinical",
   department: "",
   code: "",
-  model_group: "fast",
+  model_group: "auto",
   temperature: 0.15,
-  top_p: 0.85,
   routing: { reasoning_keywords: ["\u5206\u6790", "\u6BD4\u8F03", "\u898F\u5283", "\u70BA\u4EC0\u9EBC"], sovereign_only: false, max_cost_tier: "reasoning" },
   connectors: [],
   flow: {
     nodes: [
       { id: "in", type: "input", position: { x: 40, y: 200 }, data: { label: "\u4F7F\u7528\u8005\u8F38\u5165" } },
-      { id: "kb", type: "knowledge", position: { x: 340, y: 200 }, data: { label: "\u77E5\u8B58\u6AA2\u7D22", query: "{{input}}", top_k: 5 } },
+      { id: "kb", type: "knowledge", position: { x: 340, y: 200 }, data: { label: "\u77E5\u8B58\u6AA2\u7D22", query: "{{input}}" } },
       { id: "llm", type: "llm", position: { x: 640, y: 200 }, data: { label: "\u81E8\u5E8A\u6458\u8981\u751F\u6210", prompt: "{{input}}" } },
       { id: "out", type: "output", position: { x: 940, y: 200 }, data: { label: "\u56DE\u8986", template: "{{last}}" } }
     ],

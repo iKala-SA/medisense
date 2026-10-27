@@ -614,6 +614,9 @@ class RoutingRule(BaseModel):
 
 
 class RoutingConfigIn(BaseModel):
+    # 僅院內模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of rules, agent or node
+    # groups, and nothing falls back to a cloud model.
+    sovereign_only: bool = False
     default_group: RealGroup = "fast"
     fallback_group: RealGroup = "fast"
     rules: list[RoutingRule] = Field(default_factory=list, max_length=50)
