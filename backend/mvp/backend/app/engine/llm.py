@@ -15,6 +15,7 @@ import google.oauth2.id_token
 from openai import OpenAI
 
 from ..config import settings
+from . import routing
 
 _SKIP_IAM_PREFIXES = ("http://localhost", "http://127.0.0.1")
 
@@ -140,6 +141,8 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
     """One chat completion through the proxy. `group` is a LiteLLM model group alias."""
     if group not in GROUPS:  # "auto" is resolved by engine/routing before this point; never send it to LiteLLM
         group = "fast"
+    if routing.sovereign_only():  # 僅院內模型 backstop: callers already pick sovereign, but no path may reach a cloud group
+        group = "sovereign"
     client = _client()
     t0 = time.perf_counter()
     kwargs: dict = {}

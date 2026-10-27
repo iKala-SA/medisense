@@ -8,7 +8,11 @@ cd "$(dirname "$0")/../litellm"
 
 # Set IMAGE=<existing tag> to redeploy without rebuilding.
 IMAGE="${IMAGE:-${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/litellm:$(date +%Y%m%d-%H%M%S)}"
-if [ -z "${IMAGE_PREBUILT:-}" ]; then gcloud builds submit --tag "$IMAGE" .; fi
+# BUILD_FLAGS: extra `gcloud builds submit` flags. The CI deploy SA (litellm-apply.yml) only has access to the staging
+# bucket itself, so it passes an explicit --gcs-source-staging-dir (skips the project-wide bucket-ownership listing)
+# and --suppress-logs (streaming the default logs bucket needs project Viewer); the build status still decides success.
+# shellcheck disable=SC2086
+if [ -z "${IMAGE_PREBUILT:-}" ]; then gcloud builds submit --tag "$IMAGE" ${BUILD_FLAGS:-} .; fi
 
 # EXTRA_SECRETS="ENV=secret:latest,..." mounts the provider secrets named in a rendered registry config (infra/09).
 gcloud run deploy "$LITELLM_SERVICE" \

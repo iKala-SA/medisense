@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Publish the model registry to LiteLLM: reads the YAML the admin rendered in the platform
-# (POST /api/model-registry/apply -> Firestore config/litellm_render), writes litellm/config.yaml
-# (previous one kept as config.yaml.bak) and runs the existing 03-deploy-litellm.sh.
-# NOT run automatically. Set YES=1 to skip the confirmation prompt.
+# Publish the model registry to LiteLLM: reads the YAML the platform rendered from the admin Model registry
+# (Firestore config/litellm_render, re-rendered on every save), writes litellm/config.yaml (previous one kept as
+# config.yaml.bak) and runs the existing 03-deploy-litellm.sh. Set YES=1 to skip the confirmation prompt.
+# 套用到 LiteLLM in the admin UI runs this from .github/workflows/litellm-apply.yml with YES=1 and
+# RENDER_DOC=litellm_deploy (the snapshot taken when the button was pressed).
 set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TARGET="$HERE/../litellm/config.yaml"
 
-DOC_URL="https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE}/documents/config/litellm_render"
+DOC_URL="https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${FIRESTORE_DATABASE}/documents/config/${RENDER_DOC:-litellm_render}"
 TOKEN="$(gcloud auth print-access-token)"
-RAW="$(curl -sf -H "Authorization: Bearer ${TOKEN}" "$DOC_URL")" || { echo "no rendered config found: press 'apply' in the admin Model registry first" >&2; exit 1; }
+RAW="$(curl -sf -H "Authorization: Bearer ${TOKEN}" "$DOC_URL")" || { echo "no rendered config found: save a model in the admin Model registry first" >&2; exit 1; }
 
 # Parse with python3 stdlib: yaml text -> $TARGET.new ; "ENV=secret:latest,..." -> stdout
 EXTRA="$(RAW="$RAW" OUT="$TARGET.new" python3 - <<'PY'

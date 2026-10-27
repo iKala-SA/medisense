@@ -4,13 +4,12 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ShareDialog, { ShareChip } from "../../live/ShareLive";
 import SkillsPanel from "../components/SkillsPanel";
 import { api } from "../api";
-import { CATEGORIES, DEPARTMENTS, MODEL_GROUPS, clampToCap, toAgentIn } from "../types";
+import { CATEGORIES, DEPARTMENTS, clampToCap, toAgentIn } from "../types";
 import Canvas from "../components/Canvas";
 import NodeInspector from "../components/NodeInspector";
 import KnowledgePanel from "../components/KnowledgePanel";
 import { ErrorBox, Field, Icon, Spinner, StatusPill } from "../components/ui";
 import { currentUid } from "../mock";
-import { describeGroup, useModelGroups } from "../modelGroups";
 const estTokens = (s) => Math.ceil([...s].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 1.3 : 0.25), 0));
 function Studio() {
   const { id } = useParams();
@@ -73,7 +72,6 @@ function Studio() {
     await api.deleteAgent(agent.id);
     nav("/hub");
   };
-  const groups = useModelGroups();
   const effective = useCallback((pinned) => {
     if (!agent) return "fast";
     return agent.routing.sovereign_only ? "sovereign" : clampToCap(pinned || agent.model_group, agent.routing.max_cost_tier);
@@ -119,24 +117,6 @@ function Studio() {
             </div>
             <Field label="負責科別 / 單位" hint="監控與成本儀表板依此分科統計"><select value={agent.department} onChange={(e) => patch({ department: e.target.value })} disabled={!editable}><option value="">（未指定）</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}</select></Field>
             <Field label="臨床業務說明 (Description)"><textarea rows={3} value={agent.description} onChange={(e) => patch({ description: e.target.value })} disabled={!editable} /></Field>
-            <Field label="預設模型群組（LiteLLM 路由）" hint={`\u672A\u5728\u7BC0\u9EDE\u6307\u5B9A\u7FA4\u7D44\u7684\u6A21\u578B\u6B65\u9A5F\uFF08\u542B\u689D\u4EF6\u5224\u65B7\uFF09\u4F7F\u7528\u6B64\u7FA4\u7D44\u3002${describeGroup(groups, agent.model_group)}`}>
-              <select value={agent.model_group} onChange={(e) => patch({ model_group: e.target.value })} disabled={!editable}>
-                {MODEL_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}</select>
-            </Field>
-            {effective() !== agent.model_group && <p className="mt-1 flex items-start gap-1 text-[11px] text-warning"><Icon name="info" className="text-[14px]" />
-                目前實際使用 {effective()}：{agent.routing.sovereign_only ? "\u5DF2\u52FE\u9078\u300C\u50C5\u9650\u9662\u5167\u6A21\u578B\u300D" : `\u9AD8\u65BC\u6210\u672C\u4E0A\u9650 ${agent.routing.max_cost_tier}`}。</p>}
-            <div className="mt-3 rounded-lg bg-surface-container-low p-3">
-              <div className="flex items-center justify-between text-xs"><span className="font-semibold">隨機發散性 (Temperature)</span><span className="font-mono text-primary">{agent.temperature.toFixed(2)}</span></div>
-              <input type="range" min={0} max={1} step={0.05} value={agent.temperature} onChange={(e) => patch({ temperature: Number(e.target.value) })} disabled={!editable} className="mt-1 accent-primary" />
-              <div className="mt-2 flex items-center justify-between text-xs"><span className="font-semibold">採樣多樣性 (Top-P)</span><span className="font-mono text-primary">{agent.top_p.toFixed(2)}</span></div>
-              <input type="range" min={0} max={1} step={0.05} value={agent.top_p} onChange={(e) => patch({ top_p: Number(e.target.value) })} disabled={!editable} className="mt-1 accent-primary" />
-            </div>
-            <details className="mt-3 text-xs">
-              <summary className="cursor-pointer font-semibold text-on-surface-variant">模型路由與成本上限</summary>
-              <label className="mt-2 flex items-center gap-2"><input type="checkbox" className="w-auto" checked={agent.routing.sovereign_only} onChange={(e) => patch({ routing: { ...agent.routing, sovereign_only: e.target.checked } })} disabled={!editable} />僅限院內模型（sovereign，不回退雲端）</label>
-              <Field label="升級到 reasoning 的關鍵字" hint="只比對使用者的提問（不含檢索內容或前一步輸出）；節點已指定群組時不套用。"><input value={agent.routing.reasoning_keywords.join(", ")} onChange={(e) => patch({ routing: { ...agent.routing, reasoning_keywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} disabled={!editable} /></Field>
-              <Field label="成本上限" hint="上限，不只是門檻：預設群組、關鍵字升級與節點指定的群組若高於此等級，執行時一律降為此等級。sovereign 不受影響。"><select value={agent.routing.max_cost_tier} onChange={(e) => patch({ routing: { ...agent.routing, max_cost_tier: e.target.value } })} disabled={!editable}><option value="budget">budget</option><option value="fast">fast</option><option value="reasoning">reasoning</option></select></Field>
-            </details>
           </div>
 
           <div className="card p-4">

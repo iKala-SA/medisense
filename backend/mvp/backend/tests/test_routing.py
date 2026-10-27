@@ -88,3 +88,61 @@ def test_routing_endpoints(fs, as_user, audit_log):
     t = c.post("/api/routing/test", json={"text": "hello"}).json()
     assert t["group"] == "fast" and t["matched_rule"] is None
     assert sum(1 for a in audit_log() if a["action"] == "routing.update") == 2
+
+
+def test_sovereign_only_overrides_everything(fs, monkeypatch):
+    from app.engine import llm
+    from app.engine.flow import pick_group
+    from app.schemas import AgentIn, FlowNode
+
+    cfg = {"version": 5, "sovereign_only": True, "default_group": "fast", "fallback_group": "fast", "rules": [
+        {"id": "c", "name": "cx", "condition": "complex", "group": "reasoning", "enabled": True}]}
+    r = routing.resolve_group(cfg, "請分析")
+    assert r.group == "sovereign" and r.matched_rule is None and "僅院內模型" in r.reason
+
+    fs.put("config/routing", cfg)
+    pinned = FlowNode(id="n", type="llm", data={"group": "reasoning"})
+    for agent in (AgentIn(name="a", model_group="auto"), AgentIn(name="a", model_group="fast"),
+                  AgentIn(name="a", model_group="reasoning", routing={"max_cost_tier": "budget"})):
+        g, note = pick_group(agent, pinned, "analyze: 比較")
+        assert g == "sovereign" and "僅院內模型" in note
+
+    sent = {}
+
+    class Client:
+        class chat:  # noqa: N801
+            class completions:  # noqa: N801
+                @staticmethod
+                def create(**kw):
+                    sent.update(kw)
+                    return type("R", (), {"choices": [type("C", (), {"message": type("M", (), {"content": "x"})()})()],
+                                          "model": "gpt-oss-120b", "usage": None})()
+
+    monkeypatch.setattr(llm, "_client", lambda: Client)
+    llm.complete(group="fast", system="s", messages=[], agent_id="a", user_id="u")  # backstop for any caller
+    assert sent["model"] == "sovereign"
+
+
+def test_sovereign_only_survives_a_firestore_read_error(fs, monkeypatch):
+    from app import db
+
+    fs.put("config/routing", {"sovereign_only": True, "rules": []})
+    assert routing.sovereign_only()
+    routing._cache = (0.0, routing._cache[1])  # expire the TTL
+
+    def boom():
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(db, "client", boom)
+    assert routing.sovereign_only()  # last good config, not DEFAULT_CONFIG
+    routing.reset_cache()
+    assert not routing.sovereign_only()  # never read successfully -> defaults
+
+
+def test_sovereign_only_is_saved_and_audited(fs, as_user, audit_log):
+    c = as_user(ADMIN)
+    assert c.get("/api/routing").json()["sovereign_only"] is False
+    out = c.put("/api/routing", json={"sovereign_only": True, "rules": []}).json()
+    assert out["sovereign_only"] is True and fs.store["config/routing"]["sovereign_only"] is True
+    assert c.post("/api/routing/test", json={"text": "請分析"}).json()["group"] == "sovereign"
+    assert any(a["action"] == "routing.update" and a.get("sovereign_only") is True for a in audit_log())

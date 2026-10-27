@@ -1,15 +1,14 @@
 # TCVGH Agent Platform — MVP build (sandbox: `cloud-sa-sandbox-1`)
 
-This folder is the runnable MVP that matches diagram v0.3 plus the Stitch design
-(`../stitch_tcvgh_agent_studio`, "Clinical Jade"). It is deliberately small:
+This folder is the runnable MVP that matches diagram v0.3. It is deliberately small:
 three deployables and a handful of `gcloud` scripts, no Terraform.
 
 ```
 mvp/
 ├── infra/        numbered gcloud scripts; run in order, each is idempotent
 ├── litellm/      LiteLLM proxy config + Dockerfile (model gateway, column D)
-├── backend/      FastAPI "Platform API + Agent Runtime" (column B), Python 3.12
-└── frontend/     React + React Flow builder UI on Firebase Hosting (column A)
+└── backend/      FastAPI "Platform API + Agent Runtime" (column B), Python 3.12
+(the frontend now lives in the repo-root `frontend/`, deployed to Firebase Hosting — column A)
 ```
 
 ## 0. One-time local prerequisites
@@ -62,7 +61,7 @@ Idle cost is close to zero (Cloud Run min-instances 0, no Cloud SQL / Redis yet)
 
 ## 1c. CI/CD (GitHub Actions → Firebase Hosting)
 
-`.github/workflows/firebase-hosting.yml` builds `mvp/frontend` and deploys it to the `tcvgh-agent-builder` site on
+The repo-root `.github/workflows/firebase-hosting.yml` builds `frontend/` and deploys it to the `medisense-portal` site on
 every push to `main` that touches the frontend; pull requests get a temporary preview URL. One-time setup:
 
 ```bash

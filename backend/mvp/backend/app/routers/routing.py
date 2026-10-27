@@ -31,7 +31,7 @@ def put_routing(body: RoutingConfigIn, user: User = Depends(require_admin)):
     data = {**body.model_dump(), "version": version, "updated_by": user.email, "updated_at": db.now()}
     _ref().set(data)
     eng.reset_cache()
-    db.audit(user.uid, "routing.update", user.email, version=version, rules=len(body.rules),
+    db.audit(user.uid, "routing.update", user.email, version=version, rules=len(body.rules), sovereign_only=body.sovereign_only,
              default_group=body.default_group, fallback_group=body.fallback_group)
     return RoutingConfigOut.model_validate(data)
 

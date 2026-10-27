@@ -37,9 +37,9 @@ pip install -r requirements.txt pytest httpx
 pytest
 ```
 
-Deploying uses `backend/mvp/infra/*.sh` (`source infra/env.sh` first). The legacy builder UI under `backend/mvp/frontend` and its
-workflow `backend/.github/workflows/firebase-hosting.yml` are the platform team's original front end; they are kept for reference and
-do not run from this repository.
+Deploying uses `backend/mvp/infra/*.sh` (`source infra/env.sh` first). The frontend is deployed by
+`.github/workflows/firebase-hosting.yml`: every push to `main` that touches `frontend/` builds it and deploys to the
+`medisense-portal` Firebase Hosting site; pull requests get a temporary preview URL.
 
 ## Do not commit
 

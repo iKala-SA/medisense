@@ -1,7 +1,11 @@
+from datetime import timedelta
+
+import pytest
 import yaml
 
+from app import db
+from app.engine import github_actions, llm
 from app.engine import litellm_config as lc
-from app.engine import llm
 
 from .conftest import ADMIN, BUILDER
 
@@ -59,15 +63,80 @@ def test_render_empty_registry_is_valid():
     assert cfg["model_list"] == [] and cfg["router_settings"]["fallbacks"] == []
 
 
-def test_apply_stores_without_deploying(fs, as_user, audit_log):
+GROUPS3 = [{**CLOUD, "name": f"M {g}", "group": g} for g in ("fast", "reasoning", "budget")]
+
+
+def test_save_rerenders(fs, as_user):
+    c = as_user(ADMIN)
+    mid = c.post("/api/model-registry", json=CLOUD).json()["id"]
+    assert fs.store["config/litellm_render"]["version"] == 1
+    assert "gemini-flash" in c.get("/api/model-registry/rendered").json()["yaml"]
+    c.put(f"/api/model-registry/{mid}", json={**CLOUD, "name": "Renamed"})
+    assert "renamed" in fs.store["config/litellm_render"]["yaml"]
+    c.delete(f"/api/model-registry/{mid}")
+    r = fs.store["config/litellm_render"]
+    assert r["version"] == 3 and yaml.safe_load(r["yaml"])["model_list"] == []
+
+
+@pytest.fixture
+def gh(monkeypatch):
+    """Stub GitHub: records dispatches; find_run returns whatever state.run holds."""
+    state = type("S", (), {"dispatched": [], "run": None})()
+    monkeypatch.setattr(github_actions, "dispatch", lambda v, who: state.dispatched.append((v, who)))
+    monkeypatch.setattr(github_actions, "find_run", lambda v: state.run)
+    return state
+
+
+def test_apply_refuses_incomplete_registry(fs, as_user, gh):
     c = as_user(ADMIN)
     c.post("/api/model-registry", json=CLOUD)
+    r = c.post("/api/model-registry/apply")
+    assert r.status_code == 409 and "reasoning" in r.json()["detail"] and "budget" in r.json()["detail"]
+    assert gh.dispatched == [] and "config/litellm_deploy" not in fs.store
+
+
+def test_apply_dispatches_and_tracks_run(fs, as_user, audit_log, gh):
+    c = as_user(ADMIN)
+    for m in GROUPS3:
+        c.post("/api/model-registry", json=m)
     r = c.post("/api/model-registry/apply").json()
-    assert r["version"] == 1 and r["status"] == "rendered" and "model_list" in r["yaml"]
-    assert fs.store["config/litellm_render"]["requested_by"] == "admin@example.com"
-    assert c.post("/api/model-registry/apply").json()["version"] == 2
-    assert c.get("/api/model-registry/rendered").json()["version"] == 2
+    assert r["version"] == 4 and r["status"] == "dispatched"  # 3 saves + the apply render
+    assert gh.dispatched == [(4, "admin@example.com")]
+    assert fs.store["config/litellm_deploy"]["yaml"] == fs.store["config/litellm_render"]["yaml"]
     assert any(a["action"] == "model.apply" for a in audit_log())
+
+    assert c.get("/api/model-registry/deploy").json()["status"] == "dispatched"  # run not visible yet
+    gh.run = {"status": "in_progress", "conclusion": None, "html_url": "https://github.com/x/runs/1"}
+    d = c.get("/api/model-registry/deploy").json()
+    assert d["status"] == "deploying" and d["run_url"] == "https://github.com/x/runs/1"
+    assert c.post("/api/model-registry/apply").status_code == 409  # one deploy at a time
+    c.post("/api/model-registry", json={**CLOUD, "name": "Later"})  # saving mid-deploy leaves the snapshot alone
+    assert fs.store["config/litellm_deploy"]["version"] == 4
+    gh.run = {"status": "completed", "conclusion": "success", "html_url": "https://github.com/x/runs/1"}
+    assert c.get("/api/model-registry/deploy").json()["status"] == "deployed"
+    assert c.post("/api/model-registry/apply").status_code == 200 and gh.dispatched[-1][0] == 6
+
+
+def test_apply_failed_run_and_never_started(fs, as_user, gh):
+    c = as_user(ADMIN)
+    for m in GROUPS3:
+        c.post("/api/model-registry", json=m)
+    c.post("/api/model-registry/apply")
+    gh.run = {"status": "completed", "conclusion": "failure", "html_url": "u"}
+    assert c.get("/api/model-registry/deploy").json()["status"] == "failed"
+    gh.run = None
+    c.post("/api/model-registry/apply")
+    fs.store["config/litellm_deploy"]["requested_at"] = db.now() - timedelta(minutes=11)
+    assert c.get("/api/model-registry/deploy").json()["status"] == "failed"
+
+
+def test_apply_without_github_config_is_503(fs, as_user):
+    c = as_user(ADMIN)
+    for m in GROUPS3:
+        c.post("/api/model-registry", json=m)
+    r = c.post("/api/model-registry/apply")
+    assert r.status_code == 503 and fs.store["config/litellm_deploy"]["status"] == "failed"
+    assert as_user(BUILDER).post("/api/model-registry/apply").status_code == 403
 
 
 def test_llm_prices_fall_back_to_registry(fs):

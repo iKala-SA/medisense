@@ -6,7 +6,7 @@ A canvas is a DAG of node types. We walk it from the `input` node following edge
   his_emr           -> data: {query}      ; STUB until the FHIR gateway exists; returns a marker
   pii_mask          -> DEPRECATED no-op kept so older canvases still run; the platform de-identifies
                        every message, knowledge file and retrieved chunk itself
-  knowledge         -> data: {query?, top_k?} ; retrieves chunks from the agent's attached library documents -> {{<id>}} (de-identified)
+  knowledge         -> data: {query?} ; retrieves RAG_TOP_K chunks chunks from the agent's attached library documents -> {{<id>}} (de-identified)
   llm               -> one LiteLLM call; data: {prompt, group?} ; prompt may use {{input}}, {{last}}, {{<nodeId>}}
   condition         -> data: {question} ; an LLM yes/no decides which outgoing edge (sourceHandle "true"/"false")
   tool              -> data: {connector_id, action, args{}} ; runs one connector action (engine.connectors)
@@ -56,7 +56,8 @@ COST_TIER = {"budget": 0, "fast": 1, "reasoning": 2}  # sovereign is a data-resi
 def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str]:
     """Model group for one llm / structured_output / condition step, plus a note for the trace.
 
-    1. sovereign_only: every step on-prem, nothing overrides it.
+    1. sovereign_only (the hospital-wide 僅院內模型 switch in config/routing, or the agent's own): every step
+       on-prem, nothing overrides it, and there is no cloud fallback.
     2. the node's own group, else
     3. (agent/node group "auto" is resolved through config/routing rules, see engine/routing.py)
        reasoning if the USER's message (not the rendered prompt, which may carry retrieved text)
@@ -66,6 +67,8 @@ def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str
     """
     if agent.routing.sovereign_only:
         return "sovereign", ""
+    if routing.sovereign_only():
+        return "sovereign", routing.SOVEREIGN_REASON
     text = user_text.lower()
     want = str(node.data.get("group") or "") or (
         "reasoning" if agent.model_group != "auto" and any(k.lower() in text for k in agent.routing.reasoning_keywords)
@@ -235,7 +238,7 @@ def run_flow(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
                 from . import rag  # lazy: only agents with knowledge pay the import cost
 
                 query = _render(str(node.data.get("query") or "{{input}}"), ctx)
-                top_k = int(node.data.get("top_k") or s.rag_top_k)
+                top_k = s.rag_top_k  # platform-wide; the builder no longer offers a per-node top_k (old values ignored)
                 chunks = rag.retrieve(rag.hospital_corpus(), rag_files, query, top_k=top_k)
                 # Safety net: files indexed before upload de-id (or with it off) may still hold PHI.
                 for c, masked in zip(chunks, deid.deidentify_many([c["text"] for c in chunks]), strict=True):
@@ -266,7 +269,7 @@ def run_flow(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             group, note = pick_group(agent, node, ctx["input"])
             c = _complete(agent, agent_id, user_id, group, system=system,
                           messages=[*history, {"role": "user", "content": prompt}],
-                          temperature=agent.temperature, top_p=agent.top_p, json_mode=structured)
+                          json_mode=structured)  # platform temperature (llm.complete default); no top_p: each model's default
             reply = c.text
             if structured:
                 try:

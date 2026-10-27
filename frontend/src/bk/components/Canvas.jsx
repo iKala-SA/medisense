@@ -19,7 +19,7 @@ function summary(type, d) {
     case "his_emr":
       return `\u67E5\u8A62\uFF1A${d.query ?? "{{input}}"}`;
     case "knowledge":
-      return `\u67E5\u8A62 ${d.query ?? "{{input}}"} \xB7 top_k ${d.top_k ?? 5}`;
+      return `\u67E5\u8A62 ${d.query ?? "{{input}}"}`;
     case "llm":
       return String(d.prompt ?? "{{input}}");
     case "structured_output":
@@ -93,7 +93,7 @@ function Canvas({ flow, onChange, onSelect, selectedId }) {
     const id = `${type}-${Math.random().toString(36).slice(2, 7)}`;
     const last = flow.nodes[flow.nodes.length - 1];
     const defaults = {
-      knowledge: { query: "{{input}}", top_k: 5 },
+      knowledge: { query: "{{input}}" },
       llm: { prompt: "{{input}}" },
       output: { template: "{{last}}" },
       structured_output: { prompt: "{{input}}", schema: '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}' },

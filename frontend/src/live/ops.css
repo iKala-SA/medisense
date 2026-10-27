@@ -26,7 +26,7 @@
 .lv-o-groupdesc div{font-size:12px;line-height:1.6}
 .lv-o-status{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .lv-o-status i{width:7px;height:7px;border-radius:50%;background:#bbb}
-.lv-o-status.ok i{background:#2f9e5b}.lv-o-status.warn i{background:#d9962b}
+.lv-o-status.ok i{background:#2f9e5b}.lv-o-status.warn i{background:#d9962b}.lv-o-status.bad i{background:#c4473a}
 .lv-o-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lv-o-mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;overflow-wrap:anywhere}
 .lv-o-sub{display:block;font-size:11px;color:var(--muted);margin-top:3px}
@@ -45,3 +45,9 @@
 .lv-o-viewtabs{display:flex;gap:8px;margin:0 0 16px}
 .lv-o-viewtabs button{padding:9px 14px;border-radius:9px}
 .lv-o-viewtabs button.selected{color:var(--purple);background:#e8faf2}
+.lv-o-sovereign{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;margin:0 0 16px;cursor:pointer;border:1px solid #e3e0e8}
+.lv-o-sovereign input{width:18px;height:18px;margin-top:2px;accent-color:#2f7d5b;flex:none}
+.lv-o-sovereign b{display:block;font-size:14px;margin-bottom:3px}
+.lv-o-sovereign.on{border-color:#2f7d5b;background:#f1faf5}
+.lv-o-banner.bad{background:#fcefed;border-color:#f1d1cc;color:#8a3226}
+.lv-o-overridden{opacity:.45;pointer-events:none;user-select:none}

@@ -9,8 +9,8 @@ import './ops.css';
 const CONDITIONS=[['complex','複雜任務','訊息含推理關鍵字（預設：分析、比較、plan、why、summarize）'],['simple','簡單任務','未含推理關鍵字的一般問題'],['all','所有一般任務','不論內容，一律符合']];
 const GROUPS=[['fast','fast · 快速','一般問答與多數流程步驟，延遲低。'],['reasoning','reasoning · 深度推理','需較深推理的分析任務；成本最高。'],['budget','budget · 低成本','成本最低的雲端群組，適合簡單任務。'],['sovereign','sovereign · 院內模型','僅在院內（地端）執行，不使用雲端。']];
 const condLabel=c=>CONDITIONS.find(x=>x[0]===c)?.[1]||c;
-const clean=c=>JSON.stringify({default_group:c.default_group,fallback_group:c.fallback_group,rules:c.rules.map(r=>({id:r.id,name:r.name,condition:r.condition,group:r.group,enabled:!!r.enabled}))});
-const norm=r=>({default_group:r.default_group,fallback_group:r.fallback_group,rules:(r.rules||[]).map(x=>({id:x.id,name:x.name,condition:x.condition,group:x.group,enabled:!!x.enabled})),version:r.version,updated_by:r.updated_by,updated_at:r.updated_at});
+const clean=c=>JSON.stringify({sovereign_only:!!c.sovereign_only,default_group:c.default_group,fallback_group:c.fallback_group,rules:c.rules.map(r=>({id:r.id,name:r.name,condition:r.condition,group:r.group,enabled:!!r.enabled}))});
+const norm=r=>({sovereign_only:!!r.sovereign_only,default_group:r.default_group,fallback_group:r.fallback_group,rules:(r.rules||[]).map(x=>({id:x.id,name:x.name,condition:x.condition,group:x.group,enabled:!!x.enabled})),version:r.version,updated_by:r.updated_by,updated_at:r.updated_at});
 const uid=()=>'r-'+Math.random().toString(36).slice(2,10);
 const GroupSelect=({value,onChange,label})=><select aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{GROUPS.map(([id,l])=><option key={id} value={id}>{l}</option>)}</select>;
 
@@ -30,12 +30,14 @@ export default function RoutingRulesPage({me,notify}){
   if(base===false)return <div className="lv-o"><div className="page-heading"><h1><ArrowsSplit/>路由</h1></div><Empty text="無法載入路由規則，請稍後重新整理。"/></div>;
   const edit=fn=>{setDraft(fn);setSaved(false)};
   const change=(id,k,v)=>edit(a=>({...a,rules:a.rules.map(r=>r.id===id?{...r,[k]:v}:r)}));
+  const sov=draft.sovereign_only,sovLive=(groups||[]).find(g=>g.id==='sovereign');
+  const sovMissing=groups!==null&&!gfail&&!sovLive?.configured;
   const move=(i,d)=>edit(a=>{const rules=[...a.rules];const j=i+d;if(j<0||j>=rules.length)return a;[rules[i],rules[j]]=[rules[j],rules[i]];return {...a,rules}});
   async function publish(){
     if(draft.rules.some(r=>!r.name.trim()))return notify('規則名稱不可空白');
     setBusy(true);
     try{
-      const out=await api.saveRouting({default_group:draft.default_group,fallback_group:draft.fallback_group,rules:draft.rules.map(r=>({...r,name:r.name.trim()}))});
+      const out=await api.saveRouting({sovereign_only:draft.sovereign_only,default_group:draft.default_group,fallback_group:draft.fallback_group,rules:draft.rules.map(r=>({...r,name:r.name.trim()}))});
       const n=norm(out&&out.rules?out:await api.getRouting());setBase(n);setDraft(structuredClone(n));setSaved(true);notify(`已發布路由設定（版本 v${n.version}）`);
     }catch(e){notify('發布失敗：'+errText(e))}finally{setBusy(false)}
   }
@@ -46,8 +48,12 @@ export default function RoutingRulesPage({me,notify}){
   return <div className="lv-o">
     <div className="page-heading"><h1><ArrowsSplit/>路由</h1><button className="btn primary" onClick={()=>setAdding(true)}><Plus/>新增規則</button></div>
     <p className="subtitle">設定 Agent 選擇「auto」模型時的路由規則。由上至下比對，第一個啟用且符合的規則生效。<span className="badge" style={{marginLeft:8}}>已發布版本 v{base.version}</span>{base.updated_by&&<span className="muted small" style={{marginLeft:8}}>{base.updated_by}{base.updated_at?' · '+new Date(base.updated_at).toLocaleString('zh-TW',{hour12:false}):''}</span>}</p>
-    <div className="lv-o-policy"><Lock size={19}/><div><b>敏感資料不是路由條件</b>：去識別化一律啟用，不因內容敏感而改變路由。只有 <b>sovereign</b> 群組僅在院內（地端）執行；其他群組皆為雲端。若需確保資料不離院，請在 Agent 設定「僅用院內模型」。</div></div>
+    <div className="lv-o-policy"><Lock size={19}/><div><b>敏感資料不是路由條件</b>：去識別化一律啟用，不因內容敏感而改變路由。只有 <b>sovereign</b> 群組僅在院內（地端）執行；其他群組皆為雲端。若需確保全院資料不離院，請勾選下方「僅院內模型」；個別 Agent 也可在設定中啟用「僅用院內模型」。</div></div>
+    <label className={'panel lv-o-sovereign'+(sov?' on':'')}><input type="checkbox" checked={sov} onChange={e=>edit(a=>({...a,sovereign_only:e.target.checked}))}/><div><b>僅院內模型</b><span className="muted small">勾選並發布後，所有 Agent 與對話一律使用 <b>sovereign</b>（院內／地端）模型，覆蓋下方所有規則、預設群組、Agent 與節點指定的群組；失敗時不會回退到任何雲端模型。發布後約 1 分鐘內全部生效。</span></div></label>
+    {sov&&sovMissing&&<div className="lv-o-banner bad"><Warning size={16}/><div><b>目前 LiteLLM 沒有可用的 sovereign 模型。</b>啟用後所有請求都會失敗（不會改用雲端）。請先在「模型」頁新增地端模型並套用到 LiteLLM。</div></div>}
     <div className="lv-o-grid"><div>
+      {sov&&<p className="lv-o-help" style={{margin:'0 0 8px'}}><Lock size={11}/> 「僅院內模型」已勾選，以下規則暫不生效（保留設定，取消勾選後恢復）。</p>}
+      <div className={sov?'lv-o-overridden':''} inert={sov?'':undefined}>
       <div className="lt" style={{'--cols':'40px minmax(150px,1.6fr) minmax(130px,1fr) minmax(150px,1fr) 60px 100px'}}>
         <div className="lt-head"><span>優先</span><span>規則名稱</span><span>條件</span><span>模型群組</span><span>啟用</span><span/></div>
         {draft.rules.map((r,i)=><div className="lt-row" key={r.id}>
@@ -63,6 +69,7 @@ export default function RoutingRulesPage({me,notify}){
       <div className="panel lv-o-defaults">
         <div className="field"><label>未命中規則時使用</label><GroupSelect label="預設群組" value={draft.default_group} onChange={v=>edit(a=>({...a,default_group:v}))}/></div>
         <div className="field"><label>規則指向無效群組時的備援</label><GroupSelect label="備援群組" value={draft.fallback_group} onChange={v=>edit(a=>({...a,fallback_group:v}))}/><span className="lv-o-help">此處不提供 auto 選項。</span></div>
+      </div>
       </div>
       <div className="lv-o-save"><span className="muted small">{dirty?'有尚未發布的變更':'與已發布版本一致'}</span><button className="btn" disabled={!dirty||busy} onClick={()=>{setDraft(structuredClone(base));setSaved(false)}}>還原</button><button className="btn primary" disabled={!dirty||busy} onClick={publish}>{busy?'發布中…':'發布'}</button></div>
       {saved&&<div className="lv-o-banner ok"><CheckCircle size={16}/><div>已發布，目前版本 v{base.version}。</div></div>}

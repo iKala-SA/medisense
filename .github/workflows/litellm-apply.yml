@@ -1,0 +1,61 @@
+# 套用到 LiteLLM: dispatched by the backend (POST /api/model-registry/apply). Runs infra/09-apply-litellm-config.sh
+# against the snapshot in Firestore config/litellm_deploy (rebuild the LiteLLM image, redeploy Cloud Run), then
+# commits the deployed backend/mvp/litellm/config.yaml to main so git matches what is running.
+# The backend matches its run by run-name, so keep "LiteLLM apply v<version>" in sync with engine/github_actions.py.
+# Secrets (GitHub repo settings -> Secrets and variables -> Actions):
+#   LITELLM_DEPLOY_SA_KEY  JSON key of github-litellm-deploy@cloud-sa-sandbox-1 (infra/10-litellm-apply-cicd.sh)
+name: Apply LiteLLM config
+run-name: LiteLLM apply v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Registry render version (config/litellm_deploy)
+        required: true
+      requested_by:
+        description: Admin who pressed 套用到 LiteLLM
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+# One deploy at a time; a second request waits instead of racing the first.
+concurrency:
+  group: litellm-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/mvp
+    env:
+      VERSION: ${{ inputs.version }}
+      REQUESTED_BY: ${{ inputs.requested_by }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.LITELLM_DEPLOY_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy LiteLLM (infra/09)
+        run: |
+          source infra/env.sh
+          export BUILD_FLAGS="--gcs-source-staging-dir=gs://${PROJECT_ID}_cloudbuild/source --suppress-logs"
+          YES=1 RENDER_DOC=litellm_deploy bash infra/09-apply-litellm-config.sh
+
+      - name: Commit litellm/config.yaml
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add litellm/config.yaml
+          if git diff --cached --quiet; then echo "config.yaml unchanged"; exit 0; fi
+          git commit -m "LiteLLM config v${VERSION} applied from the admin Model registry" -m "Requested by: ${REQUESTED_BY:-unknown}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

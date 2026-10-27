@@ -215,7 +215,7 @@ ${s}` : s)}>+ {s}</button>)}
     }}
   />
               <div className="flex items-center gap-3 px-1 font-mono text-[11px] text-outline">
-                <span>溫度: {agent.temperature.toFixed(2)} | Top-P: {agent.top_p.toFixed(2)} | 院內安全合規模式</span>
+                <span>院內安全合規模式</span>
                 <span className="flex-1" />
                 <button className="btn-primary" disabled={busy || !text.trim()} onClick={() => send()}>送出測試 <Icon name="send" className="text-[16px]" /></button>
               </div>
