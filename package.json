@@ -14,8 +14,11 @@
     "@iconify/react": "^6.0.3",
     "@phosphor-icons/react": "^2.1.10",
     "@vitejs/plugin-react": "5.0.4",
+    "@xyflow/react": "^12.12.0",
+    "firebase": "^13.1.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "recharts": "^3.10.1",
     "vite": "6.4.2"
   }
 }

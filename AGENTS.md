@@ -52,3 +52,16 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - User selected daily timeline + right-hand suggestions from supplied Quick screenshot.
 - CalendarPanel supports Google Calendar / Outlook Calendar source selection, day navigation, synthetic event detail, focus-time insertion and connector-driven empty states. Default demo date 2026-10-26 Monday.
 - Authorization is simulated only; real embeds/feed adapters remain future work documented in CALENDAR-INTEGRATION.md. Never access the user's connected personal calendar to populate this product demo.
+
+## Sidebar and list pages (2026-10-27)
+- Sidebar (14px, tight rows, no title row): 對話, 我的工作台, 連接器, 空間; Agent Hub → Agent, 技能, 排程; 模型 → 模型, 路由; 治理 → 安全控管, 稽核記錄 (+ 使用者管理, 用量與成本 for admins). This supersedes the earlier "Audit is removed from the sidebar" and "Model Routing lives in Manage Account" notes. Research is not in the sidebar.
+- Header: sidebar toggle (no border) left of the logo, then a divider and "Medisense" (18px). Logo + name is a button that opens a new chat. Do not use Google Sans or the Gemini pill style (tried and reverted).
+- 技能 / 排程 / 模型 / 路由 are list pages with a primary 新增 button, search + status tabs, enable toggles. New Agent and new Skill use the full-width editor (AgentCreate.jsx), not a modal.
+- "適用範圍" is replaced by 分享 (ShareKit.jsx): specific users, groups, or the whole account, with 可使用 / 可編輯. Agents have no 部門 field in the UI (the backend still requires one; it is set from the signed-in user).
+
+## Backend integration (2026-10-27)
+- Backend = `tcvgh-agent-platform` (FastAPI on Cloud Run, Firestore, LiteLLM, Firebase Auth) in project `cloud-sa-sandbox-1`. Do not build a parallel backend; extend that repo on branch `medisense-integration` and deploy only after user review.
+- Roles follow the backend: admin | builder | user, from `/api/me`. The prototype role toggle exists only in mock mode.
+- Sensitive data follows the backend: always de-identify, then any model; only the `sovereign` group is on-prem only. The prototype's "force on-prem" rule is dropped in live mode.
+- Hosting: a new Firebase Hosting site `medisense-portal` (firebase.json) with `/api/**` rewritten to Cloud Run `tcvgh-platform-api`. Do not touch `tcvgh-agent-builder`.
+- `VITE_MOCK_API` defaults to mock (self-contained prototype). Set `VITE_MOCK_API=0` plus `VITE_FIREBASE_*` for the real platform. Live pages live in `src/live/`; `src/api.js` is the API client.
