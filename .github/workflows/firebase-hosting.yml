@@ -1,5 +1,5 @@
-# Build the Vite frontend and deploy it to Firebase Hosting (site: tcvgh-agent-builder).
-# - push to main  -> live channel (https://tcvgh-agent-builder.web.app)
+# Build the Vite frontend (frontend/) and deploy it to Firebase Hosting (site: medisense-portal, see frontend/firebase.json).
+# - push to main  -> live channel (https://medisense-portal.web.app)
 # - pull request  -> temporary preview channel, URL posted on the PR
 # Secrets (GitHub repo settings -> Secrets and variables -> Actions):
 #   FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1  JSON key of github-firebase-deploy@cloud-sa-sandbox-1
@@ -10,11 +10,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "mvp/frontend/**"
+      - "frontend/**"
       - ".github/workflows/firebase-hosting.yml"
   pull_request:
     paths:
-      - "mvp/frontend/**"
+      - "frontend/**"
   workflow_dispatch:
 
 permissions:
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: mvp/frontend
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mvp/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
 
@@ -46,12 +46,14 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: cloud-sa-sandbox-1.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: cloud-sa-sandbox-1
           VITE_ALLOWED_DOMAIN: ikala.ai
+          # The portal defaults to mock mode (fake login, seeded data); 0 = real platform API
+          VITE_MOCK_API: "0"
 
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1 }}
           projectId: cloud-sa-sandbox-1
-          entryPoint: mvp/frontend
+          entryPoint: frontend
           # push / manual run -> live site; pull_request -> auto-named preview channel
           channelId: ${{ github.event_name == 'pull_request' && '' || 'live' }}
