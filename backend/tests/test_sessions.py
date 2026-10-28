@@ -298,3 +298,68 @@ def test_features_carry_validated_rag_distance_thresholds(fs, as_user):
     assert ok.status_code == 200 and features.rag_thresholds() == (0.30, 0.45)
     ev = [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == "features.update"][-1]
     assert ev["rag_distance_old"] == [0.34, 0.4] and ev["rag_distance_new"] == [0.3, 0.45]
+
+
+# ---- 👍 / 👎
+def _chat_once(c, monkeypatch):
+    from app.engine import llm
+
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t.replace("A123456789", "[ID]"))
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr(llm, "complete", lambda **kw: llm.Completion("答案內容", "gemini-3-flash", 1, 1, 0.0, 1))
+    return c.post("/api/chat", json={"message": "請問", "knowledge_scope": "general"}).json()
+
+
+def test_thumbs_down_keeps_reasons_and_deidentified_details_and_shows_on_reopen(fs, as_user, monkeypatch, audit_log):
+    c = as_user(BUILDER)
+    r = _chat_once(c, monkeypatch)
+    assert r["message_index"] == 1  # user = 0, assistant = 1
+    body = {"session_id": r["session_id"], "message_index": 1, "rating": "down", "reasons": ["inaccurate", "incomplete", "inaccurate"],
+            "details": "病人 A123456789 的數值不對"}
+    assert c.post("/api/chat/feedback", json=body).status_code == 200
+    doc = fs.store[f"feedback/{r['session_id']}_1"]
+    assert doc["reasons"] == ["inaccurate", "incomplete"] and "A123456789" not in doc["details"] and "[ID]" in doc["details"]
+    assert doc["question"] == "請問" and doc["answer"] == "答案內容" and doc["models"] == ["gemini-3-flash"] and doc["user_email"] == BUILDER.email
+    assert c.get(f"/api/sessions/{r['session_id']}").json()["feedback"] == {"1": "down"}
+    ev = [a for a in audit_log() if a["action"] == "chat.feedback"][0]
+    assert ev["rating"] == "down" and "details" not in ev  # the audit trail never carries the free text
+    # thumbs up replaces it (and drops the reasons); none withdraws it
+    c.post("/api/chat/feedback", json={**body, "rating": "up", "details": ""})
+    assert fs.store[f"feedback/{r['session_id']}_1"]["rating"] == "up" and fs.store[f"feedback/{r['session_id']}_1"]["reasons"] == []
+    c.post("/api/chat/feedback", json={**body, "rating": "none"})
+    assert f"feedback/{r['session_id']}_1" not in fs.store and c.get(f"/api/sessions/{r['session_id']}").json()["feedback"] == {}
+
+
+def test_feedback_only_on_your_own_assistant_replies_and_admins_can_read_it(fs, as_user, monkeypatch):
+    c = as_user(BUILDER)
+    r = _chat_once(c, monkeypatch)
+    ok = {"session_id": r["session_id"], "message_index": 1, "rating": "down", "reasons": ["slow"], "details": ""}
+    assert as_user(BUILDER2).post("/api/chat/feedback", json=ok).status_code == 404  # someone else's session
+    assert c.post("/api/chat/feedback", json={**ok, "message_index": 0}).status_code == 422  # that is the user's own message
+    assert c.post("/api/chat/feedback", json={**ok, "message_index": 9}).status_code == 422
+    assert c.post("/api/chat/feedback", json={**ok, "reasons": ["nonsense"]}).status_code == 422
+    c.post("/api/chat/feedback", json=ok)
+    assert c.get("/api/chat/feedback").status_code == 403
+    rows = as_user(ADMIN).get("/api/chat/feedback").json()
+    assert len(rows) == 1 and rows[0]["reasons"] == ["slow"] and rows[0]["rating"] == "down"
+
+
+# ---- code / document blocks: 存到空間
+def test_save_to_space_creates_a_library_document_inside_the_space(fs, as_user, monkeypatch):
+    import app.routers.knowledge as k
+
+    seen = {}
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t.replace("A123456789", "[ID]"))
+    monkeypatch.setattr(k, "_index", lambda doc_id, version, filename, data, ctype: seen.update(name=filename, data=data, ctype=ctype) or
+                        {"gcs_uri": "gs://b/o", "deid_uri": "gs://b/d", "rag_file": "f", "chars": len(data), "status": "indexed", "error": "", "pii": "none", "pii_types": []})
+    c = as_user(BUILDER)
+    space = c.post("/api/spaces", json={"name": "我的空間"}).json()
+    r = c.post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "a/b:report.py", "content": "print('A123456789')"})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["filename"] == "a_b_report.py.txt" and seen["name"] == "a_b_report.py.txt" and b"A123456789" not in seen["data"] and b"[ID]" in seen["data"]  # unsupported type gets .txt
+    assert j["document_id"] in c.get(f"/api/spaces/{space['id']}").json()["document_ids"]
+    md = c.post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "單張.md", "content": "# 標題"}).json()
+    assert md["filename"] == "單張.md" and seen["ctype"] == "text/markdown"
+    assert as_user(PLAIN).post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "x.md", "content": "x"}).status_code == 403  # library is builder-only
+    assert as_user(BUILDER2).post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "x.md", "content": "x"}).status_code == 403  # not their space

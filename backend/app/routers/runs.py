@@ -96,7 +96,8 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
              models=[t.model for t in r.trace if t.model], **(audit_extra or {}))
 
     return RunResponse(session_id=session_id, reply=r.reply, trace=r.trace, citations=r.citations,
-                       structured=r.structured, pending_approval=_public_pending(r.pending), latency_ms=latency)
+                       structured=r.structured, pending_approval=_public_pending(r.pending), latency_ms=latency,
+                       message_index=len(sess["messages"]) - 1)
 
 
 @router.post("/run", response_model=RunResponse)
