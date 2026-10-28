@@ -137,3 +137,8 @@ html,body{overscroll-behavior:none}
 .bottom-composer .quick-composer-wrap .composer.tall .model-anchor{margin-left:auto}
 .bottom-composer .quick-composer-wrap .composer.tall .web-chip+.spacer+.model-anchor{margin-left:0}
 .quick-composer-wrap .composer.tall textarea{padding-right:40px}
+
+/* new-conversation greeting, ChatGPT-like: smaller, regular weight, quiet colour, centred */
+.conversation .welcome h1.wl-title,.conversation .welcome .wl-title{font-size:24px;font-weight:400;letter-spacing:0;line-height:1.35;color:#1f2328;margin:18px 0 26px;text-align:center;justify-content:center}
+.conversation .welcome .wl-char{font-weight:400}
+@media(max-width:800px){.conversation .welcome h1.wl-title{font-size:22px}}
