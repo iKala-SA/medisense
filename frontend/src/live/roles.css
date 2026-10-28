@@ -1,0 +1,50 @@
+/* 角色管理頁的統計卡與角色圖示；其餘表格與標籤沿用 admin.css 的 lt / lv 樣式 */
+.rl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 18px}
+.rl-stat{background:#fff;border:1px solid #eaf0ed;border-radius:12px;padding:14px 16px}
+.rl-stat-label{font-size:12px;color:#73737c}
+.rl-stat-value{margin-top:6px;font-size:22px;font-weight:700;letter-spacing:-.3px}
+.rl-stat-value small{font-size:12px;font-weight:500;color:#9a98a4;margin-left:4px}
+.rl-role{display:flex;align-items:center;gap:12px;min-width:0}
+.rl-role b{display:block;font-weight:600}
+.rl-role small{display:block;margin-top:2px;font-size:12px;color:#9a98a4;white-space:normal}
+.rl-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;background:#e3f5ec;color:#0f7d58;white-space:nowrap}
+.rl-actions{display:flex;justify-content:flex-end;gap:4px}
+.rl-icon-btn{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#5f6462}
+.rl-icon-btn:not(:disabled):hover{background:#ebebea}
+.rl-icon-btn:disabled{cursor:not-allowed}
+.rl-table{overflow:visible}
+.rl-menu{position:relative;display:inline-flex}
+.rl-dropdown{position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:152px;padding:6px;background:#fff;border:1px solid #eaf0ed;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);text-align:left}
+.rl-dropdown-item{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 10px;border-radius:6px;font-size:14px;color:#1d1f1e;white-space:nowrap}
+.rl-dropdown-item svg{color:#5f6462}
+.rl-dropdown-item:not(:disabled):hover{background:#ebebea}
+.rl-dropdown-item:disabled{cursor:not-allowed}
+.rl-dropdown-item.danger,.rl-dropdown-item.danger svg{color:#ff0000}
+.rl-dropdown-item.danger:disabled,.rl-dropdown-item.danger:disabled svg{color:#808080}
+.rl-dropdown-sep{height:1px;background:#eaf0ed;margin:6px 4px}
+.rl-crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:#8b918f;margin:0 0 6px}
+.rl-crumb-link{display:inline-flex;align-items:center;gap:4px;color:#8b918f;font-size:13px}
+.rl-crumb-link:hover{color:#1d1f1e}
+.rl-role-bar{display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:16px;background:#f1faf6;border:1px solid #d4ebe1;border-radius:10px;font-size:13px;color:#5f6462}
+.rl-role-bar b{color:#1d1f1e;font-size:14px}
+.rl-card{background:#fff;border:1px solid #eaf0ed;border-radius:12px;overflow:hidden;margin-top:14px}
+.rl-perm{width:100%;border-collapse:collapse}
+.rl-perm thead th{text-align:center;font-size:13px;font-weight:500;color:#5f6462;background:#fbfbfa;padding:12px 18px;border-bottom:1px solid #eaf0ed;white-space:nowrap}
+.rl-perm thead th:first-child{text-align:left}
+.rl-perm tbody td{text-align:center;padding:13px 18px;border-bottom:1px solid #eaf0ed;font-size:14px;color:#1d1f1e;white-space:nowrap}
+.rl-perm tbody td:first-child{text-align:left}
+.rl-perm tbody tr:last-child td{border-bottom:none}
+.rl-perm tbody tr:hover{background:#fbfbfa}
+.rl-perm input[type=checkbox]{width:16px;height:16px;accent-color:#14a071;vertical-align:middle}
+.rl-perm input[type=checkbox]:disabled{cursor:not-allowed;opacity:.45}
+.rl-col-head{display:inline-flex;flex-direction:column;align-items:center;gap:6px}
+.rl-col-head span{font-size:11px;color:#8b918f;font-weight:400}
+.rl-res{display:flex;align-items:center;gap:12px}
+.rl-res b{display:block;font-weight:600}
+.rl-res small{display:block;margin-top:2px;font-size:12px;color:#8b918f}
+.rl-res-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0;background:#e3f5ec;color:#0f7d58;display:inline-flex;align-items:center;justify-content:center}
+.rl-empty{text-align:center;color:#8b918f;padding:24px}
+.rl-card-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #eaf0ed;font-size:13px;color:#5f6462}
+.rl-icon{width:32px;height:32px;border-radius:8px;background:#ecfaf3;color:#1e6242;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.rl-tag.custom{background:#eef0f7;color:#4a5a8a}
+.rl-icon.custom{background:#eef0f7;color:#4a5a8a}

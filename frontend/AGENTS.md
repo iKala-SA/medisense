@@ -65,3 +65,6 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Sensitive data follows the backend: always de-identify, then any model; only the `sovereign` group is on-prem only. The prototype's "force on-prem" rule is dropped in live mode.
 - Hosting: a new Firebase Hosting site `medisense-portal` (firebase.json) with `/api/**` rewritten to Cloud Run `tcvgh-platform-api`. Do not touch `tcvgh-agent-builder`.
 - `VITE_MOCK_API` defaults to mock (self-contained prototype). Set `VITE_MOCK_API=0` plus `VITE_FIREBASE_*` for the real platform. Live pages live in `src/live/`; `src/api.js` is the API client.
+
+## Role management page (2026-10-28)
+- Admin sidebar order is 使用者管理 → 角色管理 → 群組管理 → 用量與成本. `RolesPage` (`src/live/RolesPage.jsx`) is read-only: it lists the three fixed roles from `constants.js` with live member counts from `listUsers`. The backend has no roles endpoint, so role definitions are not editable here; role changes stay in 使用者管理.
