@@ -3,6 +3,7 @@
 The canvas (React Flow) saves `nodes` and `edges`. Each node has a `type` from NODE_TYPES and a
 `data` dict with the fields the left/right panels edit. The interpreter only trusts these schemas.
 """
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -337,6 +338,7 @@ class ConnectorIn(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)  # non-secret fields
     secrets: dict[str, str] = Field(default_factory=dict)  # field -> plaintext; only on create / when changing
     redact_pii: bool = True
+    redact_off_reason: str = Field(default="", max_length=200)  # required (admin only) when redact_pii is switched off
     audit_payloads: bool = True
 
 
@@ -661,6 +663,7 @@ class RoutingConfigOut(RoutingConfigIn):
 
 class FeaturesIn(BaseModel):
     web_search: bool = False  # admin: allow users to switch 網路搜尋 on (off by default)
+    voice_input: bool = False  # admin: show the microphone (browser speech recognition; audio goes to the browser vendor)
     # Retrieval relevance as DISTANCE (smaller = more similar). <= keep: relevant; <= max: kept but flagged 低相關; above: dropped.
     rag_keep_distance: float = Field(default=0.34, ge=0.05, le=1.0)
     rag_max_distance: float = Field(default=0.40, ge=0.05, le=1.0)
@@ -710,6 +713,29 @@ class ModelEntryIn(BaseModel):
         return self
 
 
+class ProvidersIn(BaseModel):
+    """Cloud model providers the security review has approved (the prefix of litellm_model, e.g. vertex_ai, azure, bedrock).
+    On-prem models never need approval: they run inside the hospital."""
+    approved: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("approved", mode="after")
+    @classmethod
+    def _clean(cls, v: list[str]) -> list[str]:
+        out = []
+        for p in v:
+            p = p.strip().lower()
+            if p and not re.fullmatch(r"[a-z0-9_-]{2,40}", p):
+                raise ValueError(f"invalid provider name: {p}")
+            if p and p not in out:
+                out.append(p)
+        return out
+
+
+class ProvidersOut(ProvidersIn):
+    updated_by: str = ""
+    updated_at: Any = None
+
+
 class ModelEntryOut(ModelEntryIn):
     id: str
     created_by: str = ""
@@ -733,7 +759,12 @@ class SessionSummary(BaseModel):
     title: str = ""
     agent_id: str = ""
     updated_at: Any = None
+    created_at: Any = None
     message_count: int = 0
+    project_id: str = ""  # "" = not in a project
+    pinned: bool = False
+    locked: bool = False  # read-only: no new messages, cannot be deleted until unlocked
+    archived: bool = False  # hidden from the recent list
 
 
 class SessionPage(BaseModel):
@@ -793,7 +824,22 @@ class SaveToSpaceOut(BaseModel):
 
 
 class SessionPatch(BaseModel):
-    title: str = Field(min_length=1, max_length=80)
+    title: str | None = Field(default=None, min_length=1, max_length=80)
+    project_id: str | None = Field(default=None, max_length=64)  # "" takes the chat out of its project
+    pinned: bool | None = None
+    locked: bool | None = None
+    archived: bool | None = None
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class ProjectOut(BaseModel):
+    id: str
+    name: str
+    created_at: Any = None
+    updated_at: Any = None
 
 
 class ChatRequest(BaseModel):
@@ -802,6 +848,7 @@ class ChatRequest(BaseModel):
     agent_id: str | None = None
     model_group: ModelGroup = "auto"
     model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
+    project_id: str | None = Field(default=None, max_length=64)  # new conversations only: file the chat under this project
     web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅院內模型)
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see

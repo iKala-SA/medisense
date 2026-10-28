@@ -26,6 +26,29 @@ export function LiveGroupTable({groups,failed}){
   </div>;
 }
 
+/* Cloud providers the security review has approved: a cloud model whose provider is not on this list cannot be enabled or deployed. */
+function ProviderApproval({notify,models}){
+  const [list,setList]=useState(null),[draft,setDraft]=useState(''),[busy,setBusy]=useState(false),[who,setWho]=useState('');
+  useEffect(()=>{api.modelProviders().then(r=>{setList(r.approved||[]);setWho(r.updated_by||'')}).catch(e=>{setList(false);notify('無法載入已核准供應商：'+errText(e))})},[]);// eslint-disable-line
+  const used=[...new Set((models||[]).filter(m=>m.deploy==='cloud'&&m.enabled).map(m=>String(m.litellm_model).split('/')[0].toLowerCase()))];
+  const pending=list?used.filter(p=>!list.includes(p)):[];
+  async function save(next,msg){
+    if(next.length<list.length&&!window.confirm('移除後，使用這個供應商的已啟用模型將無法再儲存或部署。確定？'))return;
+    setBusy(true);
+    try{const r=await api.saveModelProviders(next);setList(r.approved);setWho(r.updated_by||'');setDraft('');notify(msg)}catch(e){notify('儲存失敗：'+errText(e))}finally{setBusy(false)}
+  }
+  if(list===null)return null;
+  if(list===false)return <div className="lv-o-banner bad"><Warning size={16}/><div>無法載入已核准的雲端供應商清單。</div></div>;
+  return <section className="panel lv-o-card" style={{margin:'0 0 14px'}}><h3><Lock size={15} style={{verticalAlign:-2,marginRight:6}}/>已核准的雲端供應商</h3>
+    <p className="muted small" style={{margin:'4px 0 10px'}}>只有通過資安審核的雲端供應商，其模型才能啟用並套用到 LiteLLM（供應商是模型字串 <span className="lv-o-mono">litellm_model</span> 斜線前的部分，例如 vertex_ai、azure、bedrock）。地端模型不受此限。每次變更都會寫入稽核記錄。</p>
+    <div className="lv-p-chips" style={{marginTop:0}}>{list.map(p=><span key={p} className="badge">{p}<button type="button" aria-label={'移除 '+p} disabled={busy} onClick={()=>save(list.filter(x=>x!==p),'已移除供應商 '+p)} style={{marginLeft:6}}>×</button></span>)}{!list.length&&<span className="muted small">尚未核准任何雲端供應商</span>}</div>
+    <div className="inline" style={{marginTop:10,gap:8,alignItems:'center'}}><input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="供應商名稱，例如 azure" style={{width:220}} aria-label="新增供應商"/>
+      <button className="btn" disabled={busy||!/^[A-Za-z0-9_-]{2,40}$/.test(draft.trim())||list.includes(draft.trim().toLowerCase())} onClick={()=>save([...list,draft.trim().toLowerCase()],'已核准供應商 '+draft.trim().toLowerCase())}>核准</button>
+      {who&&<span className="muted small">上次由 {who} 變更</span>}</div>
+    {pending.length>0&&<div className="lv-o-banner" style={{marginTop:10}}><Warning size={15}/><div>已啟用的模型使用了<b>尚未核准</b>的供應商：{pending.join('、')}。在核准前，這些模型無法套用到 LiteLLM。</div></div>}
+  </section>;
+}
+
 function validate(f){
   if(!f.name.trim())return '請輸入名稱';
   if(!f.provider.trim())return '請輸入供應商';
@@ -116,6 +139,7 @@ export default function ModelRegistryPage({me,notify}){
     <p className="subtitle">管理 LiteLLM 可用的模型登錄（雲端或地端／自架開源模型）。儲存後會更新 LiteLLM 設定檔；按「套用到 LiteLLM」才會重新部署。</p>
     <div className="lv-o-viewtabs"><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>模型登錄</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
     {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:<>
+      <ProviderApproval notify={notify} models={items}/>
       <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋名稱、供應商、模型" tabs={['全部','雲端','地端']} tab={tab} onTab={setTab}/>
       {items===null?<div className="lv-o-loading">載入中…</div>:<div className="lt" style={{'--cols':'minmax(130px,1.3fr) minmax(90px,.8fr) minmax(160px,1.5fr) 100px 70px 60px 110px 84px'}}>
         <div className="lt-head"><span>名稱</span><span>供應商</span><span>LiteLLM 模型</span><span>群組</span><span>部署</span><span>啟用</span><span>價格 輸入/輸出</span><span/></div>

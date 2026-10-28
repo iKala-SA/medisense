@@ -29,6 +29,7 @@ from ..schemas import DEPARTMENTS, AgentIn, AttachmentOut, ChatRequest, RunRespo
 from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
 from .runs import _agent_def, execute_run
 from .originals import access_for
+from .projects import own_project
 from .spaces import _load_editable, add_documents, doc_visible
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -40,7 +41,7 @@ SNIPPET = 500
 BUILTIN = AgentIn(name="Medisense", model_group="auto",
                   description="General clinical-assistant chat",
                   instructions="You are Medisense, an assistant for Taichung Veterans General Hospital staff. "
-                              "Answer concisely in the user's language. Patient identifiers are masked; do not "
+                              "Answer concisely in the language the user writes in (any language). Patient identifiers are masked; do not "
                               "try to recover them. You do not replace clinical judgment. "
                               "You may answer general questions from your own knowledge, not only hospital topics. "
                               "If a question needs live or outside information (weather, news, prices) and you have no tool "
@@ -105,11 +106,17 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     existing = db.client().collection("sessions").document(session_id).get().to_dict() or {}
     if existing and existing.get("uid") != user.uid:
         raise HTTPException(403, "not your session")
+    if existing.get("locked"):
+        raise HTTPException(409, "conversation is locked")
+    extra = {"kind": "chat", "agent_id": agent_id}
+    if body.project_id and not existing.get("project_id"):  # only a conversation without a project can be filed
+        own_project(body.project_id, user)
+        extra["project_id"] = body.project_id
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
                 audit_action="chat.run",
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": body.web_search, "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or [])},
-                extra_context=_attachment_context(existing), session_extra={"kind": "chat", "agent_id": agent_id},
+                extra_context=_attachment_context(existing), session_extra=extra,
                 pin_model=body.model, web_search=body.web_search)
 
 
@@ -170,6 +177,7 @@ async def add_attachment(file: UploadFile = File(...), session_id: str | None = 
     att = {"id": uuid.uuid4().hex[:12], "name": filename, "chars": len(text), "text": text, "at": db.now()}
     sess["attachments"] = [*(sess.get("attachments") or []), att]
     sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
     ref.set(sess)
     db.audit(user.uid, "chat.attach", user.email, session_id=sid, file=filename, chars=len(text))
     return AttachmentOut(session_id=sid, attachment_id=att["id"], name=filename, chars=len(text), snippet=text[:SNIPPET])

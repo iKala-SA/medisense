@@ -8,6 +8,7 @@ from openai import APIStatusError
 
 from .. import db, sharing
 from ..auth import User, current_user
+from ..config import settings
 from ..engine import agent as agent_runtime
 from ..engine import deid, llm, skills
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
@@ -91,6 +92,7 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
                        "version": version, "at": db.now()} if r.pending else None
     sess.update(session_extra or {})
     sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
     sess_ref.set(sess)
     db.audit(user.uid, audit_action, user.email, agent_id=agent_id, session_id=session_id, latency_ms=latency,
              models=[t.model for t in r.trace if t.model], **(audit_extra or {}))
@@ -134,6 +136,7 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
         reply = "已拒絕此步驟，流程停止。"
         sess["messages"] = [*sess["messages"], {"role": "assistant", "content": reply}]
         sess["updated_at"] = db.now()
+        sess["expire_at"] = db.expiry(settings().session_retention_days)
         sess_ref.set(sess)
         db.audit(user.uid, "agent.reject", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"])
         return RunResponse(session_id=body.session_id, reply=reply, latency_ms=0,
@@ -157,6 +160,7 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
                        "version": pending.get("version"), "at": db.now()} if r.pending else None
     sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
     sess_ref.set(sess)
     db.audit(user.uid, "agent.approve", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"],
              latency_ms=latency, models=[t.model for t in r.trace if t.model])

@@ -101,7 +101,7 @@ def invoke_connector(connector_id: str, action: str, args: dict, *, agent_id: st
     except Exception as exc:  # noqa: BLE001 - any driver/network failure becomes a visible step result
         result, ok, err = f"[連接器錯誤] {exc.__class__.__name__}: {exc}"[:1000], False, str(exc)[:300]
     # `connector_action`, not `action`: audit() already has a parameter called action.
-    db.audit(user_id, "connector.invoke", agent_id=agent_id, connector_id=connector_id, type=data.get("type"),
+    db.audit(user_id, "connector.invoke", agent_id=agent_id, connector_id=connector_id, type=data.get("type"), redacted=bool(data.get("redact_pii", True)),
              connector_action=action, ok=ok, error=err, **({"args": args} if data.get("audit_payloads", True) else {}))
     return result, f"{data.get('label', data.get('type'))} · {action} · {'成功' if ok else '失敗'}"
 
