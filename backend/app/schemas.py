@@ -647,6 +647,15 @@ class RoutingConfigOut(RoutingConfigIn):
     updated_at: Any = None
 
 
+class FeaturesIn(BaseModel):
+    web_search: bool = False  # admin: allow users to switch 網路搜尋 on (off by default)
+
+
+class FeaturesOut(FeaturesIn):
+    updated_by: str = ""
+    updated_at: Any = None
+
+
 class RoutingTestIn(BaseModel):
     text: str = Field(default="", max_length=20000)
 
@@ -732,6 +741,7 @@ class ChatRequest(BaseModel):
     agent_id: str | None = None
     model_group: ModelGroup = "auto"
     model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
+    web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅院內模型)
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
     knowledge_scope: Literal["general", "selected", "all"] = "selected"

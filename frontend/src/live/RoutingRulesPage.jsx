@@ -1,5 +1,5 @@
 import React,{useState,useMemo} from 'react';
-import {ArrowsSplit,Plus,ArrowUp,ArrowDown,Trash,Flask,Lock,CheckCircle,Warning,Info,Lightning} from '@phosphor-icons/react';
+import {ArrowsSplit,Plus,ArrowUp,ArrowDown,Trash,Flask,Lock,CheckCircle,Warning,Info,Lightning,Globe} from '@phosphor-icons/react';
 import {api} from '../api';
 import {Toggle,AddModal,Field,Empty} from '../ListKit';
 import {errText,useOnce} from './pkit';
@@ -19,10 +19,12 @@ export default function RoutingRulesPage({me,notify}){
   const [base,setBase]=useState(null),[draft,setDraft]=useState(null),[busy,setBusy]=useState(false),[adding,setAdding]=useState(false);
   const [text,setText]=useState('請分析並比較兩種排班方案的優缺點'),[res,setRes]=useState(null),[testing,setTesting]=useState(false),[tested,setTested]=useState(null);
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false),[saved,setSaved]=useState(false);
+  const [feat,setFeat]=useState(null),[featBusy,setFeatBusy]=useState(false);
   useOnce(async()=>{
     if(!admin)return;
     try{const r=norm(await api.getRouting());setBase(r);setDraft(structuredClone(r))}catch(e){notify('無法載入路由規則：'+errText(e));setBase(false)}
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true)}
+    try{setFeat(await api.features())}catch{setFeat(false)}
   });
   const dirty=useMemo(()=>base&&draft?clean(base)!==clean(draft):false,[base,draft]);
   if(!admin)return <div className="lv-o"><div className="page-heading"><h1><ArrowsSplit/>路由</h1></div><div className="panel access"><Lock size={36}/><h2>僅限管理員</h2><p>路由規則僅管理員可檢視與修改。</p></div></div>;
@@ -32,6 +34,12 @@ export default function RoutingRulesPage({me,notify}){
   const change=(id,k,v)=>edit(a=>({...a,rules:a.rules.map(r=>r.id===id?{...r,[k]:v}:r)}));
   const sov=draft.sovereign_only,sovLive=(groups||[]).find(g=>g.id==='sovereign');
   const sovMissing=groups!==null&&!gfail&&!sovLive?.configured;
+  async function setWeb(on){
+    if(on&&!window.confirm('開放後，使用者可在對話中自行開啟「Web 搜尋」。開啟時，經去識別化的搜尋詞會送到 Google。確定開放？'))return;
+    setFeatBusy(true);
+    try{setFeat(await api.saveFeatures({web_search:on}));notify(on?'已開放網路搜尋（使用者仍需自行開啟）':'已關閉網路搜尋')}
+    catch(e){notify('儲存失敗：'+errText(e))}finally{setFeatBusy(false)}
+  }
   const move=(i,d)=>edit(a=>{const rules=[...a.rules];const j=i+d;if(j<0||j>=rules.length)return a;[rules[i],rules[j]]=[rules[j],rules[i]];return {...a,rules}});
   async function publish(){
     if(draft.rules.some(r=>!r.name.trim()))return notify('規則名稱不可空白');
@@ -50,6 +58,7 @@ export default function RoutingRulesPage({me,notify}){
     <p className="subtitle">設定 Agent 選擇「auto」模型時的路由規則。由上至下比對，第一個啟用且符合的規則生效。<span className="badge" style={{marginLeft:8}}>已發布版本 v{base.version}</span>{base.updated_by&&<span className="muted small" style={{marginLeft:8}}>{base.updated_by}{base.updated_at?' · '+new Date(base.updated_at).toLocaleString('zh-TW',{hour12:false}):''}</span>}</p>
     <div className="lv-o-policy"><Lock size={19}/><div><b>敏感資料不是路由條件</b>：去識別化一律啟用，不因內容敏感而改變路由。只有 <b>sovereign</b> 群組僅在院內（地端）執行；其他群組皆為雲端。若需確保全院資料不離院，請勾選下方「僅院內模型」；個別 Agent 也可在設定中啟用「僅用院內模型」。</div></div>
     <label className={'panel lv-o-sovereign'+(sov?' on':'')}><input type="checkbox" checked={sov} onChange={e=>edit(a=>({...a,sovereign_only:e.target.checked}))}/><div><b>僅院內模型</b><span className="muted small">勾選並發布後，所有 Agent 與對話一律使用 <b>sovereign</b>（院內／地端）模型，覆蓋下方所有規則、預設群組、Agent 與節點指定的群組；失敗時不會回退到任何雲端模型。發布後約 1 分鐘內全部生效。</span></div></label>
+    <label className={'panel lv-o-sovereign'+(feat?.web_search?' on':'')} style={{marginTop:10}}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.web_search} onChange={e=>setWeb(e.target.checked)}/><div><b><Globe size={14} style={{verticalAlign:-2,marginRight:4}}/>允許網路搜尋（對外連線）</b><span className="muted small">預設關閉。勾選後，使用者可在輸入框「＋」選單自行開啟 Web 搜尋；開啟時模型可能把<b>已去識別化的搜尋詞</b>送到 Google 查詢，結果附網頁來源。「僅院內模型」開啟時，網路搜尋一律停用。變更立即生效並寫入稽核記錄。{feat?.updated_by&&<> 上次由 {feat.updated_by} 變更。</>}</span></div></label>
     {sov&&sovMissing&&<div className="lv-o-banner bad"><Warning size={16}/><div><b>目前 LiteLLM 沒有可用的 sovereign 模型。</b>啟用後所有請求都會失敗（不會改用雲端）。請先在「模型」頁新增地端模型並套用到 LiteLLM。</div></div>}
     <div className="lv-o-grid"><div>
       {sov&&<p className="lv-o-help" style={{margin:'0 0 8px'}}><Lock size={11}/> 「僅院內模型」已勾選，以下規則暫不生效（保留設定，取消勾選後恢復）。</p>}

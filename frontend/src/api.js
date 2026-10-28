@@ -118,6 +118,8 @@ export const api={
   shareSpace:(id,share)=>call(`/api/spaces/${id}/share`,{method:'PUT',body:body(share)}),
   deleteSpace:id=>call(`/api/spaces/${id}`,{method:'DELETE'}),
   // routing rules (admin)
+  features:()=>call('/api/features'),
+  saveFeatures:f=>call('/api/features',{method:'PUT',body:body(f)}),
   getRouting:()=>call('/api/routing'),
   saveRouting:r=>call('/api/routing',{method:'PUT',body:body(r)}),
   testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),

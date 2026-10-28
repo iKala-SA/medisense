@@ -153,3 +153,61 @@ def test_structured_output_node_shapes_the_final_answer(fs, rig):
     ag = AgentIn.model_validate({"name": "A", "flow": {"nodes": [{"id": "so", "type": "structured_output", "data": {"schema": "{}"}}], "edges": []}})
     r, _ = rig(Script("很好", '{"ok": true}'), ag)
     assert r.structured == {"ok": True} and r.trace[-1].type == "structured_output"
+
+
+def _web_rig(monkeypatch, enabled=True):
+    monkeypatch.setattr("app.engine.features.web_search_enabled", lambda: enabled)
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t.replace("王小明", "[PERSON_NAME]"))
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+
+
+def test_web_search_is_only_offered_when_switched_on_and_runs_a_grounded_search(fs, monkeypatch):
+    _web_rig(monkeypatch)
+    sent = []
+
+    def model(**kw):
+        sent.append(kw)
+        if kw.get("search"):  # the grounded sub-call
+            return llm.Completion("台中晴，21–30°C", "gemini-3-flash", 5, 5, 0.0, 9, sources=({"title": "weather.com", "url": "https://x/1"},),
+                                 search_queries=("台中 天氣",))
+        if not any(m["role"] == "tool" for m in kw["messages"]):
+            return llm.Completion("", "gemini-3-flash", 1, 1, 0.0, 1, tool_calls=(call("web_search", {"reason": "查即時天氣", "query": "台中天氣 王小明"}),))
+        return llm.Completion("今天台中晴 [1]", "gemini-3-flash", 1, 1, 0.0, 1)
+
+    monkeypatch.setattr(llm, "complete", model)
+    off = rt.run_agent(AgentIn(name="M"), agent_id="a", user_id="u", user_message="天氣？", history=[])
+    assert sent[0]["tools"] is None and off.reply  # switch off: no tool at all
+    sent.clear()
+    r = rt.run_agent(AgentIn(name="M"), agent_id="a", user_id="u", user_message="天氣？", history=[], web_search=True)
+    assert [x["function"]["name"] for x in sent[0]["tools"]] == ["web_search"]
+    step = r.trace[1]
+    assert step.type == "web_search" and step.reason == "查即時天氣" and "台中 天氣" in step.summary and "1 個網頁來源" in step.summary
+    assert r.citations[0].uri == "https://x/1" and r.reply == "今天台中晴 [1]"
+    grounded = [k for k in sent if k.get("search")][0]
+    assert "王小明" not in grounded["messages"][0]["content"] and "[PERSON_NAME]" in grounded["messages"][0]["content"]  # query is masked before leaving
+    audit = [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == "chat.web_search"]
+    assert audit and audit[0]["sources"] == 1
+
+
+def test_web_search_is_refused_under_sovereign_only_and_the_user_is_told(fs, monkeypatch):
+    _web_rig(monkeypatch)
+    sent = []
+    monkeypatch.setattr(llm, "complete", lambda **kw: sent.append(kw) or llm.Completion("ok", "gpt-oss", 1, 1, 0.0, 1))
+    r = rt.run_agent(AgentIn(name="M", routing={"sovereign_only": True}), agent_id="a", user_id="u", user_message="x", history=[], web_search=True)
+    assert sent[0]["tools"] is None and "網路搜尋已停用" in r.trace[1].summary
+
+
+def test_web_search_needs_the_admin_switch_too(fs, monkeypatch):
+    _web_rig(monkeypatch, enabled=False)
+    sent = []
+    monkeypatch.setattr(llm, "complete", lambda **kw: sent.append(kw) or llm.Completion("ok", "gemini-3-flash", 1, 1, 0.0, 1))
+    r = rt.run_agent(AgentIn(name="M"), agent_id="a", user_id="u", user_message="x", history=[], web_search=True)
+    assert sent[0]["tools"] is None and r.trace[1].summary == "管理員尚未開放網路搜尋"
+
+
+def test_the_model_is_told_the_current_date(rig):
+    s = Script("ok")
+    rig(s)
+    import re
+
+    assert re.search(r"現在時間：\d{4}-\d{2}-\d{2} \d{2}:\d{2}（Asia/Taipei）", s.sent[0]["system"])

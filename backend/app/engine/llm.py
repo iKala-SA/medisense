@@ -118,6 +118,8 @@ class Completion:
     ms: int
     reasoning: str = ""  # the model's own thought summary when it returns one (empty otherwise)
     tool_calls: tuple = ()  # ({id, name, arguments: JSON string}, ...) when the model chose to call tools
+    sources: tuple = ()  # ({title, url}, ...) web pages a grounded (search=True) answer relied on
+    search_queries: tuple = ()  # what Google was actually asked
 
 
 def _id_token(audience: str) -> str | None:
@@ -143,7 +145,8 @@ MAX_THINKING_CHARS = 8000
 
 def complete(*, group: str, system: str, messages: list[dict], agent_id: str, user_id: str,
              temperature: float = 0.3, top_p: float | None = None, json_mode: bool = False,
-             think: str | None = None, model: str | None = None, on_delta=None, tools: list[dict] | None = None) -> Completion:
+             think: str | None = None, model: str | None = None, on_delta=None, tools: list[dict] | None = None,
+             search: bool = False) -> Completion:
     """One chat completion through the proxy. `group` is a LiteLLM model group alias; `model` pins one exact
     LiteLLM model_name instead (the user picked it in the chat box). `on_delta(kind, text)` turns on streaming:
     kind is "text" (answer tokens) or "thought" (thought-summary tokens)."""
@@ -158,7 +161,9 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         kwargs["top_p"] = top_p
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    if tools:  # the model decides which of these to call (engine/agent.py runs the loop)
+    if search:  # Gemini's built-in Google Search grounding (a Gemini-only tool; used by the agent's web_search tool)
+        kwargs["tools"] = [{"googleSearch": {}}]
+    elif tools:  # the model decides which of these to call (engine/agent.py runs the loop)
         kwargs["tools"], kwargs["tool_choice"] = tools, "auto"
     if think:  # low | medium | high: ask thinking-capable models to return their thought summary (others ignore it: drop_params)
         kwargs["reasoning_effort"] = think
@@ -174,6 +179,7 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
     )
     if on_delta:
         text, reasoning, served, usage, calls = _stream(client, request, on_delta)
+        sources, queries = (), ()
     else:
         resp = client.chat.completions.create(**request)
         msg = resp.choices[0].message
@@ -181,12 +187,27 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         reasoning = _reasoning_of(msg)
         served, usage = getattr(resp, "model", None), getattr(resp, "usage", None)
         calls = tuple({"id": t.id, "name": t.function.name, "arguments": t.function.arguments or "{}"} for t in (getattr(msg, "tool_calls", None) or []))
+        sources, queries = _grounding(resp, msg) if search else ((), ())
     model = normalize_model(served or target)
     p_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
     c_tok = int(getattr(usage, "completion_tokens", 0) or 0)
     return Completion(text=text, model=model, prompt_tokens=p_tok, completion_tokens=c_tok,
                       cost_usd=cost_usd(model, p_tok, c_tok), ms=int((time.perf_counter() - t0) * 1000),
-                      reasoning=reasoning[:MAX_THINKING_CHARS], tool_calls=calls)
+                      reasoning=reasoning[:MAX_THINKING_CHARS], tool_calls=calls, sources=sources, search_queries=queries)
+
+
+def _grounding(resp, msg) -> tuple[tuple, tuple]:
+    """(sources, search queries) of a Google-Search-grounded reply: the page titles/URLs and what Google was asked."""
+    out: dict[str, str] = {}
+    for a in getattr(msg, "annotations", None) or []:
+        c = getattr(a, "url_citation", None) or (a.get("url_citation") if isinstance(a, dict) else None)
+        url = getattr(c, "url", None) or (c.get("url") if isinstance(c, dict) else None)
+        title = getattr(c, "title", None) or (c.get("title") if isinstance(c, dict) else None)
+        if url:
+            out.setdefault(str(url), str(title or url))
+    meta = (getattr(resp, "model_extra", None) or {}).get("vertex_ai_grounding_metadata") or []
+    queries = tuple(dict.fromkeys(q for m in meta if isinstance(m, dict) for q in m.get("webSearchQueries", [])))
+    return tuple({"title": t, "url": u} for u, t in out.items()), queries
 
 
 def _reasoning_of(obj) -> str:

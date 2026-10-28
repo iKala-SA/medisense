@@ -7,7 +7,10 @@ import {stepLabel,seconds,modelLabel} from './chatkit';
 import './chat.css';
 
 /* Inline [n] markers become clickable chips that open that reference in the side panel. */
-const withCites=(text,n)=>n?String(text).replace(/\[(\d{1,2})\](?!\()/g,(m,i)=>+i>=1&&+i<=n?`[${i}](#cite-${i})`:m):String(text);
+const chip=(i,n)=>+i>=1&&+i<=n?`[${i}](#cite-${i})`:`[${i}]`;
+const withCites=(text,n)=>n?String(text)
+  .replace(/\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})+)\]/g,(m,list)=>list.split(/\s*[,，、]\s*/).map(i=>chip(i,n)).join(''))  // [1, 2] -> [1][2]
+  .replace(/\[(\d{1,2})\](?!\()/g,(m,i)=>chip(i,n)):String(text);
 
 /* One step per row. Finished steps show a check, the running one a spinner, upcoming ones an empty circle. */
 export function Steps({trace,compact,model,run}){
@@ -23,7 +26,7 @@ export function Steps({trace,compact,model,run}){
         {st==='done'&&(s.thinking?<Thought text={s.thinking}/>:llm&&<small className="cx-none">此模型未回傳思考內容</small>)}
       </div></li>})}</ol>;
 }
-const RUNNING={input:'讀取並去識別化問題…',turn:'模型思考中…',knowledge:'正在搜尋院內文件…',llm:'模型正在撰寫回答…',structured_output:'模型正在產生結構化輸出…',tool:'正在執行連接器動作…',approval:'等待人工核准…',his_emr:'正在查詢 HIS/EMR…'};
+const RUNNING={input:'讀取並去識別化問題…',turn:'模型思考中…',knowledge:'正在搜尋院內文件…',web_search:'正在搜尋網路…',llm:'模型正在撰寫回答…',structured_output:'模型正在產生結構化輸出…',tool:'正在執行連接器動作…',approval:'等待人工核准…',his_emr:'正在查詢 HIS/EMR…'};
 const runningText=t=>RUNNING[t]||'處理中…';
 export function Thought({text}){return <blockquote className="cx-thought"><Brain size={13}/><div className="cx-thought-md"><Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown></div></blockquote>}
 

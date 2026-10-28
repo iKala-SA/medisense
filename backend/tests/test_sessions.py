@@ -271,3 +271,16 @@ def test_admin_grants_original_view_with_reason_and_audit(fs, as_user):
     r = c.patch("/api/users/user@example.com", json={"original_view": True, "reason": "感染科醫師需查核個案"})
     assert r.status_code == 200 and r.json()["original_view"] is True
     assert _audits(fs, "user.original_view")[0]["new"] is True
+
+
+def test_admin_switch_for_web_search_defaults_off_and_is_admin_only_and_audited(fs, as_user):
+    from app.engine import features
+
+    assert as_user(PLAIN).get("/api/features").json()["web_search"] is False  # off until an admin says otherwise
+    assert not features.web_search_enabled()
+    assert as_user(PLAIN).put("/api/features", json={"web_search": True}).status_code == 403
+    r = as_user(ADMIN).put("/api/features", json={"web_search": True})
+    assert r.status_code == 200 and r.json()["web_search"] is True and r.json()["updated_by"] == ADMIN.email
+    assert as_user(PLAIN).get("/api/features").json()["web_search"] is True and features.web_search_enabled()
+    ev = [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == "features.update"][0]
+    assert ev["web_search_old"] is False and ev["web_search_new"] is True

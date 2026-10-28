@@ -58,7 +58,8 @@ def _meta(r) -> dict:
 def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
-                session_extra: dict | None = None, pin_model: str | None = None, emit=None) -> RunResponse:
+                session_extra: dict | None = None, pin_model: str | None = None, emit=None,
+                web_search: bool = False) -> RunResponse:
     """The shared pipeline behind /run, /api/chat and schedules: de-identify -> flow -> save session -> audit."""
     session_id = session_id or uuid.uuid4().hex
     sess_ref = db.client().collection("sessions").document(session_id)
@@ -74,7 +75,7 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
     try:
         r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=safe_message,
                                     history=history, rag_files=rag_files, skill_prefix=skill_prefix, extra_context=extra_context,
-                                    pin_model=pin_model, emit=emit)
+                                    pin_model=pin_model, emit=emit, web_search=web_search)
     except APIStatusError as exc:
         if exc.status_code == 401:
             llm.reset_client_cache()

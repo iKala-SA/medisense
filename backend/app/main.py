@@ -12,6 +12,7 @@ from .routers import (
     chat,
     connectors,
     gateway_catalog,
+    features,
     gateway_connectors,
     groups,
     knowledge,
@@ -48,6 +49,7 @@ app.include_router(skills.router)
 app.include_router(schedules.router)
 app.include_router(spaces.router)
 app.include_router(routing.router)
+app.include_router(features.router)
 app.include_router(model_registry.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
