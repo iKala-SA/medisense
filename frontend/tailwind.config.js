@@ -23,7 +23,7 @@ export default {
         chip: { bg: "#eefbf5", border: "#d9f6e8" },
       },
       fontFamily: {
-        sans: ["Inter", "Noto Sans TC", "system-ui", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "PingFang TC", "Noto Sans TC", "Segoe UI", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       borderRadius: { sm: "0.125rem", DEFAULT: "0.25rem", md: "0.375rem", lg: "0.5rem", xl: "0.75rem" },
