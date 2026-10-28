@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import queue
+import re
 import threading
 import uuid
 
@@ -20,15 +21,15 @@ from fastapi.responses import StreamingResponse
 from google.cloud import firestore
 
 from .. import db
-from ..auth import User, current_user
+from ..auth import User, current_user, require_builder
 from ..config import settings
 from ..engine import deid, llm
 from ..engine.extract import NoTextError, extract_text
-from ..schemas import AgentIn, AttachmentOut, ChatRequest, RunResponse
-from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, resolve_rag_files
+from ..schemas import DEPARTMENTS, AgentIn, AttachmentOut, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments
+from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
 from .runs import _agent_def, execute_run
 from .originals import access_for
-from .spaces import doc_visible
+from .spaces import _load_editable, add_documents, doc_visible
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 log = logging.getLogger(__name__)
@@ -172,6 +173,26 @@ async def add_attachment(file: UploadFile = File(...), session_id: str | None = 
     ref.set(sess)
     db.audit(user.uid, "chat.attach", user.email, session_id=sid, file=filename, chars=len(text))
     return AttachmentOut(session_id=sid, attachment_id=att["id"], name=filename, chars=len(text), snippet=text[:SNIPPET])
+
+
+ALLOWED_LIBRARY = (".pdf", ".txt", ".md", ".docx", ".pptx", ".html", ".csv", ".json")
+
+
+@router.post("/save-to-space", response_model=SaveToSpaceOut)
+def save_to_space(body: SaveToSpaceIn, user: User = Depends(require_builder)):
+    """A code / document block from a reply -> a library document inside one of the user's spaces. The library is
+    builder-only, so this is too. The text is de-identified again first, so the stored original holds no identifiers."""
+    name = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", "_", body.filename.strip()).strip(". ") or "reply.txt"
+    if not name.lower().endswith(ALLOWED_LIBRARY):  # the library only takes some file types: keep the name, add .txt
+        name += ".txt"
+    _load_editable(body.space_id, user)  # fail before indexing anything the user could not put in that space
+    text = deid.deidentify(body.content)
+    ctype = "text/markdown" if name.lower().endswith(".md") else "text/plain"
+    dept = user.department if user.department in DEPARTMENTS else ""
+    doc = create_document(user, name, text.encode(), ctype, "other", dept)
+    add_documents(body.space_id, SpaceDocuments(document_ids=[doc.id]), user)
+    db.audit(user.uid, "chat.save_to_space", user.email, doc_id=doc.id, space_id=body.space_id, file=name, chars=len(text))
+    return SaveToSpaceOut(document_id=doc.id, filename=name, space_id=body.space_id)
 
 
 @router.get("/documents/{doc_id}")

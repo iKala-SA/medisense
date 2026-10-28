@@ -228,6 +228,13 @@ class StepTrace(BaseModel):
     reason: str | None = None  # the MODEL's own one-line "why this step" (tool calls); `summary` is the platform's factual record
 
 
+class CitationPassage(BaseModel):
+    text: str = ""
+    page: int | None = None
+    score: float | None = None  # retrieval DISTANCE (smaller = more similar)
+    low: bool = False
+
+
 class Citation(BaseModel):
     source: str  # display name of the knowledge file
     uri: str = ""
@@ -236,6 +243,9 @@ class Citation(BaseModel):
     text: str = ""  # chunk excerpt
     doc_id: str = ""  # library document this chunk came from (opens the viewer); empty when it cannot be resolved
     page: int | None = None  # first page of the chunk for paged files (PDF), when the retriever reports it
+    # One Citation per FILE: every retrieved passage of that file, best (smallest distance) first. The fields above
+    # mirror passages[0], so older readers and saved conversations keep working.
+    passages: list[CitationPassage] = Field(default_factory=list)
 
 
 class RunResponse(BaseModel):
@@ -246,6 +256,7 @@ class RunResponse(BaseModel):
     structured: dict[str, Any] | None = None  # parsed JSON from a structured_output node, if any
     pending_approval: dict[str, Any] | None = None
     latency_ms: int = 0
+    message_index: int | None = None  # position of this reply in the session's messages (what 👍/👎 refers to)
 
 
 class AuditEntry(BaseModel):
@@ -739,6 +750,46 @@ class SessionMessage(BaseModel):
 class SessionDetail(SessionSummary):
     messages: list[SessionMessage] = Field(default_factory=list)
     attachments: list[dict[str, Any]] = Field(default_factory=list)  # {id, name, chars}
+    feedback: dict[str, str] = Field(default_factory=dict)  # assistant message index -> "up" | "down"
+
+
+FeedbackReason = Literal["inaccurate", "incomplete", "misunderstood", "sources", "wordy", "unsafe", "slow", "other"]
+
+
+class FeedbackIn(BaseModel):
+    session_id: str
+    message_index: int = Field(ge=0)
+    rating: Literal["up", "down", "none"]  # none withdraws an earlier rating
+    reasons: list[FeedbackReason] = Field(default_factory=list, max_length=8)
+    details: str = Field(default="", max_length=2000)  # free text: de-identified before it is stored
+
+
+class FeedbackOut(BaseModel):
+    id: str
+    session_id: str = ""
+    message_index: int = 0
+    rating: str = ""
+    reasons: list[str] = Field(default_factory=list)
+    details: str = ""
+    question: str = ""
+    answer: str = ""
+    models: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    user_email: str = ""
+    created_at: Any = None
+    updated_at: Any = None
+
+
+class SaveToSpaceIn(BaseModel):
+    space_id: str
+    filename: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=200_000)
+
+
+class SaveToSpaceOut(BaseModel):
+    document_id: str
+    filename: str
+    space_id: str
 
 
 class SessionPatch(BaseModel):

@@ -131,17 +131,22 @@ def list_documents(user: User = Depends(current_user)):
 @router.post("", response_model=DocumentOut, status_code=201)
 async def upload_document(file: UploadFile = File(...), category: str = Form(...), department: str = Form(""),
                           user: User = Depends(current_user)):
+    filename, _, data = await _read_upload(file)
+    return create_document(user, filename, data, file.content_type or "", category, department)
+
+
+def create_document(user: User, filename: str, data: bytes, content_type: str, category: str, department: str = "") -> DocumentOut:
+    """Store, de-identify, index and record one library document (shared by the upload endpoint and chat's 存到空間)."""
     if not settings().rag_enabled:
         raise HTTPException(503, "knowledge is disabled (RAG_ENABLED=false)")
     _check_meta(category, department)
-    filename, _, data = await _read_upload(file)
     ref = _col().document()
-    record = {"name": filename, "category": category, "department": department, "content_type": file.content_type or "",
+    record = {"name": filename, "category": category, "department": department, "content_type": content_type,
               "size_bytes": len(data), "version": 1, "status": "indexing", "error": "", "rag_file": None,
               "uploaded_by": user.email, "uploaded_uid": user.uid, "created_at": db.now(), "updated_at": db.now()}
     ref.set(record)
     try:
-        ref.update(_index(ref.id, 1, filename, data, file.content_type or ""))
+        ref.update(_index(ref.id, 1, filename, data, content_type))
     except Exception as exc:  # keep the record so the library shows the failure and it can be replaced/deleted
         err = _fail(exc)
         ref.update({"status": "error", "error": err.detail})

@@ -63,7 +63,8 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     return SessionDetail(**_summary(snap.id, d).model_dump(),
                          messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta")) for m in d.get("messages") or []],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0)}
-                                      for a in d.get("attachments") or []])
+                                      for a in d.get("attachments") or []],
+                         feedback={str(k): v for k, v in (d.get("feedback") or {}).items()})
 
 
 @router.patch("/{session_id}", response_model=SessionSummary)

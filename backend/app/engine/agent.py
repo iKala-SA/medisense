@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from ..config import settings
-from ..schemas import AgentIn, Citation, FlowNode, StepTrace
+from ..schemas import AgentIn, Citation, CitationPassage, FlowNode, StepTrace
 from . import connectors, deid, features, routing
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
@@ -43,9 +43,33 @@ GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼�
          "呼叫工具時務必填寫 reason。")
 NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你可以用一般知識回答，但必須明確說明「院內文件中沒有找到相關依據，以下為一般知識，非院內依據」，"
                  "且不要標註來源編號。標示「低相關」的段落只供參考，引用時要說明相關度較低。")
+FORMAT_GUIDE = ("輸出格式：任何程式碼（含 HTML、CSS、SQL 等網頁或標記語言）、指令、資料（CSV/JSON）一律放進三個反引號的 Markdown 程式碼區塊並標註語言，例如 ```html、```python，"
+                "絕對不要把程式碼放進 ~~~document。"
+                "只有當你產出的是使用者要拿去使用的完整『文字文件』（報告、信件、衛教單張、表單、會議紀錄、SOP 等純文字內容，不是程式碼）時，"
+                "才用波浪線區塊包起來：第一行寫 ~~~document 加上文件標題，最後一行寫 ~~~，區塊內用 Markdown 排版。"
+                "一般對話、說明與簡短回答不要放進區塊。")
 WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
              "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
 WEB_SYSTEM = "你是網路搜尋助理。用繁體中文簡要整理搜尋到的事實，保留數字、日期與單位，不要加入個人意見或猜測。"
+
+
+_CITE = re.compile(r"\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})*)\](?!\()")  # [1] / [1, 2] (not a markdown link)
+_CODE = re.compile(r"(```.*?```|`[^`\n]*`)", re.S)  # code is left alone: [1, 2, 3] there is a list, not a citation
+_SPLIT = re.compile(r"\s*[,，、]\s*")
+
+
+def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Citation]]:
+    """Keep only the sources the answer really cites, renumbered 1..k in their original order, and rewrite the [n]
+    markers to match. A marker that points at no source is removed. No sources at all: the text is left untouched."""
+    if not citations:
+        return text, citations
+    nums = lambda m: [int(n) for n in _SPLIT.split(m.group(1))]  # noqa: E731
+    parts = _CODE.split(text)  # odd items are code
+    used = sorted({n for i, p in enumerate(parts) if i % 2 == 0 for m in _CITE.finditer(p) for n in nums(m) if 1 <= n <= len(citations)})
+    remap = {old: new for new, old in enumerate(used, 1)}
+    rewrite = lambda m: "".join(f"[{n}]" for n in dict.fromkeys(remap[x] for x in nums(m) if x in remap))  # noqa: E731
+    out = "".join(p if i % 2 else _CITE.sub(rewrite, p) for i, p in enumerate(parts))
+    return out, [citations[o - 1] for o in used]
 
 
 class _Trace(list):
@@ -173,6 +197,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     web_on = web_search and not web_blocked
     tools = build_tools(agent, rag_files, user_message, web=web_on)
     specs = [t.spec for t in tools.values()]
+    system = f"{system}\n\n{FORMAT_GUIDE}"
     if specs:
         system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
     llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
@@ -183,15 +208,21 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     approval = next((n for n in flow.nodes if n.type == "approval"), None)
     structured_node = next((n for n in flow.nodes if n.type == "structured_output"), None)
 
-    seen: dict[tuple[str, str], int] = {}  # passage -> its [n]
+    seen: dict[str, int] = {}  # library file -> its [n]: one reference per FILE, however many of its passages matched
     seen_urls: dict[str, int] = {}  # web page -> its [n]
 
     def number(chunk: dict, low: bool = False) -> int:
-        key = (chunk["source"], chunk["text"][:80])
+        """The file's [n]; its passages accumulate on one Citation, best (smallest distance) first."""
+        key = chunk.get("doc_id") or chunk["source"]
+        p = CitationPassage(text=chunk["text"][:600], page=chunk.get("page"), score=chunk["score"], low=low)
         if key not in seen:
             seen[key] = len(res.citations) + 1
-            res.citations.append(Citation(source=chunk["source"], uri=chunk["uri"], score=chunk["score"], low=low, text=chunk["text"][:600],
-                                          doc_id=chunk.get("doc_id", ""), page=chunk.get("page")))
+            res.citations.append(Citation(source=chunk["source"], uri=chunk["uri"], doc_id=chunk.get("doc_id", ""), passages=[]))
+        c = res.citations[seen[key] - 1]
+        if all(q.text[:80] != p.text[:80] for q in c.passages):
+            c.passages = sorted([*c.passages, p], key=lambda q: (q.score is None, q.score if q.score is not None else 0.0))
+            best = c.passages[0]
+            c.text, c.page, c.score, c.low = best.text, best.page, best.score, best.low
         return seen[key]
 
     def search(query: str) -> tuple[str, str]:
@@ -213,7 +244,12 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             c["doc_id"] = index.get(rag.file_id(c["uri"]), "") or index.get("name:" + c["source"], "")
         keep_d, max_d = features.rag_thresholds()
         dist = lambda c: c["score"] if c["score"] is not None else 0.0  # noqa: E731 - no score: cannot judge, keep it
-        kept = [c for c in chunks if dist(c) <= max_d]
+        kept, shown = [], set()
+        for c in chunks:  # near the threshold AND not a repeat of a passage already in this result
+            sig = (c.get("doc_id") or c["source"], c["text"][:80])
+            if dist(c) <= max_d and sig not in shown:
+                shown.add(sig)
+                kept.append(c)
         ms = int((time.perf_counter() - t0) * 1000)
         if not kept:
             nearest = min((dist(c) for c in chunks), default=None)
@@ -222,11 +258,14 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         parts = []
         for c in kept:
             low = dist(c) > keep_d
-            parts.append(f"[{number(c, low)}]{'（低相關）' if low else ''} 來源：{c['source']}\n{c['text']}")
+            page = f"（第 {c['page']} 頁）" if c.get("page") else ""
+            parts.append(f"[{number(c, low)}]{'（低相關）' if low else ''} 來源：{c['source']}{page}\n{c['text']}")
         if emit:  # the 參考文件 tab fills in as soon as retrieval returns
             emit({"event": "citations", "citations": [c.model_dump() for c in res.citations]})
         n_low = sum(dist(c) > keep_d for c in kept)
-        detail = f"{len(kept)} 段" + (f"（{n_low} 段低相關）" if n_low else "") + (f"，捨棄 {len(chunks) - len(kept)} 段不相關" if len(chunks) > len(kept) else "")
+        n_files = len({c.get("doc_id") or c["source"] for c in kept})
+        detail = (f"{len(kept)} 段" + (f"（來自 {n_files} 份文件）" if n_files < len(kept) else "") + (f"（{n_low} 段低相關）" if n_low else "")
+                  + (f"，捨棄 {sum(dist(c) > max_d for c in chunks)} 段不相關" if any(dist(c) > max_d for c in chunks) else ""))
         return "\n\n".join(parts), f"搜尋「{query}」：命中 {detail}，已去識別化（{ms} ms）"
 
     def web(query: str) -> tuple[str, str]:
@@ -274,7 +313,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     if resume:
         messages = list(resume["messages"])
         res.citations = [Citation(**c) for c in resume.get("citations", [])]
-        seen.update({(c.source, c.text[:80]): i + 1 for i, c in enumerate(res.citations) if not c.uri.startswith("http")})
+        seen.update({(c.doc_id or c.source): i + 1 for i, c in enumerate(res.citations) if not c.uri.startswith("http")})
         seen_urls.update({c.uri: i + 1 for i, c in enumerate(res.citations) if c.uri.startswith("http")})
         queue = [resume["call"], *resume.get("rest", [])]
         approved_id = resume["call"]["id"]
@@ -350,9 +389,12 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         if not text:  # some models return nothing after a tool result: ask once more without tools
             c2 = _complete(agent, agent_id, user_id, group, system=system, messages=messages, think=think, model=pin_model)
             text = c2.text.strip() or "（模型沒有產生回覆，請重新提問。）"
+        retrieved = len(res.citations)
+        text, res.citations = prune_citations(text, res.citations)  # the references tab shows what the answer used, not everything found
+        cited = f"，引用 {len(res.citations)}/{retrieved} 個來源" if retrieved else ""
         res.trace.append(StepTrace(node_id=node_id, type="llm", model=c.model, group=group, ms=c.ms, prompt_tokens=c.prompt_tokens,
                                    completion_tokens=c.completion_tokens, cost_usd=c.cost_usd, thinking=c.reasoning or None,
-                                   summary=f"{len(text)} 字" + (f"（{note}）" if note else "") + ("（已達工具呼叫上限）" if turn == MAX_ROUNDS else "")))
+                                   summary=f"{len(text)} 字{cited}" + (f"（{note}）" if note else "") + ("（已達工具呼叫上限）" if turn == MAX_ROUNDS else "")))
         res.reply = text
         break
 

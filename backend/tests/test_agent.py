@@ -5,7 +5,7 @@ import pytest
 
 from app.engine import agent as rt
 from app.engine import llm, rag
-from app.schemas import AgentIn
+from app.schemas import AgentIn, Citation
 
 from .conftest import BUILDER
 
@@ -72,7 +72,7 @@ def test_model_decides_to_search_and_the_steps_carry_its_reason_and_the_platform
 
 
 def test_search_can_repeat_and_passages_keep_stable_numbers(rig):
-    s = Script([call("search_knowledge", {"reason": "a", "query": "q1"})], [call("search_knowledge", {"reason": "b", "query": "q2"}, "c2")], "ok")
+    s = Script([call("search_knowledge", {"reason": "a", "query": "q1"})], [call("search_knowledge", {"reason": "b", "query": "q2"}, "c2")], "ok [1]")
     r, _ = rig(s, rag_files=["f"])
     assert [t.type for t in r.trace] == ["input", "knowledge", "knowledge", "llm"] and len(r.citations) == 1  # same passage, one [1]
 
@@ -219,7 +219,7 @@ def _chunks(*dists):
 
 def test_retrieval_is_filtered_by_distance_and_borderline_passages_are_flagged(rig, monkeypatch):
     monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.27, 0.37, 0.44, 0.49))  # smaller = more similar
-    s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "答案")
+    s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "答案 [1][2]")
     r, _ = rig(s, rag_files=["f"])
     assert [c.low for c in r.citations] == [False, True] and len(r.citations) == 2  # 0.44 and 0.49 never reach the model
     k = r.trace[1].summary
@@ -241,5 +241,57 @@ def test_when_everything_is_too_far_the_model_hears_there_was_nothing_and_no_cit
 def test_thresholds_follow_the_admin_setting(rig, monkeypatch):
     monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.44))
     monkeypatch.setattr("app.engine.features.rag_thresholds", lambda: (0.30, 0.50))  # admin loosened it
-    r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "ok"), rag_files=["f"])
+    r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "ok [1]"), rag_files=["f"])
     assert len(r.citations) == 1 and r.citations[0].low
+
+
+def _cites(n):
+    return [Citation(source=f"文件{i}.pdf", uri=f"u{i}") for i in range(1, n + 1)]
+
+
+def test_only_cited_sources_survive_and_are_renumbered():
+    text, cites = rt.prune_citations("甲 [3]，乙 [1][3]，丙 [7]。", _cites(4))
+    assert [c.source for c in cites] == ["文件1.pdf", "文件3.pdf"]  # original order, uncited 2 and 4 gone
+    assert text == "甲 [2]，乙 [1][2]，丙 。"  # 3 -> 2, 1 -> 1; [7] pointed at nothing and is removed
+
+
+def test_grouped_markers_are_split_and_code_and_links_are_left_alone():
+    text, cites = rt.prune_citations("見 [2, 3]。程式 `x = [1, 2]` 與\n```\ny = [1, 2, 3]\n```\n另見 [連結 1](http://a) 與 [2](http://b)", _cites(3))
+    assert [c.source for c in cites] == ["文件2.pdf", "文件3.pdf"]
+    assert text.startswith("見 [1][2]。") and "`x = [1, 2]`" in text and "y = [1, 2, 3]" in text and "[2](http://b)" in text
+
+
+def test_nothing_cited_means_no_references_and_no_sources_means_untouched_text():
+    assert rt.prune_citations("完全沒引用", _cites(3)) == ("完全沒引用", [])
+    assert rt.prune_citations("a [1]", []) == ("a [1]", [])
+
+
+def test_retrieved_but_unused_passages_do_not_show_up_as_references(rig, monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.20, 0.25, 0.30))
+    s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "只有第二段有用 [2]")
+    r, _ = rig(s, rag_files=["f"])
+    assert [c.source for c in r.citations] == ["文件1.pdf"] and r.reply == "只有第二段有用 [1]"
+    assert "引用 1/3 個來源" in r.trace[-1].summary
+
+
+def test_passages_of_one_file_share_one_reference(rig, monkeypatch):
+    same = lambda text, d, pg: {"text": text, "source": "辦法.pdf", "uri": "x/ragFiles/F1", "score": d, "page": pg}  # noqa: E731
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: [same("第二章 版本管理", 0.30, 2), same("第三章 審核流程", 0.25, 3),
+                                                         same("第二章 版本管理", 0.30, 2),  # the same passage twice: kept once
+                                                         {"text": "別份文件", "source": "另一份.pdf", "uri": "x/ragFiles/F2", "score": 0.28, "page": None}])
+    s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "由副院長核定 [1]，另見 [2]")
+    r, _ = rig(s, rag_files=["f"])
+    assert [c.source for c in r.citations] == ["辦法.pdf", "另一份.pdf"]  # two files, not four passages
+    one = r.citations[0]
+    assert [p.text for p in one.passages] == ["第三章 審核流程", "第二章 版本管理"]  # best first, duplicate dropped
+    assert one.text == "第三章 審核流程" and one.page == 3 and one.score == 0.25  # the top-level fields mirror the best passage
+    tool = [m for m in s.sent[1]["messages"] if m["role"] == "tool"][0]["content"]
+    assert tool.count("[1] 來源：辦法.pdf") == 2 and tool.count("[2] 來源：另一份.pdf") == 1  # one number per file
+    assert "命中 3 段（來自 2 份文件）" in r.trace[1].summary
+
+
+def test_citing_a_multi_passage_file_once_keeps_all_its_passages(rig, monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: [
+        {"text": "段一", "source": "辦法.pdf", "uri": "u", "score": 0.2, "page": 1}, {"text": "段二", "source": "辦法.pdf", "uri": "u", "score": 0.3, "page": 4}])
+    r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "依辦法 [1]"), rag_files=["f"])
+    assert len(r.citations) == 1 and len(r.citations[0].passages) == 2 and "引用 1/1 個來源" in r.trace[-1].summary
