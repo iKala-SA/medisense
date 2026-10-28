@@ -1,14 +1,19 @@
 import React,{useMemo,useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkCjk from 'remark-cjk-friendly';
 import {CaretRight,CheckCircle,Circle,CircleNotch,Copy,ListChecks,Brain,Lightning,FileText} from '@phosphor-icons/react';
 import {Jelly} from '../Jelly';
+import {artifactComponents} from './Artifact';
+import FeedbackBar from './Feedback';
 import {stepLabel,seconds,modelLabel} from './chatkit';
 import './chat.css';
 
 /* Inline [n] markers become clickable chips that open that reference in the side panel. */
 const chip=(i,n)=>+i>=1&&+i<=n?`[${i}](#cite-${i})`:`[${i}]`;
-const withCites=(text,n)=>n?String(text)
+const CODE=/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/;  // code is never rewritten: [1] there is an index, not a citation
+const withCites=(text,n)=>n?String(text).split(CODE).map((seg,i)=>i%2?seg:citeText(seg,n)).join(''):String(text);
+const citeText=(text,n)=>n?String(text)
   .replace(/\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})+)\]/g,(m,list)=>list.split(/\s*[,，、]\s*/).map(i=>chip(i,n)).join(''))  // [1, 2] -> [1][2]
   .replace(/\[(\d{1,2})\](?!\()/g,(m,i)=>chip(i,n)):String(text);
 
@@ -28,7 +33,7 @@ export function Steps({trace,compact,model,run}){
 }
 const RUNNING={input:'讀取並去識別化問題…',turn:'模型思考中…',knowledge:'正在搜尋院內文件…',web_search:'正在搜尋網路…',llm:'模型正在撰寫回答…',structured_output:'模型正在產生結構化輸出…',tool:'正在執行連接器動作…',approval:'等待人工核准…',his_emr:'正在查詢 HIS/EMR…'};
 const runningText=t=>RUNNING[t]||'處理中…';
-export function Thought({text}){return <blockquote className="cx-thought"><Brain size={13}/><div className="cx-thought-md"><Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown></div></blockquote>}
+export function Thought({text}){return <blockquote className="cx-thought"><Brain size={13}/><div className="cx-thought-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]}>{text}</Markdown></div></blockquote>}
 
 /* Collapsible "思考過程" (Claude / Amazon Quick style): collapsed once the answer is done. */
 /* Collapsible "思考過程" (Claude / Amazon Quick style): collapsed once the answer is done. */
@@ -50,6 +55,7 @@ export function Thinking({label='正在思考…'}){
 }
 
 /* The answer while it is being produced: current step as a headline, the llm draft streaming in below. */
+const live=artifactComponents({canSave:false,live:true});
 export function LiveRun({run,onSteps}){
   const cur=run.steps.find(s=>s.status==='running')||[...run.steps].reverse().find(s=>s.status==='done');
   const done=run.steps.filter(s=>s.status==='done').length;
@@ -59,25 +65,27 @@ export function LiveRun({run,onSteps}){
       <span className="shimmer">{cur?runningText(cur.type):'正在思考…'}</span>
       {done>0&&<small>已完成 {done} 步</small>}<CaretRight size={13}/>
     </button>
-    {md&&<div className="cx-md streaming"><Markdown remarkPlugins={[remarkGfm]}>{md}</Markdown></div>}
+    {md&&<div className="cx-md streaming"><Markdown remarkPlugins={[remarkGfm,remarkCjk]} components={live}>{md}</Markdown></div>}
   </div>;
 }
 
-export default function ChatAnswer({m,onCite,onSteps,notify}){
+export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mock}){
   const n=m.citations?.length||0;
   const md=useMemo(()=>withCites(m.ans,n),[m.ans,n]);
   const comps=useMemo(()=>({
     a:({href,children})=>href?.startsWith('#cite-')?<button type="button" className="cx-cite" onClick={()=>onCite(+href.slice(6))}>{children}</button>:<a href={href} target="_blank" rel="noreferrer">{children}</a>,
-    table:({children})=><div className="cx-table"><table>{children}</table></div>
-  }),[onCite]);
+    table:({children})=><div className="cx-table"><table>{children}</table></div>,
+    ...artifactComponents({canSave,notify,mock})
+  }),[onCite,canSave,notify,mock]);
   return <div className="cx-answer">
     {m.trace?.length>0&&<ThinkingBlock trace={m.trace} ms={m.ms}/>}
-    <div className="cx-md"><Markdown remarkPlugins={[remarkGfm]} components={comps}>{md}</Markdown></div>
+    <div className="cx-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]} components={comps}>{md}</Markdown></div>
     {n>0&&<div className="cx-refs">{m.citations.map((c,i)=><button key={i} type="button" onClick={()=>onCite(i+1)} title={c.source}><FileText size={13}/><b>{i+1}</b><span>{c.source}</span></button>)}</div>}
     <div className="cx-foot">
       <span className="cx-agent">{m.agent||'Medisense'}</span>
       <button type="button" onClick={()=>onSteps()}><ListChecks size={15}/>{m.used&&m.used!=='—'?m.used:'執行步驟'}<CaretRight size={13}/></button>
       <button type="button" aria-label="複製回覆" onClick={()=>{navigator.clipboard?.writeText(m.ans);notify('已複製回覆')}}><Copy size={15}/></button>
+      <FeedbackBar sessionId={sessionId} msgIndex={m.msgIndex} rating={m.fb} question={m.text} answer={m.ans} notify={notify} mock={mock}/>
     </div>
   </div>;
 }

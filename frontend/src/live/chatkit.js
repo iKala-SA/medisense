@@ -30,9 +30,9 @@ export const stepLabel=t=>STEP[t]||t;
 export const seconds=ms=>ms>=1000?(ms/1000).toFixed(1)+' 秒':ms+' 毫秒';
 
 /* Entry for one answered turn (live API or a reopened session). */
-export function toEntry(text,reply,{trace=[],citations=[],ms=0,agent}={}){
+export function toEntry(text,reply,{trace=[],citations=[],ms=0,agent,msgIndex,fb}={}){
   const llm=[...trace].reverse().find(s=>s.model);
-  return {text,ans:reply,trace,citations,ms,agent,
+  return {text,ans:reply,trace,citations,ms,agent,msgIndex,fb,
     used:llm?`${modelLabel(llm.model)}${GROUP_LABEL[llm.group]?' · '+GROUP_LABEL[llm.group]:''}`:'—',
     thinking:trace.map(s=>s.thinking).filter(Boolean)};
 }

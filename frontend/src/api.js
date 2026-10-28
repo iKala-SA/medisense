@@ -137,6 +137,8 @@ export const api={
   renameSession:(id,title)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({title})}),
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
   chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
+  sendFeedback:f=>call('/api/chat/feedback',{method:'POST',body:body(f)}),
+  saveToSpace:b=>call('/api/chat/save-to-space',{method:'POST',body:body(b)}),
   citedDocument:id=>call(`/api/chat/documents/${id}`),
   openOriginal:(id,purpose)=>call(`/api/chat/documents/${id}/original`,{method:'POST',body:body({purpose})}),
   fetchOriginal:(url,download=false)=>blob(download?`${url}&download=true`:url),
