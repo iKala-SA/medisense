@@ -19,9 +19,9 @@ export default function RoutingRulesPage({me,notify}){
   const [base,setBase]=useState(null),[draft,setDraft]=useState(null),[busy,setBusy]=useState(false),[adding,setAdding]=useState(false);
   const [text,setText]=useState('請分析並比較兩種排班方案的優缺點'),[res,setRes]=useState(null),[testing,setTesting]=useState(false),[tested,setTested]=useState(null);
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false),[saved,setSaved]=useState(false);
-  const [feat,setFeat]=useState(null),[featErr,setFeatErr]=useState(''),[featBusy,setFeatBusy]=useState(false);
+  const [feat,setFeat]=useState(null),[featErr,setFeatErr]=useState(''),[featBusy,setFeatBusy]=useState(false),[rag,setRag]=useState(null);
   // null = loading, false = could not be read (see featErr). Loaded on its own so a slow model-group lookup cannot hold it up.
-  const loadFeat=()=>{setFeat(null);setFeatErr('');api.features().then(setFeat).catch(e=>{setFeat(false);setFeatErr(errText(e))})};
+  const loadFeat=()=>{setFeat(null);setFeatErr('');api.features().then(f=>{setFeat(f);setRag({keep:String(f.rag_keep_distance),max:String(f.rag_max_distance)})}).catch(e=>{setFeat(false);setFeatErr(errText(e))})};
   useOnce(async()=>{
     if(!admin)return;
     loadFeat();
@@ -36,10 +36,19 @@ export default function RoutingRulesPage({me,notify}){
   const change=(id,k,v)=>edit(a=>({...a,rules:a.rules.map(r=>r.id===id?{...r,[k]:v}:r)}));
   const sov=draft.sovereign_only,sovLive=(groups||[]).find(g=>g.id==='sovereign');
   const sovMissing=groups!==null&&!gfail&&!sovLive?.configured;
+  const featBody=f=>({web_search:!!f?.web_search,rag_keep_distance:f?.rag_keep_distance??0.34,rag_max_distance:f?.rag_max_distance??0.40});
+  const ragNum=v=>Number.isFinite(parseFloat(v))?parseFloat(v):NaN;
+  const ragValid=!!rag&&ragNum(rag.keep)>=0.05&&ragNum(rag.max)<=1&&ragNum(rag.keep)<=ragNum(rag.max);
+  const ragDirty=!!rag&&!!feat&&(ragNum(rag.keep)!==feat.rag_keep_distance||ragNum(rag.max)!==feat.rag_max_distance);
+  async function saveRag(){
+    setFeatBusy(true);
+    try{const f=await api.saveFeatures({...featBody(feat),rag_keep_distance:ragNum(rag.keep),rag_max_distance:ragNum(rag.max)});setFeat(f);setRag({keep:String(f.rag_keep_distance),max:String(f.rag_max_distance)});notify('已儲存文件檢索門檻')}
+    catch(e){notify('儲存失敗：'+errText(e))}finally{setFeatBusy(false)}
+  }
   async function setWeb(on){
     if(on&&!window.confirm('開放後，使用者可在對話中自行開啟「Web 搜尋」。開啟時，經去識別化的搜尋詞會送到 Google。確定開放？'))return;
     setFeatBusy(true);
-    try{setFeat(await api.saveFeatures({web_search:on}));notify(on?'已開放網路搜尋（使用者仍需自行開啟）':'已關閉網路搜尋')}
+    try{setFeat(await api.saveFeatures({...featBody(feat),web_search:on}));notify(on?'已開放網路搜尋（使用者仍需自行開啟）':'已關閉網路搜尋')}
     catch(e){notify('儲存失敗：'+errText(e))}finally{setFeatBusy(false)}
   }
   const move=(i,d)=>edit(a=>{const rules=[...a.rules];const j=i+d;if(j<0||j>=rules.length)return a;[rules[i],rules[j]]=[rules[j],rules[i]];return {...a,rules}});
@@ -63,6 +72,17 @@ export default function RoutingRulesPage({me,notify}){
     <label className={'panel lv-o-sovereign'+(feat?.web_search?' on':'')} style={{marginTop:10}}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.web_search} onChange={e=>setWeb(e.target.checked)}/><div><b><Globe size={14} style={{verticalAlign:-2,marginRight:4}}/>允許網路搜尋（對外連線）</b><span className="muted small">預設關閉。勾選後，使用者可在輸入框「＋」選單自行開啟 Web 搜尋；開啟時模型可能把<b>已去識別化的搜尋詞</b>送到 Google 查詢，結果附網頁來源。「僅院內模型」開啟時，網路搜尋一律停用。變更立即生效並寫入稽核記錄。{feat?.updated_by&&<> 上次由 {feat.updated_by} 變更。</>}</span>
       {feat===null&&<span className="small muted">讀取目前設定中…</span>}
       {feat===false&&<span className="small" role="alert" style={{color:'#b3261e'}}>無法讀取此設定，暫時無法變更：{featErr||'未知錯誤'}　<button type="button" className="lv-linkbtn" onClick={e=>{e.preventDefault();loadFeat()}}>重試</button></span>}</div></label>
+    <section className="panel lv-o-card" style={{marginTop:10}}><h3>文件檢索相關度門檻</h3>
+      <p className="muted small" style={{margin:'4px 0 10px'}}>數值是<b>距離</b>，越小代表越相似。距離 ≤「高相關」線：正常引用；介於兩線之間：保留但標示「低相關」；超過「捨棄」線：不交給模型，模型會被告知沒有找到足夠相關的文件。預設 0.34／0.40 是用示範知識庫量測的起點（真正命中約 0.26–0.31，查無相關約 0.36–0.49）；換成真實院內文件後，請用 <code>backend/scripts/calibrate_rag.py</code> 重新量測。變更立即生效並寫入稽核記錄。</p>
+      {feat===null&&<span className="small muted">讀取目前設定中…</span>}
+      {feat!==null&&feat!==false&&rag&&<div className="inline" style={{alignItems:'flex-end',gap:12,flexWrap:'wrap'}}>
+        <Field label="高相關線（≤ 此值）"><input type="number" step="0.01" min="0.05" max="1" value={rag.keep} onChange={e=>setRag(r=>({...r,keep:e.target.value}))} style={{width:110}}/></Field>
+        <Field label="捨棄線（> 此值不使用）"><input type="number" step="0.01" min="0.05" max="1" value={rag.max} onChange={e=>setRag(r=>({...r,max:e.target.value}))} style={{width:110}}/></Field>
+        <button className="btn primary" disabled={!ragDirty||!ragValid||featBusy} onClick={saveRag}>{featBusy?'儲存中…':'儲存門檻'}</button>
+        <button className="btn" disabled={!ragDirty||featBusy} onClick={()=>setRag({keep:String(feat.rag_keep_distance),max:String(feat.rag_max_distance)})}>還原</button>
+        {!ragValid&&<span className="small" role="alert" style={{color:'#b3261e'}}>高相關線不可大於捨棄線，範圍 0.05–1。</span>}
+      </div>}
+    </section>
     {sov&&sovMissing&&<div className="lv-o-banner bad"><Warning size={16}/><div><b>目前 LiteLLM 沒有可用的 sovereign 模型。</b>啟用後所有請求都會失敗（不會改用雲端）。請先在「模型」頁新增地端模型並套用到 LiteLLM。</div></div>}
     <div className="lv-o-grid"><div>
       {sov&&<p className="lv-o-help" style={{margin:'0 0 8px'}}><Lock size={11}/> 「僅院內模型」已勾選，以下規則暫不生效（保留設定，取消勾選後恢復）。</p>}

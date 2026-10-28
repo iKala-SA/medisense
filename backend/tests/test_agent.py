@@ -37,7 +37,7 @@ def rig(fs, monkeypatch):
     monkeypatch.setattr(rag, "hospital_corpus", lambda: "c")
     monkeypatch.setattr(rag, "library_index", lambda: {"F1": "d1"})
     monkeypatch.setattr(rag, "retrieve", lambda *a, **k: [
-        {"text": "每份指引應標示版本號", "source": "辦法.pdf", "uri": "x/ragFiles/F1", "score": 0.9, "page": 2}])
+        {"text": "每份指引應標示版本號", "source": "辦法.pdf", "uri": "x/ragFiles/F1", "score": 0.27, "page": 2}])
 
     def go(script, agent=None, **kw):
         monkeypatch.setattr(llm, "complete", script)
@@ -211,3 +211,35 @@ def test_the_model_is_told_the_current_date(rig):
     import re
 
     assert re.search(r"現在時間：\d{4}-\d{2}-\d{2} \d{2}:\d{2}（Asia/Taipei）", s.sent[0]["system"])
+
+
+def _chunks(*dists):
+    return [{"text": f"段落{i}", "source": f"文件{i}.pdf", "uri": f"x/ragFiles/F{i}", "score": d, "page": None} for i, d in enumerate(dists)]
+
+
+def test_retrieval_is_filtered_by_distance_and_borderline_passages_are_flagged(rig, monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.27, 0.37, 0.44, 0.49))  # smaller = more similar
+    s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "答案")
+    r, _ = rig(s, rag_files=["f"])
+    assert [c.low for c in r.citations] == [False, True] and len(r.citations) == 2  # 0.44 and 0.49 never reach the model
+    k = r.trace[1].summary
+    assert "命中 2 段（1 段低相關）" in k and "捨棄 2 段不相關" in k
+    tool = [m for m in s.sent[1]["messages"] if m["role"] == "tool"][0]["content"]
+    assert "[1] 來源：文件0.pdf" in tool and "[2]（低相關） 來源：文件1.pdf" in tool and "段落2" not in tool
+
+
+def test_when_everything_is_too_far_the_model_hears_there_was_nothing_and_no_citations_exist(rig, monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.439, 0.443))
+    s = Script([call("search_knowledge", {"reason": "r", "query": "今天天氣"})], "院內文件中沒有找到相關依據，以下為一般知識")
+    r, _ = rig(s, rag_files=["f"])
+    assert not r.citations
+    assert "命中 0 段（最近的一段距離 0.44，超過門檻 0.40，已捨棄）" in r.trace[1].summary
+    assert "沒有找到足夠相關的院內文件" in [m for m in s.sent[1]["messages"] if m["role"] == "tool"][0]["content"]
+    assert "非院內依據" in s.sent[0]["system"]  # the standing instruction for exactly this case
+
+
+def test_thresholds_follow_the_admin_setting(rig, monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.44))
+    monkeypatch.setattr("app.engine.features.rag_thresholds", lambda: (0.30, 0.50))  # admin loosened it
+    r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "ok"), rag_files=["f"])
+    assert len(r.citations) == 1 and r.citations[0].low
