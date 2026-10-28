@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     google_cloud_project: str
     region: str = "asia-east1"
+    # Signs the short-lived links that open a library document's ORIGINAL file (routers/originals.py). Empty = the
+    # feature is off (fail closed). Must be the same on every Cloud Run instance.
+    download_signing_key: str = ""
+    original_link_ttl_seconds: int = 120
 
     litellm_base_url: str
     litellm_api_key: str

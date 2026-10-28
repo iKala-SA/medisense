@@ -11,6 +11,7 @@ and retrieved chunks before they reach the LLM (covers files indexed before uplo
 There is no off switch (decided 2026-10-26, after a local backend with DEID_ENABLED=false indexed
 raw PHI into the shared sandbox corpus). A DLP error propagates and fails the request: fail closed.
 """
+import re
 from functools import lru_cache
 
 from google.api_core.exceptions import InvalidArgument
@@ -83,6 +84,14 @@ def deidentify(text: str) -> str:
     if not text.strip():
         return text
     return "".join(_deidentify_piece(p) for p in _pieces(text))
+
+
+_TOKEN = re.compile(r"\[([A-Z][A-Z_]{2,})\]")
+
+
+def replaced_types(raw: str, masked: str) -> list[str]:
+    """infoType names DLP substituted into `masked` (tokens like [PERSON_NAME] that the raw text did not already contain)."""
+    return sorted(set(_TOKEN.findall(masked)) - set(_TOKEN.findall(raw)))
 
 
 def deidentify_many(texts: list[str]) -> list[str]:

@@ -25,6 +25,14 @@ if gcloud secrets describe github-dispatch-token --project "$PROJECT_ID" >/dev/n
 else
   echo "warning: secret github-dispatch-token missing; 套用到 LiteLLM will return 503 (run infra/10-litellm-apply-cicd.sh)" >&2
 fi
+# Original-file viewing signs its short-lived links with this key (routers/originals.py); without it the feature stays off.
+# Create once: openssl rand -hex 32 | gcloud secrets create original-link-signing-key --data-file=- --project "$PROJECT_ID"
+if gcloud secrets describe original-link-signing-key --project "$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud secrets add-iam-policy-binding original-link-signing-key --member "serviceAccount:${BACKEND_SA}@${PROJECT_ID}.iam.gserviceaccount.com" --role roles/secretmanager.secretAccessor --project "$PROJECT_ID" >/dev/null
+  SECRETS="${SECRETS},DOWNLOAD_SIGNING_KEY=original-link-signing-key:latest"
+else
+  echo "warning: secret original-link-signing-key missing; opening original library files is disabled" >&2
+fi
 # One Google OAuth app shared by every Google service (Gmail, Drive, ...): enabling them then needs no client fields.
 if gcloud secrets describe google-oauth-client-secret --project "$PROJECT_ID" >/dev/null 2>&1; then
   for s in google-oauth-client-id google-oauth-client-secret; do

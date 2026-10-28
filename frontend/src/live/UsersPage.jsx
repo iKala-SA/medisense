@@ -93,18 +93,20 @@ function UserEdit({email,me,notify,goAudit,onBack}){
   const [role,setRole]=useState('user');
   const [status,setStatus]=useState('active');
   const [department,setDepartment]=useState('');
+  const [origView,setOrigView]=useState(false);
   const [reason,setReason]=useState('');
   const [busy,setBusy]=useState(false);
   const [saved,setSaved]=useState(false);
 
-  const reset=x=>{setU(x);setRole(x.role);setStatus(x.status);setDepartment(x.department||'');setReason('')};
+  const reset=x=>{setU(x);setRole(x.role);setStatus(x.status);setDepartment(x.department||'');setOrigView(!!x.original_view);setReason('')};
   useEffect(()=>{api.getUser(email).then(reset).catch(e=>{notify?.('載入使用者失敗：'+errText(e));onBack()})},[email]);// eslint-disable-line react-hooks/exhaustive-deps
 
   if(!u)return <div className="card-page lv-page"><Loading/></div>;
 
   const self=!!u.uid&&u.uid===me?.uid||(!!me?.email&&me.email.toLowerCase()===u.email.toLowerCase());
   const locked=self||u.bootstrap_admin;
-  const accessChanged=role!==u.role||status!==u.status;
+  const viewChanged=origView!==!!u.original_view;
+  const accessChanged=role!==u.role||status!==u.status||viewChanged;
   const dirty=accessChanged||department!==(u.department||'');
   const needReason=accessChanged&&!reason.trim();
   const owned=u.owned||{agents:0,published_agents:0,connectors:0,documents:0};
@@ -115,7 +117,7 @@ function UserEdit({email,me,notify,goAudit,onBack}){
   async function save(){
     setBusy(true);setSaved(false);
     try{
-      const patch={...(role!==u.role?{role}:{}),...(status!==u.status?{status}:{}),...(department!==(u.department||'')?{department}:{}),reason:reason.trim()};
+      const patch={...(role!==u.role?{role}:{}),...(status!==u.status?{status}:{}),...(viewChanged?{original_view:origView}:{}),...(department!==(u.department||'')?{department}:{}),reason:reason.trim()};
       reset(await api.updateUser(u.email,patch));setSaved(true);notify?.('已儲存並寫入稽核記錄');
     }catch(e){notify?.('儲存失敗：'+errText(e))}finally{setBusy(false)}
   }
@@ -125,7 +127,7 @@ function UserEdit({email,me,notify,goAudit,onBack}){
     catch(e){notify?.('取消失敗：'+errText(e))}
   }
 
-  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),department!==(u.department||'')&&`科別 → ${department||'未設定'}`].filter(Boolean).join('、');
+  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),viewChanged&&(origView?'授予原始檔檢視':'撤銷原始檔檢視'),department!==(u.department||'')&&`科別 → ${department||'未設定'}`].filter(Boolean).join('、');
 
   return <div className="card-page lv-page">
     <button className="lv-back" onClick={onBack}><ArrowLeft/>返回使用者列表</button>
@@ -155,12 +157,17 @@ function UserEdit({email,me,notify,goAudit,onBack}){
       {demoting&&<div style={{marginTop:12}}><Notice tone="warn" icon={<Warning size={16}/>}>此人擁有 {owned.agents} 個 Agent、{owned.connectors} 個連接器與 {owned.documents} 份知識文件。改為一般使用者後這些項目仍歸此人所有，但此人無法再編輯；已發布的 Agent 照常上線，管理員仍可編輯。</Notice></div>}
     </div>
 
-    {accessChanged&&<div className="lv-card"><h2>變更原因 <span style={{color:'#b3261e'}}>*</span></h2><p className="lv-sub">原因會連同變更前後的角色或狀態寫入稽核記錄。</p>
+    <div className="lv-card"><h2>原始檔檢視</h2><p className="lv-sub">知識庫文件預設只顯示去識別化內容。含個資的原始檔，只有被授權的人可以開啟，且每次必須填寫用途；每次開啟都會寫入稽核記錄。{u.original_view_changed_at&&` 上次由 ${u.original_view_changed_by} 於 ${fmtDateTime(u.original_view_changed_at)} 變更。`}</p>
+      {self&&<div style={{marginBottom:10}}><Notice icon={<Lock size={16}/>}>不能變更自己的原始檔檢視權限，請由另一位管理員操作。</Notice></div>}
+      {[[false,'不可檢視含個資的原始檔','只能看去識別化版本；未偵測到個資的文件仍可開啟原始檔。'],[true,'可檢視含個資的原始檔（需填用途）','適用於需要核對原文、表格或頁面的臨床同仁。']].map(([v,t,d])=><button key={String(v)} type="button" disabled={self} className={'lv-opt '+(origView===v?'on':'')} onClick={()=>setOrigView(v)}><span className="dot"/><span><b>{t}</b><p>{d}</p></span></button>)}
+    </div>
+
+    {accessChanged&&<div className="lv-card"><h2>變更原因 <span style={{color:'#b3261e'}}>*</span></h2><p className="lv-sub">原因會連同變更前後的角色、狀態或原始檔檢視權限寫入稽核記錄。</p>
       <textarea maxLength={200} value={reason} onChange={e=>setReason(e.target.value)} placeholder="例如：轉調護理部，改為一般使用者；留職停薪，停用存取。"/><div className="lv-hint">{reason.length} / 200</div></div>}
 
     {!u.uid&&<div className="lv-card"><div className="lv-actions" style={{justifyContent:'space-between'}}><span className="small muted">此帳號為預先註冊，對方尚未登入過。如果登錄錯誤，可以直接取消。</span><button className="btn danger" onClick={cancelPrereg}><Trash/>取消預先註冊</button></div></div>}
 
-    <div className="lv-savebar"><div><span>正在編輯 <b>{u.name||u.email}</b>{dirty&&<span className="muted small">　{summary}</span>}</span><small>{saved&&!dirty?'已儲存並寫入稽核記錄。':needReason?'變更角色或狀態需要填寫原因。':'角色與狀態的變更會寫入稽核記錄。'}</small></div>
+    <div className="lv-savebar"><div><span>正在編輯 <b>{u.name||u.email}</b>{dirty&&<span className="muted small">　{summary}</span>}</span><small>{saved&&!dirty?'已儲存並寫入稽核記錄。':needReason?'變更角色、狀態或原始檔檢視權限需要填寫原因。':'角色與狀態的變更會寫入稽核記錄。'}</small></div>
       <button className="btn" disabled={!dirty||busy} onClick={()=>reset(u)}>取消變更</button>
       <button className={'btn primary'} style={suspending?{background:'#b3261e',borderColor:'#b3261e'}:undefined} disabled={!dirty||needReason||busy} onClick={save}>{busy?'儲存中…':suspending?'確認停用並儲存':'儲存變更'}</button>
     </div>

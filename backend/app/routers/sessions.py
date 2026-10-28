@@ -61,7 +61,7 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     d = snap.to_dict() or {}
     return SessionDetail(**_summary(snap.id, d).model_dump(),
-                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", "")) for m in d.get("messages") or []],
+                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta")) for m in d.get("messages") or []],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0)}
                                       for a in d.get("attachments") or []])
 

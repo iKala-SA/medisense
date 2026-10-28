@@ -50,7 +50,7 @@ def test_instruction_injection_helper(fs):
 
 
 def test_prefix_reaches_system_prompt(fs, monkeypatch):
-    from app.engine import flow, llm
+    from app.engine import agent, llm
     from app.schemas import AgentIn
 
     seen = {}
@@ -61,7 +61,7 @@ def test_prefix_reaches_system_prompt(fs, monkeypatch):
 
     monkeypatch.setattr(llm, "complete", fake_complete)
     monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
-    r = flow.run_flow(AgentIn(name="A", instructions="BASE"), agent_id="a", user_id="u", user_message="hi", history=[],
+    r = agent.run_agent(AgentIn(name="A", instructions="BASE"), agent_id="a", user_id="u", user_message="hi", history=[],
                       skill_prefix="## Skill: S\nDO X")
     assert r.reply == "ok"
     assert seen["system"].startswith("## Skill: S\nDO X") and "BASE" in seen["system"]

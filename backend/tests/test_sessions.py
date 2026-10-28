@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from .conftest import ADMIN, BUILDER, BUILDER2
+from .conftest import ADMIN, BUILDER, BUILDER2, PLAIN
 
 
 def seed(fs, sid, uid, n, mins, **extra):
@@ -99,3 +99,175 @@ def test_calendar_status(fs, as_user):
     # No calendar connector exists yet: an honest "not connected" with the reason (full flow: tests/test_open_connector.py).
     r = as_user(BUILDER).get("/api/calendar/status").json()
     assert r["connected"] is False and r["connector_id"] is None and r["reason"]
+
+
+def test_chat_returns_thinking_and_persists_steps(fs, as_user, monkeypatch):
+    from app.engine import llm
+
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return llm.Completion("答案", "gemini-3.1-pro", 3, 4, 0.0, 5, reasoning="先確認問題，再比較兩個選項")
+
+    monkeypatch.setattr(llm, "complete", fake)
+    c = as_user(BUILDER)
+    r = c.post("/api/chat", json={"message": "請分析兩個方案", "model_group": "reasoning"}).json()
+    assert r["trace"][1]["thinking"] == "先確認問題，再比較兩個選項" and seen["think"] == "medium"
+    d = c.get(f"/api/sessions/{r['session_id']}").json()
+    meta = d["messages"][1]["meta"]
+    assert d["messages"][0]["meta"] is None and meta["trace"][1]["thinking"].startswith("先確認") and meta["citations"] == []
+
+
+def test_chat_general_scope_offers_no_search_tool(fs, as_user, monkeypatch):
+    from app.engine import llm
+
+    seen = []
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr(llm, "complete", lambda **kw: seen.append(kw.get("tools")) or llm.Completion("ok", "gemini-3-flash", 1, 1, 0.0, 1))
+    fs.put("documents/d1", {"status": "indexed", "rag_file": "f1", "name": "指引"})
+    c = as_user(BUILDER)
+    c.post("/api/chat", json={"message": "hi", "knowledge_scope": "general"})
+    assert seen[-1] is None  # model only: nothing to call
+    c.post("/api/chat", json={"message": "hi", "knowledge_scope": "all"})
+    assert [t["function"]["name"] for t in seen[-1]] == ["search_knowledge"]  # indexed, visible documents are searchable
+
+
+def _stub_chat(monkeypatch, models=("gemini-3-flash", "gemini-2.5-flash")):
+    from app.engine import llm
+
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr(llm, "model_catalog", lambda: [{"id": m, "model": f"vertex_ai/{m}"} for m in models])
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        if kw.get("on_delta"):
+            kw["on_delta"]("thought", "想一下")
+            kw["on_delta"]("text", "你")
+            kw["on_delta"]("text", "好")
+        return llm.Completion("你好", kw.get("model") or "gemini-3-flash", 1, 1, 0.0, 1)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    return seen
+
+
+def test_chat_pins_the_chosen_model(fs, as_user, monkeypatch):
+    seen = _stub_chat(monkeypatch)
+    c = as_user(BUILDER)
+    r = c.post("/api/chat", json={"message": "hi", "model": "gemini-2.5-flash"}).json()
+    assert seen["model"] == "gemini-2.5-flash" and r["trace"][1]["model"] == "gemini-2.5-flash"
+    assert c.post("/api/chat", json={"message": "hi", "model": "gpt-9"}).status_code == 422
+
+
+def test_chat_pin_is_ignored_when_sovereign_only(fs, as_user, monkeypatch):
+    seen = _stub_chat(monkeypatch)
+    monkeypatch.setattr("app.engine.routing.sovereign_only", lambda: True)
+    as_user(BUILDER).post("/api/chat", json={"message": "hi", "model": "gemini-2.5-flash"})
+    assert not seen.get("model") and seen["group"] == "sovereign"
+
+
+def test_cited_document_viewer_respects_visibility(fs, as_user, monkeypatch):
+    class Blob:
+        def download_as_text(self, encoding="utf-8"):
+            return "第一段\n第二段 ALT 40"
+
+    class Bucket:
+        def blob(self, path):
+            assert path == "docs/d1/deidentified.txt"
+            return Blob()
+
+    monkeypatch.setattr("app.routers.chat._bucket", lambda: Bucket())
+    monkeypatch.setattr("app.routers.knowledge.settings", lambda: type("S", (), {"upload_bucket": "test-bucket"})())
+    fs.store["documents/d1"] = {"name": "指引.pdf", "version": 2, "deid_uri": "gs://test-bucket/docs/d1/deidentified.txt",
+                                "share": {"access": "restricted", "role": "use", "members": []}, "uploaded_uid": BUILDER.uid}
+    fs.store["documents/d2"] = {"name": "公開.pdf", "version": 1, "deid_uri": "gs://test-bucket/docs/d1/deidentified.txt"}
+    r = as_user(PLAIN).get("/api/chat/documents/d2")
+    assert r.status_code == 200 and r.json()["name"] == "公開.pdf" and "ALT 40" in r.json()["text"]
+    assert as_user(PLAIN).get("/api/chat/documents/nope").status_code == 404
+    assert as_user(PLAIN).get("/api/chat/documents/d1").status_code == 404  # not shared with this user
+
+
+# ---- original-file viewing (routers/originals.py)
+def _original_setup(fs, monkeypatch, pii):
+    import app.routers.originals as o
+
+    monkeypatch.setattr(o, "settings", lambda: type("S", (), {"download_signing_key": "k" * 32, "original_link_ttl_seconds": 120})())
+    blob = type("Blob", (), {"download_as_bytes": lambda self: b"%PDF-1.4 original"})()
+    monkeypatch.setattr(o, "_bucket", lambda: type("B", (), {"blob": lambda self, p: blob})())
+    monkeypatch.setattr(o, "_blob_path", lambda uri: uri)
+    text_blob = type("T", (), {"download_as_text": lambda self, encoding="utf-8": "去識別化文字"})()
+    monkeypatch.setattr("app.routers.chat._bucket", lambda: type("B", (), {"blob": lambda self, p: text_blob})())
+    fs.store["documents/d1"] = {"name": "指引.pdf", "version": 2, "gcs_uri": "gs://b/o.pdf", "deid_uri": "gs://b/d.txt", "pii": pii}
+    return o
+
+
+def _audits(fs, action):
+    return [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == action]
+
+
+def test_original_without_personal_data_opens_for_anyone_and_is_audited(fs, as_user, monkeypatch):
+    _original_setup(fs, monkeypatch, "none")
+    c = as_user(PLAIN)
+    r = c.post("/api/chat/documents/d1/original", json={})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["kind"] == "pdf" and j["ttl_seconds"] == 120 and PLAIN.email in j["watermark"]
+    got = c.get(j["url"])
+    assert got.status_code == 200 and got.content.startswith(b"%PDF") and got.headers["cache-control"] == "no-store"
+    assert "inline" in got.headers["content-disposition"]
+    assert "attachment" in c.get(j["url"] + "&download=true").headers["content-disposition"]
+    opened = _audits(fs, "knowledge.original_open")
+    assert len(opened) == 1 and opened[0]["actor_email"] == PLAIN.email and opened[0]["doc_id"] == "d1" and opened[0]["at"]
+    assert [a["disposition"] for a in _audits(fs, "knowledge.original_fetch")] == ["view", "download"]
+
+
+def test_original_with_personal_data_needs_grant_and_purpose(fs, as_user, monkeypatch):
+    from dataclasses import replace
+
+    _original_setup(fs, monkeypatch, "found")
+    assert as_user(PLAIN).post("/api/chat/documents/d1/original", json={"purpose": "查核病人處置"}).status_code == 403
+    assert as_user(PLAIN).get("/api/chat/documents/d1").json()["original"] == "denied"
+    granted = replace(PLAIN, uid="u-doc", email="doc@example.com", original_view=True)
+    c = as_user(granted)
+    assert c.get("/api/chat/documents/d1").json()["original"] == "purpose"
+    assert c.post("/api/chat/documents/d1/original", json={"purpose": " "}).status_code == 422
+    assert not _audits(fs, "knowledge.original_open")  # refused attempts issue no link and no open record
+    ok = c.post("/api/chat/documents/d1/original", json={"purpose": "查核病人處置"})
+    assert ok.status_code == 200 and _audits(fs, "knowledge.original_open")[0]["purpose"] == "查核病人處置"
+    fs.store["documents/d1"]["pii"] = "unknown"  # unclassified counts as personal data
+    assert as_user(PLAIN).post("/api/chat/documents/d1/original", json={"purpose": "查核病人處置"}).status_code == 403
+
+
+def test_original_link_is_bound_expires_and_follows_revocation(fs, as_user, monkeypatch):
+    from dataclasses import replace
+
+    o = _original_setup(fs, monkeypatch, "found")
+    doc = replace(PLAIN, original_view=True)
+    url = as_user(doc).post("/api/chat/documents/d1/original", json={"purpose": "會診討論"}).json()["url"]
+    other = replace(PLAIN, uid="u-other", email="other@example.com", original_view=True)
+    assert as_user(other).get(url).status_code == 403  # a copied link is useless to someone else
+    assert as_user(doc).get(url.replace("t=", "t=x")).status_code == 401  # tampered
+    assert as_user(PLAIN).get(url).status_code == 403  # grant removed after the link was issued
+    monkeypatch.setattr(o.time, "time", lambda: 10**10)
+    assert as_user(doc).get(url).status_code == 401  # expired
+
+
+def test_original_viewing_is_off_without_a_signing_key(fs, as_user, monkeypatch):
+    o = _original_setup(fs, monkeypatch, "none")
+    monkeypatch.setattr(o, "settings", lambda: type("S", (), {"download_signing_key": "", "original_link_ttl_seconds": 120})())
+    assert as_user(PLAIN).post("/api/chat/documents/d1/original", json={}).status_code == 503
+    assert not _audits(fs, "knowledge.original_open")
+
+
+def test_admin_grants_original_view_with_reason_and_audit(fs, as_user):
+    fs.store["users/user@example.com"] = {"email": "user@example.com", "uid": "u-u1", "role": "user", "status": "active"}
+    c = as_user(ADMIN)
+    assert c.patch("/api/users/user@example.com", json={"original_view": True}).status_code == 422  # needs a reason
+    r = c.patch("/api/users/user@example.com", json={"original_view": True, "reason": "感染科醫師需查核個案"})
+    assert r.status_code == 200 and r.json()["original_view"] is True
+    assert _audits(fs, "user.original_view")[0]["new"] is True
