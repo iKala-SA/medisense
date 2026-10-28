@@ -41,6 +41,8 @@ REASON = {"type": "string", "description": "一句話（繁體中文）說明你
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
          "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
          "呼叫工具時務必填寫 reason。")
+NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你可以用一般知識回答，但必須明確說明「院內文件中沒有找到相關依據，以下為一般知識，非院內依據」，"
+                 "且不要標註來源編號。標示「低相關」的段落只供參考，引用時要說明相關度較低。")
 WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
              "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
 WEB_SYSTEM = "你是網路搜尋助理。用繁體中文簡要整理搜尋到的事實，保留數字、日期與單位，不要加入個人意見或猜測。"
@@ -172,7 +174,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     tools = build_tools(agent, rag_files, user_message, web=web_on)
     specs = [t.spec for t in tools.values()]
     if specs:
-        system = f"{system}\n\n{GUIDE}" + (f"\n{WEB_GUIDE}" if web_on else "")
+        system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
     llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
     group, note = pick_group(agent, llm_node, user_message)
     think = THINK.get(group)
@@ -184,11 +186,11 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     seen: dict[tuple[str, str], int] = {}  # passage -> its [n]
     seen_urls: dict[str, int] = {}  # web page -> its [n]
 
-    def number(chunk: dict) -> int:
+    def number(chunk: dict, low: bool = False) -> int:
         key = (chunk["source"], chunk["text"][:80])
         if key not in seen:
             seen[key] = len(res.citations) + 1
-            res.citations.append(Citation(source=chunk["source"], uri=chunk["uri"], score=chunk["score"], text=chunk["text"][:600],
+            res.citations.append(Citation(source=chunk["source"], uri=chunk["uri"], score=chunk["score"], low=low, text=chunk["text"][:600],
                                           doc_id=chunk.get("doc_id", ""), page=chunk.get("page")))
         return seen[key]
 
@@ -209,12 +211,23 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             index = {}
         for c in chunks:
             c["doc_id"] = index.get(rag.file_id(c["uri"]), "") or index.get("name:" + c["source"], "")
-        if not chunks:
-            return "沒有找到相關文件。", f"搜尋「{query}」：沒有找到相關文件"
-        body = "\n\n".join(f"[{number(c)}] 來源：{c['source']}\n{c['text']}" for c in chunks)
+        keep_d, max_d = features.rag_thresholds()
+        dist = lambda c: c["score"] if c["score"] is not None else 0.0  # noqa: E731 - no score: cannot judge, keep it
+        kept = [c for c in chunks if dist(c) <= max_d]
+        ms = int((time.perf_counter() - t0) * 1000)
+        if not kept:
+            nearest = min((dist(c) for c in chunks), default=None)
+            why = f"最近的一段距離 {nearest:.2f}，超過門檻 {max_d:.2f}，已捨棄" if nearest is not None else "檢索沒有回傳任何段落"
+            return "沒有找到足夠相關的院內文件。", f"搜尋「{query}」：命中 0 段（{why}）（{ms} ms）"
+        parts = []
+        for c in kept:
+            low = dist(c) > keep_d
+            parts.append(f"[{number(c, low)}]{'（低相關）' if low else ''} 來源：{c['source']}\n{c['text']}")
         if emit:  # the 參考文件 tab fills in as soon as retrieval returns
             emit({"event": "citations", "citations": [c.model_dump() for c in res.citations]})
-        return body, f"搜尋「{query}」：命中 {len(chunks)} 段，已去識別化（{int((time.perf_counter() - t0) * 1000)} ms）"
+        n_low = sum(dist(c) > keep_d for c in kept)
+        detail = f"{len(kept)} 段" + (f"（{n_low} 段低相關）" if n_low else "") + (f"，捨棄 {len(chunks) - len(kept)} 段不相關" if len(chunks) > len(kept) else "")
+        return "\n\n".join(parts), f"搜尋「{query}」：命中 {detail}，已去識別化（{ms} ms）"
 
     def web(query: str) -> tuple[str, str]:
         from .. import db

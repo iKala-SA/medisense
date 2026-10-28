@@ -231,7 +231,8 @@ class StepTrace(BaseModel):
 class Citation(BaseModel):
     source: str  # display name of the knowledge file
     uri: str = ""
-    score: float | None = None
+    score: float | None = None  # retrieval DISTANCE (smaller = more similar), not a percentage
+    low: bool = False  # kept but only weakly related (between the admin's keep and max distance)
     text: str = ""  # chunk excerpt
     doc_id: str = ""  # library document this chunk came from (opens the viewer); empty when it cannot be resolved
     page: int | None = None  # first page of the chunk for paged files (PDF), when the retriever reports it
@@ -649,6 +650,15 @@ class RoutingConfigOut(RoutingConfigIn):
 
 class FeaturesIn(BaseModel):
     web_search: bool = False  # admin: allow users to switch 網路搜尋 on (off by default)
+    # Retrieval relevance as DISTANCE (smaller = more similar). <= keep: relevant; <= max: kept but flagged 低相關; above: dropped.
+    rag_keep_distance: float = Field(default=0.34, ge=0.05, le=1.0)
+    rag_max_distance: float = Field(default=0.40, ge=0.05, le=1.0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "FeaturesIn":
+        if self.rag_keep_distance > self.rag_max_distance:
+            raise ValueError("rag_keep_distance must not exceed rag_max_distance")
+        return self
 
 
 class FeaturesOut(FeaturesIn):

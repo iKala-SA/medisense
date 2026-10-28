@@ -27,5 +27,7 @@ def put_features(body: FeaturesIn, user: User = Depends(require_admin)):
     data = {**body.model_dump(), "updated_by": user.email, "updated_at": db.now()}
     _ref().set(data)
     eng.reset_cache()
-    db.audit(user.uid, "features.update", user.email, web_search_old=bool(old.get("web_search")), web_search_new=body.web_search)
+    db.audit(user.uid, "features.update", user.email, web_search_old=bool(old.get("web_search")), web_search_new=body.web_search,
+             rag_distance_old=[old.get("rag_keep_distance"), old.get("rag_max_distance")],
+             rag_distance_new=[body.rag_keep_distance, body.rag_max_distance])
     return FeaturesOut.model_validate(data)
