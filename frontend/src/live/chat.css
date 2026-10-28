@@ -162,3 +162,10 @@
 .cx-foot button[aria-label]{padding:0 8px;background:none;border-color:transparent;box-shadow:none}
 .cx-foot button[aria-label]:hover{background:#eceef2;color:#2f353f}
 .cx-foot button svg{color:currentColor}
+
+/* reply header: jellyfish + agent name on one line, with room around it */
+.cx-who{display:flex;align-items:center;gap:9px;margin:0 0 10px}
+.cx-who b{font-size:14px;font-weight:600;color:#33433a;letter-spacing:0}
+.cx-who .jelly{width:26px!important;height:26px!important}
+.cx-answer .cx-livehead{margin-top:2px}
+.conversation .cx-foot{margin-top:14px}

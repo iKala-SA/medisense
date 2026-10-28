@@ -33,6 +33,8 @@ export function Steps({trace,compact,model,run}){
 }
 const RUNNING={input:'讀取並去識別化問題…',turn:'模型思考中…',knowledge:'正在搜尋院內文件…',web_search:'正在搜尋網路…',llm:'模型正在撰寫回答…',structured_output:'模型正在產生結構化輸出…',tool:'正在執行連接器動作…',approval:'等待人工核准…',his_emr:'正在查詢 HIS/EMR…'};
 const runningText=t=>RUNNING[t]||'處理中…';
+/* Who is answering: the jellyfish and the agent name together, above the reply. */
+export const Who=({name,animated})=><div className="cx-who"><Jelly size={26} animated={animated}/><b>{name||'Medisense'}</b></div>;
 export function Thought({text}){return <blockquote className="cx-thought"><Brain size={13}/><div className="cx-thought-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]}>{text}</Markdown></div></blockquote>}
 
 /* Collapsible "思考過程" (Claude / Amazon Quick style): collapsed once the answer is done. */
@@ -56,11 +58,12 @@ export function Thinking({label='正在思考…'}){
 
 /* The answer while it is being produced: current step as a headline, the llm draft streaming in below. */
 const live=artifactComponents({canSave:false,live:true});
-export function LiveRun({run,onSteps}){
+export function LiveRun({run,onSteps,agent}){
   const cur=run.steps.find(s=>s.status==='running')||[...run.steps].reverse().find(s=>s.status==='done');
   const done=run.steps.filter(s=>s.status==='done').length;
   const md=useMemo(()=>run.draft,[run.draft]);
   return <div className="cx-answer">
+    <Who name={agent} animated/>
     <button type="button" className="cx-livehead" onClick={onSteps} aria-label="在右側查看執行步驟">
       <span className="shimmer">{cur?runningText(cur.type):'正在思考…'}</span>
       {done>0&&<small>已完成 {done} 步</small>}<CaretRight size={13}/>
@@ -78,11 +81,11 @@ export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mo
     ...artifactComponents({canSave,notify,mock})
   }),[onCite,canSave,notify,mock]);
   return <div className="cx-answer">
+    <Who name={m.agent}/>
     {m.trace?.length>0&&<ThinkingBlock trace={m.trace} ms={m.ms}/>}
     <div className="cx-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]} components={comps}>{md}</Markdown></div>
     {n>0&&<div className="cx-refs">{m.citations.map((c,i)=><button key={i} type="button" onClick={()=>onCite(i+1)} title={c.source}><FileText size={13}/><b>{i+1}</b><span>{c.source}</span></button>)}</div>}
     <div className="cx-foot">
-      <span className="cx-agent">{m.agent||'Medisense'}</span>
       <button type="button" onClick={()=>onSteps()}><ListChecks size={15}/>{m.used&&m.used!=='—'?m.used:'執行步驟'}<CaretRight size={13}/></button>
       <button type="button" aria-label="複製回覆" onClick={()=>{navigator.clipboard?.writeText(m.ans);notify('已複製回覆')}}><Copy size={15}/></button>
       <FeedbackBar sessionId={sessionId} msgIndex={m.msgIndex} rating={m.fb} question={m.text} answer={m.ans} notify={notify} mock={mock}/>
