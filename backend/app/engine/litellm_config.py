@@ -1,6 +1,6 @@
 """Render a LiteLLM proxy config.yaml from the model registry (Firestore `models/{id}` rows).
 
-Pure functions, no I/O. Structure mirrors mvp/litellm/config.yaml: one individually named entry per enabled
+Pure functions, no I/O. Structure mirrors litellm/config.yaml: one individually named entry per enabled
 model, one alias entry per group (model_name = fast|reasoning|budget|sovereign) pointing at the group's primary,
 and router_settings.fallbacks. Group primary = first enabled model of the group by name; the other members of the
 group become that group's fallbacks; reasoning and budget additionally fall back to `fast` when it has members.

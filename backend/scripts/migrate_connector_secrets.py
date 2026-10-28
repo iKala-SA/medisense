@@ -7,7 +7,7 @@ this clears the plaintext from Firestore without waiting for someone to edit eac
 Dry run by default; pass --apply to write. Uses Application Default Credentials and the same env
 as the backend (GOOGLE_CLOUD_PROJECT, FIRESTORE_DATABASE, REGION), e.g. from backend/.env:
 
-    cd mvp/backend && set -a && . ./.env && set +a
+    cd backend && set -a && . ./.env && set +a
     .venv/bin/python -m scripts.migrate_connector_secrets           # list what would move
     .venv/bin/python -m scripts.migrate_connector_secrets --apply   # move it
 """

@@ -5,8 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH="$HOME/.local/bin:$PATH"
-# Master key must match LITELLM_API_KEY in ../backend/.env
-KEY="$(grep -E '^LITELLM_API_KEY=' ../backend/.env | cut -d= -f2- | awk '{print $1}')"
+# Master key must match LITELLM_API_KEY in ../.env
+KEY="$(grep -E '^LITELLM_API_KEY=' ../.env | cut -d= -f2- | awk '{print $1}')"
 export LITELLM_MASTER_KEY="$KEY"
 export VERTEX_PROJECT="${VERTEX_PROJECT:-cloud-sa-sandbox-1}"
 export VERTEX_LOCATION="${VERTEX_LOCATION:-global}"

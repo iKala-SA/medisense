@@ -1,6 +1,6 @@
 # 套用到 LiteLLM: dispatched by the backend (POST /api/model-registry/apply). Runs infra/09-apply-litellm-config.sh
 # against the snapshot in Firestore config/litellm_deploy (rebuild the LiteLLM image, redeploy Cloud Run), then
-# commits the deployed backend/mvp/litellm/config.yaml to main so git matches what is running.
+# commits the deployed backend/litellm/config.yaml to main so git matches what is running.
 # The backend matches its run by run-name, so keep "LiteLLM apply v<version>" in sync with engine/github_actions.py.
 # Secrets (GitHub repo settings -> Secrets and variables -> Actions):
 #   LITELLM_DEPLOY_SA_KEY  JSON key of github-litellm-deploy@cloud-sa-sandbox-1 (infra/10-litellm-apply-cicd.sh)
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend/mvp
+        working-directory: backend
     env:
       VERSION: ${{ inputs.version }}
       REQUESTED_BY: ${{ inputs.requested_by }}

@@ -9,7 +9,7 @@ backend/    TCVGH Agent Platform: FastAPI API + agent runtime, LiteLLM gateway c
 ```
 
 `frontend/` calls the platform at `/api/**`; Firebase Hosting rewrites that path to the Cloud Run service `tcvgh-platform-api`
-(see `frontend/firebase.json`). The API contract the front end codes against is `backend/mvp/INTEGRATION-API.md`.
+(see `frontend/firebase.json`). The API contract the front end codes against is `backend/INTEGRATION-API.md`.
 
 ## Front end (`frontend/`)
 
@@ -28,16 +28,16 @@ Mock mode is the default. Real mode needs `VITE_MOCK_API=0` and the `VITE_FIREBA
 
 ## Back end (`backend/`)
 
-Layout, provisioning and deploy steps are in `backend/mvp/README.md`. Quick local check (offline, no cloud access needed):
+Layout, provisioning and deploy steps are in `backend/README.md`. Quick local check (offline, no cloud access needed):
 
 ```sh
-cd backend/mvp/backend
+cd backend
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt pytest httpx
 pytest
 ```
 
-Deploying uses `backend/mvp/infra/*.sh` (`source infra/env.sh` first). The frontend is deployed by
+Deploying uses `backend/infra/*.sh` (`source infra/env.sh` first). The frontend is deployed by
 `.github/workflows/firebase-hosting.yml`: every push to `main` that touches `frontend/` builds it and deploys to the
 `medisense-portal` Firebase Hosting site; pull requests get a temporary preview URL.
 

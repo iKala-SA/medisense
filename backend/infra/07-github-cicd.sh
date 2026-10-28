@@ -7,7 +7,7 @@ set -euo pipefail
 REPO="iKala-aix-tech/tcvgh-agent-platform"
 SA_NAME="github-firebase-deploy"
 SA="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-ENV_FILE="$(dirname "$0")/../frontend/.env"
+ENV_FILE="$(dirname "$0")/../../frontend/.env"
 KEY="$(mktemp)"
 trap 'rm -f "$KEY"' EXIT   # the key must only live in GitHub secrets
 

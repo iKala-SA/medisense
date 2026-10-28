@@ -4,7 +4,7 @@
 # has internal-only ingress; Google APIs stay reachable through Private Google Access.
 set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
-cd "$(dirname "$0")/../backend"
+cd "$(dirname "$0")/.."
 
 LITELLM_URL="$(gcloud run services describe "$LITELLM_SERVICE" --region "$REGION" --format='value(status.url)')"
 : "${LITELLM_URL:?deploy LiteLLM first (03-deploy-litellm.sh)}"

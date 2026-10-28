@@ -4,10 +4,10 @@ This folder is the runnable MVP that matches diagram v0.3. It is deliberately sm
 three deployables and a handful of `gcloud` scripts, no Terraform.
 
 ```
-mvp/
+backend/
 ├── infra/        numbered gcloud scripts; run in order, each is idempotent
 ├── litellm/      LiteLLM proxy config + Dockerfile (model gateway, column D)
-└── backend/      FastAPI "Platform API + Agent Runtime" (column B), Python 3.12
+└── app/          FastAPI "Platform API + Agent Runtime" (column B), Python 3.12
 (the frontend now lives in the repo-root `frontend/`, deployed to Firebase Hosting — column A)
 ```
 
@@ -20,7 +20,7 @@ mvp/
 | uv (present) | backend local run | — |
 | Docker | **not required** — images build in Cloud Build | — |
 
-## 1. Provision (run from `mvp/`)
+## 1. Provision (run from `backend/`)
 
 ```bash
 source infra/env.sh                 # project, region, names; edit ALLOWED_DOMAINS first

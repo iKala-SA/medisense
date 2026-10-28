@@ -9,7 +9,7 @@ its per-agent corpus, legacy records and rag_corpus/knowledge_count fields are d
 
 Dry run by default; pass --apply to write. Uses the backend env, e.g. from backend/.env:
 
-    cd mvp/backend && set -a && . ./.env && set +a
+    cd backend && set -a && . ./.env && set +a
     .venv/bin/python -m scripts.migrate_knowledge_library           # list what would move
     .venv/bin/python -m scripts.migrate_knowledge_library --apply   # move it and delete old corpora
 """

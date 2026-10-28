@@ -10,7 +10,7 @@ admin has set the role yet; admins and suspended accounts are left alone. ADMIN_
 
 Dry run by default; pass --apply to write. Uses the backend env, e.g. from backend/.env:
 
-    cd mvp/backend && set -a && . ./.env && set +a
+    cd backend && set -a && . ./.env && set +a
     .venv/bin/python -m scripts.migrate_users           # list who would be created / promoted
     .venv/bin/python -m scripts.migrate_users --apply
 """
