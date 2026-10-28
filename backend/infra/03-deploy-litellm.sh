@@ -40,7 +40,7 @@ gcloud run deploy "$LITELLM_SERVICE" \
   --no-allow-unauthenticated \
   --port 4000 \
   --cpu 1 --memory 1Gi --min-instances 0 --max-instances 3 --concurrency 40 \
-  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO" \
+  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO,LITELLM_LOCAL_MODEL_COST_MAP=True" \
   --set-secrets "LITELLM_MASTER_KEY=litellm-master-key:latest${EXTRA_SECRETS:+,$EXTRA_SECRETS}" \
   --args="--config,/app/config.yaml,--port,4000"
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.jsx";
+import "./fonts.css";
 import "./styles.css";
 import "./chat-type.css";
 import "./welcome.css";

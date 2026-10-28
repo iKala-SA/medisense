@@ -1,0 +1,4 @@
+/* Self-hosted: no font request leaves the hospital network. Plus Jakarta Sans (Latin, variable weight) is used for the wordmark only. */
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:200 800;font-display:swap;src:url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2')}
+/* Material Symbols Outlined, subset to the icons the Agent Hub pages use (self-hosted, ~68 KB instead of the 4 MB full set). */
+@font-face{font-family:'Material Symbols Outlined';font-style:normal;font-weight:100 700;font-display:block;src:url('/fonts/material-symbols-subset.woff2') format('woff2')}

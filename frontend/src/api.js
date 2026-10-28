@@ -124,6 +124,8 @@ export const api={
   saveRouting:r=>call('/api/routing',{method:'PUT',body:body(r)}),
   testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),
   // model registry (admin)
+  modelProviders:()=>call('/api/model-registry/providers'),
+  saveModelProviders:approved=>call('/api/model-registry/providers',{method:'PUT',body:body({approved})}),
   listModelRegistry:()=>call('/api/model-registry'),
   createModelEntry:m=>call('/api/model-registry',{method:'POST',body:body(m)}),
   updateModelEntry:(id,m)=>call(`/api/model-registry/${id}`,{method:'PUT',body:body(m)}),

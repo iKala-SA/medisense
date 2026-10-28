@@ -3,6 +3,7 @@
 The canvas (React Flow) saves `nodes` and `edges`. Each node has a `type` from NODE_TYPES and a
 `data` dict with the fields the left/right panels edit. The interpreter only trusts these schemas.
 """
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -337,6 +338,7 @@ class ConnectorIn(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)  # non-secret fields
     secrets: dict[str, str] = Field(default_factory=dict)  # field -> plaintext; only on create / when changing
     redact_pii: bool = True
+    redact_off_reason: str = Field(default="", max_length=200)  # required (admin only) when redact_pii is switched off
     audit_payloads: bool = True
 
 
@@ -708,6 +710,29 @@ class ModelEntryIn(BaseModel):
         if self.deploy == "cloud" and self.group == "sovereign":
             raise ValueError("group 'sovereign' is on-prem only; a cloud model cannot be in it")
         return self
+
+
+class ProvidersIn(BaseModel):
+    """Cloud model providers the security review has approved (the prefix of litellm_model, e.g. vertex_ai, azure, bedrock).
+    On-prem models never need approval: they run inside the hospital."""
+    approved: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("approved", mode="after")
+    @classmethod
+    def _clean(cls, v: list[str]) -> list[str]:
+        out = []
+        for p in v:
+            p = p.strip().lower()
+            if p and not re.fullmatch(r"[a-z0-9_-]{2,40}", p):
+                raise ValueError(f"invalid provider name: {p}")
+            if p and p not in out:
+                out.append(p)
+        return out
+
+
+class ProvidersOut(ProvidersIn):
+    updated_by: str = ""
+    updated_at: Any = None
 
 
 class ModelEntryOut(ModelEntryIn):
