@@ -135,6 +135,29 @@ export const api={
   renameSession:(id,title)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({title})}),
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
   chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
+  citedDocument:id=>call(`/api/chat/documents/${id}`),
+  openOriginal:(id,purpose)=>call(`/api/chat/documents/${id}/original`,{method:'POST',body:body({purpose})}),
+  fetchOriginal:(url,download=false)=>blob(download?`${url}&download=true`:url),
+  /* Server-Sent Events from POST /api/chat/stream; onEvent gets each parsed event, resolves with the final RunResponse. */
+  chatStream:async(m,onEvent,signal)=>{
+    const res=await fetch('/api/chat/stream',{method:'POST',signal,headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body(m)});
+    if(!res.ok){let d=await res.text();try{d=JSON.parse(d).detail??d}catch{/* plain text */}throw new Error(`${res.status} ${typeof d==='string'?d:JSON.stringify(d)}`)}
+    const reader=res.body.getReader(),dec=new TextDecoder();let buf='',result=null;
+    for(;;){
+      const {value,done}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf('\n\n'))>=0){
+        const block=buf.slice(0,i);buf=buf.slice(i+2);
+        const line=block.split('\n').find(l=>l.startsWith('data: '));if(!line)continue;
+        const ev=JSON.parse(line.slice(6));
+        if(ev.event==='error')throw new Error(`${ev.status} ${ev.detail}`);
+        if(ev.event==='done')result=ev.result;
+        onEvent(ev);
+      }
+    }
+    if(!result)throw new Error('連線中斷，未收到完整回覆');
+    return result;
+  },
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),

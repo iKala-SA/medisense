@@ -19,6 +19,7 @@ from .routers import (
     monitoring,
     my_connectors,
     oauth_proxy,
+    originals,
     routing,
     runs,
     schedules,
@@ -50,6 +51,7 @@ app.include_router(routing.router)
 app.include_router(model_registry.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
+app.include_router(originals.router)
 app.include_router(calendar.router)
 app.include_router(my_connectors.router)
 app.include_router(gateway_catalog.router)
@@ -68,7 +70,7 @@ def health():
 @app.get("/api/models")
 def model_groups(user: User = Depends(current_user)):
     """Selectable model groups with their live LiteLLM members and fallback chain (Studio labels)."""
-    return {"groups": llm.routing_table()}
+    return {"groups": llm.routing_table(), "models": llm.model_catalog()}
 
 
 @app.get("/api/me")

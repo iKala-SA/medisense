@@ -3,7 +3,7 @@
 agents/{agentId}                 draft definition (mutable)      owner_uid, name, ..., flow{nodes,edges}, knowledge_doc_ids
 agents/{agentId}/versions/{n}    immutable snapshot on publish
 agents/{agentId}/knowledge/{id}  LEGACY per-agent files (before the library; see scripts/migrate_knowledge_library.py)
-documents/{docId}                hospital knowledge library: name, category, department, gcs_uri, deid_uri, rag_file, version
+documents/{docId}                hospital knowledge library: name, category, department, gcs_uri, deid_uri, rag_file, version, pii(none|found|unknown), pii_types[]
 config/knowledge                 {rag_corpus}: the single hospital RAG corpus
 sessions/{sessionId}             test-chat / channel conversations, pseudonymized content only
 audit/{autoId}                   who did what, when (append-only)

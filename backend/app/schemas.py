@@ -180,6 +180,10 @@ class DocumentOut(BaseModel):
     version: int = 1  # bumped by "upload new version" (replace)
     status: Literal["indexing", "indexed", "error"] = "indexing"
     error: str = ""
+    # DLP verdict on the ORIGINAL text at upload: found = personal data was masked, none = nothing detected.
+    # unknown (older documents, or an admin could not decide) is treated like found.
+    pii: Literal["none", "found", "unknown"] = "unknown"
+    pii_types: list[str] = Field(default_factory=list)  # infoType names DLP replaced, e.g. PERSON_NAME
     uploaded_by: str = ""
     uploaded_uid: str = ""
     created_at: Any = None
@@ -195,6 +199,7 @@ class DocumentOut(BaseModel):
 class DocumentPatch(BaseModel):
     category: DocCategory
     department: str = ""
+    pii: Literal["none", "found"] | None = None  # admin override of the DLP verdict
 
 
 class RunRequest(BaseModel):
@@ -219,6 +224,8 @@ class StepTrace(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cost_usd: float = 0.0
+    thinking: str | None = None  # the model's thought summary for this step, when the model returns one
+    reason: str | None = None  # the MODEL's own one-line "why this step" (tool calls); `summary` is the platform's factual record
 
 
 class Citation(BaseModel):
@@ -226,6 +233,8 @@ class Citation(BaseModel):
     uri: str = ""
     score: float | None = None
     text: str = ""  # chunk excerpt
+    doc_id: str = ""  # library document this chunk came from (opens the viewer); empty when it cannot be resolved
+    page: int | None = None  # first page of the chunk for paged files (PDF), when the retriever reports it
 
 
 class RunResponse(BaseModel):
@@ -417,6 +426,7 @@ class UserOut(BaseModel):
     status: AccountStatus = "active"
     department: str = ""
     bootstrap_admin: bool = False  # listed in ADMIN_EMAILS: role/status are not editable here
+    original_view: bool = False  # may open original library files that contain personal data (with a stated purpose)
     created_at: Any = None
     created_by: str = ""  # admin who pre-registered the account; "" when created by signing in
     first_login_at: Any = None
@@ -465,7 +475,8 @@ class UserPatch(BaseModel):
     role: Role | None = None
     status: AccountStatus | None = None
     department: str | None = None
-    reason: str = Field(default="", max_length=200)  # required when role or status changes
+    original_view: bool | None = None
+    reason: str = Field(default="", max_length=200)  # required when role, status or original_view changes
 
 
 # ------------------------------------------------------------------ sharing: groups + directory
@@ -703,6 +714,7 @@ class SessionPage(BaseModel):
 class SessionMessage(BaseModel):
     role: str
     content: str
+    meta: dict[str, Any] | None = None  # assistant turns: {trace, citations, model} so a reopened chat shows its steps and sources
 
 
 class SessionDetail(SessionSummary):
@@ -719,7 +731,10 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
     agent_id: str | None = None
     model_group: ModelGroup = "auto"
+    model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
+    # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
+    knowledge_scope: Literal["general", "selected", "all"] = "selected"
 
 
 class AttachmentOut(BaseModel):
@@ -733,3 +748,16 @@ class AttachmentOut(BaseModel):
 class CalendarStatus(BaseModel):
     connected: bool = False
     reason: str = ""
+
+
+class OpenOriginalIn(BaseModel):
+    purpose: str = Field(default="", max_length=200)  # required when the original contains personal data
+
+
+class OpenOriginalOut(BaseModel):
+    url: str  # short-lived; fetch it with the normal bearer token
+    expires_at: int  # unix seconds
+    ttl_seconds: int
+    filename: str
+    kind: Literal["pdf", "text", "download"]  # how the viewer can show it
+    watermark: str  # text the viewer repeats over the page

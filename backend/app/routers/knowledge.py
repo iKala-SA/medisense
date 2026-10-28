@@ -23,6 +23,7 @@ from ..config import settings
 from ..engine import deid
 from ..engine.extract import NoTextError, extract_text
 from ..schemas import DEPARTMENTS, AgentRef, DocCategory, DocumentOut, DocumentPatch
+from .spaces import doc_visible
 
 # Run-only users never see the library (Hub + chat only); retrieval runs server-side inside a flow.
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"], dependencies=[Depends(require_builder)])
@@ -94,7 +95,9 @@ def _index(doc_id: str, version: int, filename: str, data: bytes, content_type: 
     bucket = _bucket()
     original = f"{base}/{filename}"
     bucket.blob(original).upload_from_string(data, content_type=content_type or "application/octet-stream")
-    masked = deid.deidentify(extract_text(data, Path(filename).suffix.lower()))
+    raw_text = extract_text(data, Path(filename).suffix.lower())
+    masked = deid.deidentify(raw_text)
+    pii_types = deid.replaced_types(raw_text, masked)
     bucket.blob(f"{base}/deidentified.txt").upload_from_string(masked.encode(), content_type="text/plain; charset=utf-8")
     with tempfile.TemporaryDirectory() as tmp:
         local = Path(tmp) / "upload.txt"  # ASCII path; the real name goes in display_name
@@ -102,7 +105,8 @@ def _index(doc_id: str, version: int, filename: str, data: bytes, content_type: 
         rag_file = rag.upload_file(rag.hospital_corpus(), str(local), filename)
     s = settings()
     return {"gcs_uri": f"gs://{s.upload_bucket}/{original}", "deid_uri": f"gs://{s.upload_bucket}/{base}/deidentified.txt",
-            "rag_file": rag_file, "chars": len(masked), "status": "indexed", "error": ""}
+            "rag_file": rag_file, "chars": len(masked), "status": "indexed", "error": "",
+            "pii": "found" if masked != raw_text else "none", "pii_types": pii_types}
 
 
 def _fail(exc: Exception) -> HTTPException:
@@ -175,8 +179,15 @@ async def replace_document(doc_id: str, file: UploadFile = File(...), user: User
 def update_document(doc_id: str, body: DocumentPatch, user: User = Depends(current_user)):
     snap = _load_editable(doc_id, user)
     _check_meta(body.category, body.department)
-    snap.reference.update({"category": body.category, "department": body.department, "updated_at": db.now()})
-    db.audit(user.uid, "knowledge.update", user.email, doc_id=doc_id, file=(snap.to_dict() or {}).get("name", ""))
+    cur = snap.to_dict() or {}
+    fields = {"category": body.category, "department": body.department, "updated_at": db.now()}
+    if body.pii and body.pii != cur.get("pii"):
+        if user.role != "admin":
+            raise HTTPException(403, "only an admin can change the personal-data classification")
+        fields["pii"] = body.pii
+    snap.reference.update(fields)
+    db.audit(user.uid, "knowledge.update", user.email, doc_id=doc_id, file=cur.get("name", ""),
+             **({"pii_old": cur.get("pii", "unknown"), "pii_new": fields["pii"]} if "pii" in fields else {}))
     return _out(snap.reference.get())
 
 
@@ -209,6 +220,8 @@ def reindex_document(doc_id: str, user: User = Depends(require_admin)):
 def preview_document(doc_id: str, user: User = Depends(current_user)):
     """The de-identified text exactly as RAG Engine received it (first PREVIEW_CHARS characters)."""
     cur = _load(doc_id).to_dict() or {}
+    if not doc_visible(user, cur):
+        raise HTTPException(403, "no access to this document")
     if not cur.get("deid_uri"):
         raise HTTPException(409, "document is not indexed yet")
     text = _bucket().blob(_blob_path(cur["deid_uri"])).download_as_text(encoding="utf-8")

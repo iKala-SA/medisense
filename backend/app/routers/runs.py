@@ -8,7 +8,8 @@ from openai import APIStatusError
 
 from .. import db, sharing
 from ..auth import User, current_user
-from ..engine import deid, flow, llm, skills
+from ..engine import agent as agent_runtime
+from ..engine import deid, llm, skills
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -49,10 +50,15 @@ def make_title(safe_message: str) -> str:
     return " ".join(safe_message.split())[:30]
 
 
+def _meta(r) -> dict:
+    """What the chat UI re-renders for a past answer: steps (with thought summaries) and reference passages."""
+    return {"trace": [t.model_dump() for t in r.trace], "citations": [c.model_dump() for c in r.citations]}
+
+
 def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
-                session_extra: dict | None = None) -> RunResponse:
+                session_extra: dict | None = None, pin_model: str | None = None, emit=None) -> RunResponse:
     """The shared pipeline behind /run, /api/chat and schedules: de-identify -> flow -> save session -> audit."""
     session_id = session_id or uuid.uuid4().hex
     sess_ref = db.client().collection("sessions").document(session_id)
@@ -66,8 +72,9 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
 
     t0 = time.perf_counter()
     try:
-        r = flow.run_flow(agent, agent_id=agent_id, user_id=user.uid, user_message=safe_message,
-                          history=history, rag_files=rag_files, skill_prefix=skill_prefix, extra_context=extra_context)
+        r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=safe_message,
+                                    history=history, rag_files=rag_files, skill_prefix=skill_prefix, extra_context=extra_context,
+                                    pin_model=pin_model, emit=emit)
     except APIStatusError as exc:
         if exc.status_code == 401:
             llm.reset_client_cache()
@@ -77,7 +84,7 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
     if not sess.get("title"):  # auto title on the first run
         sess["title"] = title or make_title(safe_message)
     sess["messages"] = [*sess["messages"], {"role": "user", "content": safe_message},
-                        {"role": "assistant", "content": r.reply}]
+                        {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
     # A run that stopped at an approval node parks its state on the session; a new message discards it.
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None
@@ -134,9 +141,9 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
     history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
     t0 = time.perf_counter()
     try:
-        r = flow.run_flow(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending["ctx"].get("input", "")),
-                          history=history, rag_files=rag_files, resume=pending,
-                          skill_prefix=skills.build_prefix(agent.skill_ids, user))
+        r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
+                                    history=history, rag_files=rag_files, resume=pending,
+                                    skill_prefix=skills.build_prefix(agent.skill_ids, user))
     except APIStatusError as exc:
         if exc.status_code == 401:
             llm.reset_client_cache()

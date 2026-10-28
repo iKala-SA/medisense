@@ -163,6 +163,12 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
             raise HTTPException(409, "cannot remove the last active admin")
     if body.department is not None and body.department and body.department not in DEPARTMENTS:
         raise HTTPException(422, f"unknown department {body.department}")
+    view_change = body.original_view is not None and body.original_view != bool(data.get("original_view", False))
+    if view_change:
+        if email == user.email:
+            raise HTTPException(409, "you cannot change your own original-file access")
+        if not reason:
+            raise HTTPException(422, "a reason is required to change original-file access")
 
     at = db.now()
     patch: dict = {}
@@ -170,6 +176,8 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
         patch["department"] = body.department
     if role_change:
         patch |= {"role": body.role, "role_changed_at": at, "role_changed_by": user.email}
+    if view_change:
+        patch |= {"original_view": body.original_view, "original_view_changed_at": at, "original_view_changed_by": user.email}
     if status_change:
         patch |= {"status": body.status, "status_reason": reason, "status_changed_at": at, "status_changed_by": user.email}
     if not patch:
@@ -183,6 +191,9 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
         synced = _set_firebase_disabled(data.get("uid", ""), body.status == "suspended")
         db.audit(user.uid, "user.suspend" if body.status == "suspended" else "user.reactivate", user.email,
                  target_email=email, reason=reason, firebase_synced=synced)
+    if view_change:
+        db.audit(user.uid, "user.original_view", user.email, target_email=email, old=bool(data.get("original_view", False)),
+                 new=body.original_view, reason=reason)
     if "department" in patch:
         db.audit(user.uid, "user.update", user.email, target_email=email, old=data.get("department", ""), department=patch["department"])
     data = {**data, **patch}
