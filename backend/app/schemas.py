@@ -663,6 +663,7 @@ class RoutingConfigOut(RoutingConfigIn):
 
 class FeaturesIn(BaseModel):
     web_search: bool = False  # admin: allow users to switch 網路搜尋 on (off by default)
+    voice_input: bool = False  # admin: show the microphone (browser speech recognition; audio goes to the browser vendor)
     # Retrieval relevance as DISTANCE (smaller = more similar). <= keep: relevant; <= max: kept but flagged 低相關; above: dropped.
     rag_keep_distance: float = Field(default=0.34, ge=0.05, le=1.0)
     rag_max_distance: float = Field(default=0.40, ge=0.05, le=1.0)

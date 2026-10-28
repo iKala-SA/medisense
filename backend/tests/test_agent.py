@@ -295,3 +295,11 @@ def test_citing_a_multi_passage_file_once_keeps_all_its_passages(rig, monkeypatc
         {"text": "段一", "source": "辦法.pdf", "uri": "u", "score": 0.2, "page": 1}, {"text": "段二", "source": "辦法.pdf", "uri": "u", "score": 0.3, "page": 4}])
     r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "依辦法 [1]"), rag_files=["f"])
     assert len(r.citations) == 1 and len(r.citations[0].passages) == 2 and "引用 1/1 個來源" in r.trace[-1].summary
+
+
+def test_the_model_is_told_to_answer_in_the_users_language(rig):
+    s = Script("Bonjour")
+    rig(s, rag_files=["f"], msg="Bonjour, quelle est la règle de versionnement ?")
+    sys_prompt = s.sent[0]["system"]
+    assert "language of the user's latest message" in sys_prompt and "French" in sys_prompt
+    assert "USER's language" in s.sent[0]["tools"][0]["function"]["parameters"]["properties"]["reason"]["description"]

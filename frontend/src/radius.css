@@ -96,8 +96,6 @@ select,input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=
 .bottom-composer .quick-composer-wrap .agent-strip{padding:0 0 2px 0;align-self:flex-start}
 .bottom-composer .quick-composer-wrap .composer{flex:none;width:100%}
 /* every menu from this bar opens UPWARD, so nothing needs scrolling to be seen */
-.bottom-composer .composer-popover{top:auto!important;bottom:calc(100% + 8px)!important;max-height:min(60vh,520px);overflow:auto}
-.bottom-composer .agent-strip .composer-popover{left:0}
 
 /* the chat page never scrolls as a whole: the reply list scrolls inside, the composer stays put */
 html,body{overscroll-behavior:none}
@@ -117,10 +115,8 @@ html,body{overscroll-behavior:none}
 .tools-menu .menu-caption{padding:6px 12px 2px}
 .tools-menu .source-option{width:100%}
 .scope-chip{background:#eef3f0}
-.bottom-composer .composer-popover.tools-menu{max-height:min(70vh,560px)}
 
 /* home screen: the Medisense menu opens upward so it is never hidden below the viewport */
-.welcome .quick-composer-wrap .composer-popover.agent-picker{top:auto!important;bottom:calc(100% + 8px)!important;max-height:min(60vh,460px);overflow:auto}
 
 /* growing input: more text -> taller box; expand icon at the top right; controls stay at the bottom edge */
 .quick-composer-wrap .composer{position:relative}
@@ -212,3 +208,83 @@ html,body{overscroll-behavior:none}
 .shell aside .quick-brand>*{animation:side-in .28s var(--ease-emph) both}
 @keyframes side-in{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.shell aside,.shell .main-shell,.shell .quick-topbar,.shell aside *{transition:none!important;animation:none!important}}
+
+/* every button in the input box hovers like the Medisense picker: the same light green pill */
+.quick-composer-wrap .add-tool:hover,.quick-composer-wrap .model-select:hover,.quick-composer-wrap .composer-expand:hover,
+.quick-composer-wrap .scope-toggle:hover,.quick-composer-wrap .add-tool[aria-expanded=true],.quick-composer-wrap .model-select[aria-expanded=true]{background:#f3fcf8!important}
+.quick-composer-wrap .send:disabled:hover{background:#f3fcf8!important}
+
+/* microphone next to send (ChatGPT): plain until listening, then a soft red pulse */
+.quick-composer-wrap .mic-btn{order:6;width:38px;height:38px;border-radius:50%!important;display:grid;place-items:center;color:#3a3f47;background:transparent;border:0}
+.quick-composer-wrap .mic-btn:hover{background:#f3fcf8!important}
+.quick-composer-wrap .mic-btn.on{color:#c5221f;background:#fdecea!important;animation:mic-pulse 1.4s ease-in-out infinite}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(197,34,31,.28)}50%{box-shadow:0 0 0 7px rgba(197,34,31,0)}}
+.quick-composer-wrap .send{order:7}
+@media(prefers-reduced-motion:reduce){.quick-composer-wrap .mic-btn.on{animation:none}}
+
+.tool-submenu.voice-langs{max-height:220px;overflow-y:auto;overscroll-behavior:contain}
+
+/* ===== "+" menu, Gemini style: roomy rounded panel; a row with an arrow opens a SECOND floating panel to its right ===== */
+.quick-composer-wrap .tools-menu{width:290px;padding:10px;border-radius:24px!important;overflow:visible!important;max-height:none!important}
+.tools-menu>button{width:100%;display:flex;align-items:center;gap:14px;height:48px;padding:0 14px;border-radius:14px!important;font-size:15.5px;color:#1f242b;text-align:left}
+.tools-menu>button svg{flex-shrink:0}
+.tools-menu>button:hover,.tools-menu>button.open{background:#f3fcf8!important}
+.tools-menu>hr{margin:6px 8px;border:0;border-top:1px solid #e8ebee}
+.tools-menu .tool-fly{display:none}
+.tools-menu .tool-submenu{position:absolute;left:calc(100% + 10px);width:270px;max-height:min(60vh,420px);overflow-y:auto;overscroll-behavior:contain;margin:-48px 0 0;padding:10px;background:#fff;
+  border-radius:24px;box-shadow:0 8px 32px rgba(20,24,32,.16),0 0 0 1px rgba(20,24,32,.05);display:flex;flex-direction:column;gap:2px;z-index:15}
+.tools-menu .tool-submenu button{display:flex;align-items:center;gap:12px;width:100%;height:46px;padding:0 14px;border-radius:14px!important;font-size:15.5px;color:#1f242b;text-align:left;flex-shrink:0}
+.tools-menu .tool-submenu button:hover{background:#f3fcf8!important}
+.tool-submenu.voice-langs{max-height:min(60vh,380px)}
+.tools-menu>.menu-caption{padding:6px 14px 2px;font-size:12.5px;color:#8a919c}
+.tools-menu>button.source-option{height:auto;min-height:58px;padding:8px 14px;align-items:center}
+.tools-menu>button.source-option>span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tools-menu>button.source-option b{font-size:15px;font-weight:500}.tools-menu>button.source-option small{font-size:12.5px;color:#8a919c;line-height:1.4;background:none!important}
+.tools-menu .selection-check{width:20px;flex-shrink:0;color:#1f8656}
+.tools-menu .popover-note{padding:8px 14px 2px;font-size:12px;color:#8a919c;background:none!important}
+
+/* 資料範圍: its own icon next to the +; filled green when the answer will search hospital documents, outline grey for general knowledge only */
+.quick-composer-wrap .composer-tools>.scope-anchor{order:0}
+.bottom-composer .quick-composer-wrap .composer-tools>.scope-anchor{order:2}
+.quick-composer-wrap .scope-icon{width:38px;height:38px;border-radius:50%!important;display:grid;place-items:center;color:#6b7280;background:transparent;border:0}
+.quick-composer-wrap .scope-icon.on{color:#1f8656}
+.quick-composer-wrap .scope-icon:hover,.quick-composer-wrap .scope-icon[aria-expanded=true]{background:#f3fcf8!important}
+.quick-composer-wrap .scope-menu{left:0;width:300px;padding:10px;border-radius:24px!important;max-height:none!important;overflow:visible!important}
+.scope-menu>.menu-caption{padding:6px 14px 2px;font-size:12.5px;color:#8a919c}
+.scope-menu>button.source-option{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 14px;border-radius:14px!important;text-align:left}
+.scope-menu>button.source-option:hover{background:#f3fcf8!important}
+.scope-menu .selection-check{width:20px;flex-shrink:0;color:#1f8656}
+.scope-menu>button.source-option>span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.scope-menu b{font-size:15px;font-weight:500}.scope-menu small{font-size:12.5px;color:#8a919c;line-height:1.4;background:none!important}
+
+/* the divider line above 最近項目 stays very faint so the rail still reads as a list */
+.shell aside hr,.shell aside .recents{border-color:rgba(20,30,25,.06)}
+
+/* ===== Menus (Gemini Enterprise): airy white panels, 28px corners, soft shadow; they hang below their button and scroll inside ===== */
+.quick-composer-wrap.pop-down .composer-popover{top:calc(100% + 10px)!important;bottom:auto!important}
+.quick-composer-wrap.pop-up .composer-popover{bottom:calc(100% + 10px)!important;top:auto!important}
+.quick-composer-wrap .composer-popover{background:#fff;border:0;border-radius:28px!important;padding:10px;box-shadow:0 10px 40px rgba(20,24,32,.14),0 0 0 1px rgba(20,24,32,.05);max-height:var(--pop-max,520px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.quick-composer-wrap .agent-anchor .agent-picker{left:0;width:min(580px,86vw)}
+.quick-composer-wrap .model-menu{right:0;left:auto;width:360px}
+.quick-composer-wrap .tools-menu,.quick-composer-wrap .scope-menu{overflow:visible!important;max-height:none!important}
+.quick-composer-wrap .popover-search{border:0;background:#f3f4f6;border-radius:999px!important;padding:0 16px;height:44px;display:flex;align-items:center;gap:10px;margin:2px 4px 8px}
+.quick-composer-wrap .popover-search input{border:0!important;background:transparent!important;box-shadow:none!important;flex:1;font-size:15px;outline:0}
+.quick-composer-wrap .agent-picker-tabs{margin:0 4px 6px;padding:4px;background:#f3f4f6;border-radius:999px;display:flex;gap:2px}
+.quick-composer-wrap .agent-picker-tabs button{flex:1;height:34px;border-radius:999px!important;font-size:14px;color:#5d6470}
+.quick-composer-wrap .agent-picker-tabs button.selected{background:#fff;color:#1f242b;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.quick-composer-wrap .agent-options{display:flex;flex-direction:column;gap:2px}
+.quick-composer-wrap .agent-choice{display:flex;align-items:center;gap:4px}
+.quick-composer-wrap .agent-choice>button:first-child{flex:1;display:flex;align-items:center;gap:12px;min-height:56px;padding:6px 14px;border-radius:16px!important;text-align:left}
+.quick-composer-wrap .agent-choice>button:first-child:hover{background:#f3fcf8!important}
+.quick-composer-wrap .agent-choice b{font-size:15px;font-weight:500}
+.quick-composer-wrap .agent-description{font-size:12.5px;color:#8a919c;margin-left:6px}
+/* model menu rows: icon, name, check; Auto is the tinted header row */
+.quick-composer-wrap .model-menu .menu-caption{padding:6px 14px 2px;font-size:12.5px;color:#8a919c}
+.quick-composer-wrap .model-options{display:flex;flex-direction:column;gap:2px}
+.quick-composer-wrap .model-options>button{display:flex;align-items:center;gap:12px;min-height:54px;padding:6px 14px;border-radius:16px!important;text-align:left;width:100%}
+.quick-composer-wrap .model-options>button:hover{background:#f3fcf8!important}
+.quick-composer-wrap .model-options>button.chosen{background:#f3f4f6}
+.quick-composer-wrap .model-options b{font-size:15px;font-weight:500}.quick-composer-wrap .model-options small{display:block;font-size:12.5px;color:#8a919c;background:none!important}
+.quick-composer-wrap .model-ico{color:#1f8656;display:grid;place-items:center;flex-shrink:0}
+.quick-composer-wrap .model-options .selection-check{order:3;margin-left:auto;width:20px;color:#3a3f47}
+.quick-composer-wrap .model-options>button>span:last-child{flex:1;min-width:0}

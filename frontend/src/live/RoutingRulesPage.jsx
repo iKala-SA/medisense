@@ -36,13 +36,19 @@ export default function RoutingRulesPage({me,notify}){
   const change=(id,k,v)=>edit(a=>({...a,rules:a.rules.map(r=>r.id===id?{...r,[k]:v}:r)}));
   const sov=draft.sovereign_only,sovLive=(groups||[]).find(g=>g.id==='sovereign');
   const sovMissing=groups!==null&&!gfail&&!sovLive?.configured;
-  const featBody=f=>({web_search:!!f?.web_search,rag_keep_distance:f?.rag_keep_distance??0.34,rag_max_distance:f?.rag_max_distance??0.40});
+  const featBody=f=>({web_search:!!f?.web_search,voice_input:!!f?.voice_input,rag_keep_distance:f?.rag_keep_distance??0.34,rag_max_distance:f?.rag_max_distance??0.40});
   const ragNum=v=>Number.isFinite(parseFloat(v))?parseFloat(v):NaN;
   const ragValid=!!rag&&ragNum(rag.keep)>=0.05&&ragNum(rag.max)<=1&&ragNum(rag.keep)<=ragNum(rag.max);
   const ragDirty=!!rag&&!!feat&&(ragNum(rag.keep)!==feat.rag_keep_distance||ragNum(rag.max)!==feat.rag_max_distance);
   async function saveRag(){
     setFeatBusy(true);
     try{const f=await api.saveFeatures({...featBody(feat),rag_keep_distance:ragNum(rag.keep),rag_max_distance:ragNum(rag.max)});setFeat(f);setRag({keep:String(f.rag_keep_distance),max:String(f.rag_max_distance)});notify('已儲存文件檢索門檻')}
+    catch(e){notify('儲存失敗：'+errText(e))}finally{setFeatBusy(false)}
+  }
+  async function setVoice(on){
+    if(on&&!window.confirm('開放後，輸入框會出現麥克風。語音辨識由瀏覽器提供：Chrome 與 Edge 會把「錄到的聲音」送到 Google 的語音服務，Safari 送到 Apple，聲音不會先去識別化。如果口述內容可能含病人資料，請先取得資安同意。確定開放？'))return;
+    setFeatBusy(true);
+    try{setFeat(await api.saveFeatures({...featBody(feat),voice_input:on}));notify(on?'已開放語音輸入':'已關閉語音輸入')}
     catch(e){notify('儲存失敗：'+errText(e))}finally{setFeatBusy(false)}
   }
   async function setWeb(on){
@@ -72,6 +78,7 @@ export default function RoutingRulesPage({me,notify}){
     <label className={'panel lv-o-sovereign'+(feat?.web_search?' on':'')} style={{marginTop:10}}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.web_search} onChange={e=>setWeb(e.target.checked)}/><div><b><Globe size={14} style={{verticalAlign:-2,marginRight:4}}/>允許網路搜尋（對外連線）</b><span className="muted small">預設關閉。勾選後，使用者可在輸入框「＋」選單自行開啟 Web 搜尋；開啟時模型可能把<b>已去識別化的搜尋詞</b>送到 Google 查詢，結果附網頁來源。「僅院內模型」開啟時，網路搜尋一律停用。變更立即生效並寫入稽核記錄。{feat?.updated_by&&<> 上次由 {feat.updated_by} 變更。</>}</span>
       {feat===null&&<span className="small muted">讀取目前設定中…</span>}
       {feat===false&&<span className="small" role="alert" style={{color:'#b3261e'}}>無法讀取此設定，暫時無法變更：{featErr||'未知錯誤'}　<button type="button" className="lv-linkbtn" onClick={e=>{e.preventDefault();loadFeat()}}>重試</button></span>}</div></label>
+    <label className={'panel lv-o-sovereign'+(feat?.voice_input?' on':'')} style={{marginTop:10}}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.voice_input} onChange={e=>setVoice(e.target.checked)}/><div><b>允許語音輸入（麥克風）</b><span className="muted small">預設關閉。開放後輸入框會出現麥克風，使用者可口述問題。語音辨識由瀏覽器提供，<b>錄到的聲音會送到瀏覽器廠商的語音服務</b>（Chrome／Edge 是 Google，Safari 是 Apple），且不會先去識別化；Firefox 不支援。變更立即生效並寫入稽核記錄。</span></div></label>
     <section className="panel lv-o-card" style={{marginTop:10}}><h3>文件檢索相關度門檻</h3>
       <p className="muted small" style={{margin:'4px 0 10px'}}>數值是<b>距離</b>，越小代表越相似。距離 ≤「高相關」線：正常引用；介於兩線之間：保留但標示「低相關」；超過「捨棄」線：不交給模型，模型會被告知沒有找到足夠相關的文件。預設 0.34／0.40 是用示範知識庫量測的起點（真正命中約 0.26–0.31，查無相關約 0.36–0.49）；換成真實院內文件後，請用 <code>backend/scripts/calibrate_rag.py</code> 重新量測。變更立即生效並寫入稽核記錄。</p>
       {feat===null&&<span className="small muted">讀取目前設定中…</span>}

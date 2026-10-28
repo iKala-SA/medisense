@@ -97,3 +97,12 @@ def test_only_admins_may_switch_connector_deidentification_off(fs, as_user, audi
     assert a.put(f"/api/connectors/{cid}", json=_conn(redact_pii=True)).status_code == 200
     assert any(e["action"] == "connector.deid_on" for e in audit_log())
     assert b.post("/api/connectors", json=_conn()).status_code == 201  # default (on) is open to builders
+
+
+def test_voice_input_is_an_admin_switch_and_off_by_default(fs, as_user, audit_log):
+    assert as_user(PLAIN).get("/api/features").json()["voice_input"] is False
+    assert as_user(PLAIN).put("/api/features", json={"voice_input": True}).status_code == 403
+    r = as_user(ADMIN).put("/api/features", json={"web_search": False, "voice_input": True})
+    assert r.status_code == 200 and r.json()["voice_input"] is True
+    ev = [e for e in audit_log() if e["action"] == "features.update"][0]
+    assert ev["voice_old"] is False and ev["voice_new"] is True

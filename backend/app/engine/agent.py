@@ -37,12 +37,17 @@ log = logging.getLogger(__name__)
 TAIPEI = timezone(timedelta(hours=8))  # fixed offset: Taiwan has no DST, and a slim container may not ship the tz database
 MAX_ROUNDS = 5  # model turns that may end in tool calls; after that the model must answer with what it has
 MAX_TOOL_CHARS = 8000
-REASON = {"type": "string", "description": "一句話（繁體中文）說明你為什麼要做這一步；會原文顯示給使用者看。"}
+LANG_GUIDE = ("Language: always answer in the language of the user's latest message (French question -> French answer, English -> English, "
+              "繁體中文 -> 繁體中文), unless the user asks for another language. This holds even when the instructions, documents or tool "
+              "results are in another language: translate what you use. Keep citation numbers and code unchanged. The `reason` you write for each tool call is shown to the user too, so write it in that same language.")
+REASON = {"type": "string", "description": "One short sentence explaining why you take this step, in the USER's language (it is shown to them as written)."}
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
          "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
          "呼叫工具時務必填寫 reason。")
-NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你可以用一般知識回答，但必須明確說明「院內文件中沒有找到相關依據，以下為一般知識，非院內依據」，"
-                 "且不要標註來源編號。標示「低相關」的段落只供參考，引用時要說明相關度較低。")
+NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你可以用一般知識回答，但必須用使用者的語言明確說明："
+                 "「院內文件中沒有找到相關依據，以下為一般知識，非院內依據」（Chinese wording; translate it, e.g. "
+                 "\"No supporting hospital document was found; the following is general knowledge, not hospital evidence.\"），"
+                 "且不要標註來源編號。標示「低相關」的段落只供參考，引用時要用使用者的語言說明相關度較低。")
 FORMAT_GUIDE = ("輸出格式：任何程式碼（含 HTML、CSS、SQL 等網頁或標記語言）、指令、資料（CSV/JSON）一律放進三個反引號的 Markdown 程式碼區塊並標註語言，例如 ```html、```python，"
                 "絕對不要把程式碼放進 ~~~document。"
                 "只有當你產出的是使用者要拿去使用的完整『文字文件』（報告、信件、衛教單張、表單、會議紀錄、SOP 等純文字內容，不是程式碼）時，"
@@ -50,7 +55,7 @@ FORMAT_GUIDE = ("輸出格式：任何程式碼（含 HTML、CSS、SQL 等網頁
                 "一般對話、說明與簡短回答不要放進區塊。")
 WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
              "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
-WEB_SYSTEM = "你是網路搜尋助理。用繁體中文簡要整理搜尋到的事實，保留數字、日期與單位，不要加入個人意見或猜測。"
+WEB_SYSTEM = "You are a web research assistant. Summarise the facts found briefly, in the language of the search query, keeping numbers, dates and units; add no opinion or guesswork."
 
 
 _CITE = re.compile(r"\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})*)\](?!\()")  # [1] / [1, 2] (not a markdown link)
@@ -197,7 +202,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     web_on = web_search and not web_blocked
     tools = build_tools(agent, rag_files, user_message, web=web_on)
     specs = [t.spec for t in tools.values()]
-    system = f"{system}\n\n{FORMAT_GUIDE}"
+    system = f"{system}\n\n{LANG_GUIDE}\n{FORMAT_GUIDE}"
     if specs:
         system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
     llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
