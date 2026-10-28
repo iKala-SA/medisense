@@ -26,7 +26,8 @@ def _title(d: dict) -> str:
 
 def _summary(doc_id: str, d: dict) -> SessionSummary:
     return SessionSummary(id=doc_id, title=_title(d), agent_id=d.get("agent_id", ""), updated_at=d.get("updated_at"),
-                          message_count=len(d.get("messages") or []))
+                          created_at=d.get("created_at"), project_id=d.get("project_id", ""),
+                          pinned=bool(d.get("pinned")), locked=bool(d.get("locked")), archived=bool(d.get("archived")), message_count=len(d.get("messages") or []))
 
 
 def _own(session_id: str, user: User):
@@ -68,18 +69,36 @@ def get_session(session_id: str, user: User = Depends(current_user)):
 
 
 @router.patch("/{session_id}", response_model=SessionSummary)
-def rename_session(session_id: str, body: SessionPatch, user: User = Depends(current_user)):
+def update_session(session_id: str, body: SessionPatch, user: User = Depends(current_user)):
+    """Rename and/or move to a project (project_id "" = out of any project)."""
     snap = _own(session_id, user)
-    title = " ".join(body.title.split())
-    if not title:
-        raise HTTPException(422, "title is empty")
-    snap.reference.update({"title": title})  # not updated_at: renaming must not reorder the list
-    db.audit(user.uid, "session.update", user.email, session_id=session_id)
-    return _summary(snap.id, {**(snap.to_dict() or {}), "title": title})
+    upd: dict = {}
+    if body.title is not None:
+        title = " ".join(body.title.split())
+        if not title:
+            raise HTTPException(422, "title is empty")
+        upd["title"] = title
+    if body.project_id is not None:
+        if body.project_id:
+            from .projects import own_project
+            own_project(body.project_id, user)
+        upd["project_id"] = body.project_id
+    for k in ("pinned", "locked", "archived"):
+        if getattr(body, k) is not None:
+            upd[k] = getattr(body, k)
+    if not upd:
+        raise HTTPException(422, "nothing to update")
+    if (snap.to_dict() or {}).get("locked") and (set(upd) - {"locked", "pinned"}):
+        raise HTTPException(409, "conversation is locked")  # unlock first (pinning stays allowed)
+    snap.reference.update(upd)  # not updated_at: renaming / moving must not reorder the list
+    db.audit(user.uid, "session.update", user.email, session_id=session_id, **{k: v for k, v in upd.items() if k != "title"})
+    return _summary(snap.id, {**(snap.to_dict() or {}), **upd})
 
 
 @router.delete("/{session_id}", status_code=204)
 def delete_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
+    if (snap.to_dict() or {}).get("locked"):
+        raise HTTPException(409, "conversation is locked")
     snap.reference.delete()
     db.audit(user.uid, "session.delete", user.email, session_id=session_id)

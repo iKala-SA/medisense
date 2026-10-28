@@ -22,6 +22,7 @@ from .routers import (
     my_connectors,
     oauth_proxy,
     originals,
+    projects,
     routing,
     runs,
     schedules,
@@ -52,6 +53,7 @@ app.include_router(spaces.router)
 app.include_router(routing.router)
 app.include_router(features.router)
 app.include_router(model_registry.router)
+app.include_router(projects.router)
 app.include_router(sessions.router)
 app.include_router(chat.router)
 app.include_router(feedback.router)
