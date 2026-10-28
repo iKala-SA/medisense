@@ -284,7 +284,9 @@ body,#root{background:transparent!important}
 .quick-composer-wrap.pop-down .composer-popover{top:calc(100% + 10px)!important;bottom:auto!important}
 .quick-composer-wrap.pop-up .composer-popover{bottom:calc(100% + 10px)!important;top:auto!important}
 .quick-composer-wrap .composer-popover{background:#fff;border:0;border-radius:28px!important;padding:10px;box-shadow:0 10px 40px rgba(20,24,32,.14),0 0 0 1px rgba(20,24,32,.05);max-height:var(--pop-max,520px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.quick-composer-wrap .agent-anchor .agent-picker{left:0;width:min(580px,86vw)}
+.quick-composer-wrap .composer-tools{position:static}
+.quick-composer-wrap .agent-anchor{position:static}
+.quick-composer-wrap .agent-anchor .agent-picker{left:0;right:0;width:auto}
 .quick-composer-wrap .model-menu{right:0;left:auto;width:360px}
 .quick-composer-wrap .tools-menu,.quick-composer-wrap .scope-menu{overflow:visible!important;max-height:none!important}
 .quick-composer-wrap .popover-search{border:0;background:#f3f4f6;border-radius:999px!important;padding:0 16px;height:44px;display:flex;align-items:center;gap:10px;margin:2px 4px 8px}
@@ -308,3 +310,74 @@ body,#root{background:transparent!important}
 .quick-composer-wrap .model-ico{color:#1f8656;display:grid;place-items:center;flex-shrink:0}
 .quick-composer-wrap .model-options .selection-check{order:3;margin-left:auto;width:20px;color:#3a3f47}
 .quick-composer-wrap .model-options>button>span:last-child{flex:1;min-width:0}
+
+
+/* ===== Menus, Amazon Quick density: compact rows, small type, modest corners, narrow panels ===== */
+.quick-composer-wrap .composer-popover:not(.agent-picker){border-radius:14px!important;padding:6px;box-shadow:0 4px 18px rgba(20,24,32,.14),0 0 0 1px rgba(20,24,32,.06);font-size:13px}
+.quick-composer-wrap .composer-popover:not(.agent-picker) b{font-size:13.5px;font-weight:500}
+.quick-composer-wrap .composer-popover:not(.agent-picker) small,.quick-composer-wrap .menu-caption{font-size:11.5px}
+/* + menu and its second panel */
+.quick-composer-wrap .tools-menu{width:228px;border-radius:14px!important}
+.tools-menu>button{height:34px;gap:10px;padding:0 10px;border-radius:8px!important;font-size:13.5px}
+.tools-menu>button svg{width:18px;height:18px}
+.tools-menu>hr{margin:4px 6px}
+.tools-menu>.menu-caption,.tools-menu>button.source-option{display:none}
+.tools-menu .row-switch .switch,.tools-menu .switch{margin-left:auto}
+.tools-menu .tool-submenu{width:224px;left:calc(100% + 6px);margin:-34px 0 0;padding:6px;border-radius:14px;gap:0;box-shadow:0 4px 18px rgba(20,24,32,.14),0 0 0 1px rgba(20,24,32,.06)}
+.tools-menu .tool-submenu button{height:34px;gap:10px;padding:0 10px;border-radius:8px!important;font-size:13.5px}
+.tools-menu .tool-submenu.conn-list{padding:6px 6px 0;max-height:min(60vh,330px)}
+.conn-row{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:8px;flex-shrink:0}
+.conn-row:hover{background:#f3fcf8}
+.conn-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn-row .ok{color:#1f8656;flex-shrink:0}
+.tools-menu .tool-submenu .conn-link{width:auto;height:26px;padding:0 6px;color:#1f8656;font-weight:600;font-size:13px}
+.tools-menu .tool-submenu .conn-all{position:sticky;bottom:0;display:block;width:100%;height:38px;margin-top:2px;border-top:1px solid #e8ebee;border-radius:0 0 8px 8px!important;background:#fff;color:#1f8656;font-weight:600;text-align:center}
+.fly-empty{margin:0;padding:10px;color:#8a919c;font-size:12.5px}
+/* data scope menu */
+.quick-composer-wrap .scope-menu{width:270px;padding:8px 6px}
+.scope-menu>.menu-caption{display:none}
+.scope-menu>button.source-option{min-height:0;padding:7px 10px 7px 8px;border-radius:8px!important;gap:6px;align-items:flex-start}
+.scope-menu .selection-check{width:18px;flex:0 0 18px;color:#1f8656;padding-top:1px}
+.scope-menu b{display:block;font-size:13.5px;font-weight:500;color:#1f242b}
+.scope-menu small{display:block;margin-top:1px;font-size:12px;line-height:1.4;color:#6b7280}
+.scope-menu>button.source-option:has(.selection-check svg) b{color:#1f8656}
+/* model list: Gemini style, icon + name only; Auto on top with a one-line hint */
+.quick-composer-wrap .model-menu{width:240px;padding:6px}
+.quick-composer-wrap .model-options{display:flex;flex-direction:column;gap:1px}
+.quick-composer-wrap .model-options>hr{margin:4px 8px;border:0;border-top:1px solid #e4e6ea}
+.quick-composer-wrap .model-options>button{display:flex;align-items:center;gap:10px;min-height:34px;padding:4px 10px;border-radius:10px!important;text-align:left}
+.quick-composer-wrap .model-options>button>span:not(.lv-gc-ico){flex:1;min-width:0}
+.quick-composer-wrap .model-options>button.model-auto{min-height:44px}
+.quick-composer-wrap .model-options b{display:block;font-size:13px;font-weight:400;color:#1f242b}
+.quick-composer-wrap .model-options small{display:block;font-size:11px;line-height:1.3;color:#7b828d}
+.quick-composer-wrap .model-options small.model-note{display:inline}
+.quick-composer-wrap .model-options b:has(+small.model-note){display:inline}
+.quick-composer-wrap .model-options .lv-gc-ico{width:20px;height:20px;border:0;border-radius:0;background:none}
+.quick-composer-wrap .model-options .lv-gc-ico svg,.quick-composer-wrap .model-options .lv-gc-ico img{width:18px;height:18px}
+.quick-composer-wrap .model-options>button>svg{flex:none;color:#1f242b}
+.quick-composer-wrap .model-options .model-star{margin:0 1px}
+.quick-composer-wrap .model-options .lv-gc-ico{color:#5d6470}
+.quick-composer-wrap .model-options>button.chosen{background:#ededee!important}
+.quick-composer-wrap .model-menu .popover-note{font-size:9px;line-height:1.35;color:#9aa0aa;padding:6px 8px 2px}
+/* agent list: wide panel above the composer, outlined search, left-aligned rounded tabs */
+.quick-composer-wrap .agent-picker{border-radius:22px!important;padding:10px 12px 10px}
+.quick-composer-wrap .agent-picker .popover-search{height:36px;margin:0 0 10px;padding:0 12px;gap:8px;background:#fff;border:1.5px solid #9fb5aa;border-radius:7px!important}
+.quick-composer-wrap .agent-picker .popover-search svg{width:15px;height:15px}
+.quick-composer-wrap .agent-picker .popover-search input{font-size:13.5px}
+.quick-composer-wrap .agent-picker-tabs{margin:0 0 8px;padding:4px;background:#eef4f1;border-radius:9px;justify-content:flex-start;gap:4px}
+.quick-composer-wrap .agent-picker-tabs button{flex:0 0 auto;height:28px;padding:0 11px;font-size:13px;border-radius:7px!important;color:#1f242b}
+.quick-composer-wrap .agent-picker-tabs button.selected{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.quick-composer-wrap .agent-picker .agent-choice b{font-size:14px;font-weight:500}
+.quick-composer-wrap .agent-picker .agent-description{font-size:11.5px}
+.quick-composer-wrap .agent-picker .agent-choice>button:first-child{min-height:40px;padding:4px 8px;border-radius:10px!important}
+.quick-composer-wrap .agent-picker .agent-choice svg{width:18px;height:18px}
+.quick-composer-wrap .agent-picker .star-agent svg{width:16px;height:16px}
+.quick-composer-wrap .agent-picker .agent-default{font-size:10.5px;padding:1px 7px}
+.quick-composer-wrap .agent-picker>.text-button{font-size:13px;padding:4px 8px;margin-top:4px}
+/* the language list is long: it opens upward, its bottom edge level with the + menu's */
+.tools-menu .tool-submenu.voice-langs{top:auto;bottom:0;margin:0;max-height:min(60vh,320px)}
+/* the agent list sits over the composer, its top edge level with the composer's top edge */
+.quick-composer-wrap.pop-down .agent-picker,.quick-composer-wrap.pop-up .agent-picker{top:0!important;bottom:auto!important}
+.quick-composer-wrap .agent-picker{max-height:min(560px,calc(100vh - 140px))!important}
+/* ...starting just right of the agent button (which stays visible), as in Amazon Quick */
+.quick-composer-wrap .agent-anchor .agent-picker{left:calc(var(--agent-w,150px) + 22px);right:0;width:auto}
