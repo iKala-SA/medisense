@@ -25,7 +25,7 @@ export function buildOptions(groups,models){
 }
 export const toScope=k=>k==='一般知識'?'general':k==='具體資料'?'selected':'all';
 
-export const STEP={input:'收到問題',turn:'思考',knowledge:'檢索院內文件',llm:'撰寫回答',structured_output:'結構化輸出',tool:'連接器動作',approval:'人工核准',his_emr:'HIS/EMR'};
+export const STEP={input:'收到問題',turn:'思考',knowledge:'檢索院內文件',web_search:'網路搜尋',llm:'撰寫回答',structured_output:'結構化輸出',tool:'連接器動作',approval:'人工核准',his_emr:'HIS/EMR'};
 export const stepLabel=t=>STEP[t]||t;
 export const seconds=ms=>ms>=1000?(ms/1000).toFixed(1)+' 秒':ms+' 毫秒';
 

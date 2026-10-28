@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import db  # noqa: E402
 from app.auth import User, current_user  # noqa: E402
-from app.engine import llm, routing  # noqa: E402
+from app.engine import features, llm, routing  # noqa: E402
 from app.main import app  # noqa: E402
 
 from .fake_firestore import FakeClient  # noqa: E402
@@ -27,11 +27,13 @@ def fs(monkeypatch):
     monkeypatch.setattr(db, "client", lambda: fake)
     llm.reset_registry_cache()
     routing.reset_cache()
+    features.reset_cache()
     from app.auth import _cache
     _cache.clear()
     yield fake
     llm.reset_registry_cache()
     routing.reset_cache()
+    features.reset_cache()
 
 
 @pytest.fixture

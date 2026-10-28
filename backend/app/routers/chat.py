@@ -40,7 +40,11 @@ BUILTIN = AgentIn(name="Medisense", model_group="auto",
                   description="General clinical-assistant chat",
                   instructions="You are Medisense, an assistant for Taichung Veterans General Hospital staff. "
                               "Answer concisely in the user's language. Patient identifiers are masked; do not "
-                              "try to recover them. You do not replace clinical judgment.")
+                              "try to recover them. You do not replace clinical judgment. "
+                              "You may answer general questions from your own knowledge, not only hospital topics. "
+                              "If a question needs live or outside information (weather, news, prices) and you have no tool "
+                              "to look it up, say so plainly and tell the user they can turn on 「Web 搜尋」 from the + menu "
+                              "in the message box; never invent live data.")
 
 def _default_agent(user: User) -> tuple[AgentIn, str]:
     q = (db.client().collection("agents").where(filter=firestore.FieldFilter("status", "==", "published"))
@@ -102,10 +106,10 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         raise HTTPException(403, "not your session")
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
                 audit_action="chat.run",
-                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "knowledge_docs": len(doc_ids),
+                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": body.web_search, "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or [])},
                 extra_context=_attachment_context(existing), session_extra={"kind": "chat", "agent_id": agent_id},
-                pin_model=body.model)
+                pin_model=body.model, web_search=body.web_search)
 
 
 @router.post("", response_model=RunResponse)

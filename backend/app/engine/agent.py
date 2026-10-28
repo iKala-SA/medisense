@@ -26,19 +26,24 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from ..schemas import AgentIn, Citation, FlowNode, StepTrace
-from . import connectors, deid, routing
+from . import connectors, deid, features, routing
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
 log = logging.getLogger(__name__)
+TAIPEI = timezone(timedelta(hours=8))  # fixed offset: Taiwan has no DST, and a slim container may not ship the tz database
 MAX_ROUNDS = 5  # model turns that may end in tool calls; after that the model must answer with what it has
 MAX_TOOL_CHARS = 8000
 REASON = {"type": "string", "description": "一句話（繁體中文）說明你為什麼要做這一步；會原文顯示給使用者看。"}
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
-         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，例如 [1]。"
+         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
          "呼叫工具時務必填寫 reason。")
+WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
+             "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
+WEB_SYSTEM = "你是網路搜尋助理。用繁體中文簡要整理搜尋到的事實，保留數字、日期與單位，不要加入個人意見或猜測。"
 
 
 class _Trace(list):
@@ -115,8 +120,13 @@ def _connector_tool(node: FlowNode, user_message: str) -> Tool | None:
     return tool
 
 
-def build_tools(agent: AgentIn, rag_files: list[str], user_message: str) -> dict[str, Tool]:
+def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bool = False) -> dict[str, Tool]:
     tools: dict[str, Tool] = {}
+    if web:
+        tools["web_search"] = Tool(
+            "web_search", "web_search",
+            _fn("web_search", "搜尋網路（Google）取得即時或院外公開資訊，例如天氣、新聞、公開統計。",
+                {"query": {"type": "string", "description": "搜尋詞，不得包含任何個人識別資訊"}}, ["query"]), "網路搜尋")
     if rag_files:
         tools["search_knowledge"] = Tool(
             "search_knowledge", "knowledge",
@@ -137,7 +147,7 @@ def _clip(s: str) -> str:
 
 def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str, history: list[dict],
               rag_files: list[str] | None = None, resume: dict | None = None, skill_prefix: str = "",
-              extra_context: str = "", pin_model: str | None = None, emit=None) -> RunResult:
+              extra_context: str = "", pin_model: str | None = None, emit=None, web_search: bool = False) -> RunResult:
     """One conversation turn. `resume` = the `pending` dict a previous run returned at an approval: the paused
     tool call is executed (approved) and the loop continues. `emit(event)` feeds the chat stream:
     step_start, step_skip, step_done, delta, citations."""
@@ -150,11 +160,19 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     if extra_context:
         base = f"{base}\n\n{extra_context}"
     system = f"{skill_prefix}\n\n{base}" if skill_prefix else base
+    system = f"{system}\n\n現在時間：{datetime.now(TAIPEI):%Y-%m-%d %H:%M}（Asia/Taipei）。回答與搜尋「今天」「最新」等問題時以此為準。"
 
-    tools = build_tools(agent, rag_files, user_message)
+    sovereign = agent.routing.sovereign_only or routing.sovereign_only()  # nothing may leave the hospital
+    web_blocked = ""
+    if web_search and sovereign:
+        web_blocked = "僅院內模型已啟用，網路搜尋已停用"
+    elif web_search and not features.web_search_enabled():
+        web_blocked = "管理員尚未開放網路搜尋"
+    web_on = web_search and not web_blocked
+    tools = build_tools(agent, rag_files, user_message, web=web_on)
     specs = [t.spec for t in tools.values()]
     if specs:
-        system = f"{system}\n\n{GUIDE}"
+        system = f"{system}\n\n{GUIDE}" + (f"\n{WEB_GUIDE}" if web_on else "")
     llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
     group, note = pick_group(agent, llm_node, user_message)
     think = THINK.get(group)
@@ -164,6 +182,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     structured_node = next((n for n in flow.nodes if n.type == "structured_output"), None)
 
     seen: dict[tuple[str, str], int] = {}  # passage -> its [n]
+    seen_urls: dict[str, int] = {}  # web page -> its [n]
 
     def number(chunk: dict) -> int:
         key = (chunk["source"], chunk["text"][:80])
@@ -197,11 +216,32 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             emit({"event": "citations", "citations": [c.model_dump() for c in res.citations]})
         return body, f"搜尋「{query}」：命中 {len(chunks)} 段，已去識別化（{int((time.perf_counter() - t0) * 1000)} ms）"
 
+    def web(query: str) -> tuple[str, str]:
+        from .. import db
+
+        t0 = time.perf_counter()
+        q = deid.deidentify(query)[:300]  # the query leaves the hospital: mask anything identifying that slipped in
+        c = _complete(agent, agent_id, user_id, "fast", system=WEB_SYSTEM, messages=[{"role": "user", "content": q}], search=True)
+        db.audit(user_id, "chat.web_search", agent_id=agent_id, query=q, google_queries=list(c.search_queries), sources=len(c.sources))
+        lines = []
+        for s in c.sources:
+            if s["url"] not in seen_urls:
+                res.citations.append(Citation(source=s["title"], uri=s["url"]))
+                seen_urls[s["url"]] = len(res.citations)
+            lines.append(f"[{seen_urls[s['url']]}] {s['title']}")
+        if emit and c.sources:
+            emit({"event": "citations", "citations": [x.model_dump() for x in res.citations]})
+        asked = "、".join(c.search_queries) or q
+        facts = f"Google 搜尋「{asked}」：{len(c.sources)} 個網頁來源（{int((time.perf_counter() - t0) * 1000)} ms）"
+        return (f"{c.text.strip() or '沒有找到相關網頁資訊。'}\n\n來源：\n" + "\n".join(lines)).strip(), facts
+
     def execute(tool: Tool, args: dict) -> tuple[str, str]:
         """-> (text the model reads, factual summary for the step). Never raises."""
         try:
             if tool.kind == "knowledge":
                 return search(str(args.get("query", "")).strip() or user_message)
+            if tool.kind == "web_search":
+                return web(str(args.get("query", "")).strip() or user_message)
             if tool.kind == "his_emr":
                 q = str(args.get("query", ""))
                 return f"[HIS/EMR 尚未串接] 查詢條件：{q}", "HIS/EMR 閘道未啟用（stub）"
@@ -221,7 +261,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     if resume:
         messages = list(resume["messages"])
         res.citations = [Citation(**c) for c in resume.get("citations", [])]
-        seen.update({(c.source, c.text[:80]): i + 1 for i, c in enumerate(res.citations)})
+        seen.update({(c.source, c.text[:80]): i + 1 for i, c in enumerate(res.citations) if not c.uri.startswith("http")})
+        seen_urls.update({c.uri: i + 1 for i, c in enumerate(res.citations) if c.uri.startswith("http")})
         queue = [resume["call"], *resume.get("rest", [])]
         approved_id = resume["call"]["id"]
         res.trace.append(StepTrace(node_id=resume.get("node_id", "approval"), type="approval", summary="已由 Agent 負責人核准，繼續執行"))
@@ -229,6 +270,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         messages = [*history, {"role": "user", "content": user_message}]
         queue, approved_id = [], ""
         res.trace.append(StepTrace(node_id="input", type="input", summary="收到使用者輸入（已去識別化）"))
+        if web_blocked:
+            res.trace.append(StepTrace(node_id="web-blocked", type="web_search", summary=web_blocked))
 
     first_of_round: dict = {}  # model-call stats, attached to the first tool step of that call
 

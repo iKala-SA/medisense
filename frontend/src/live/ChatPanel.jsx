@@ -6,16 +6,18 @@ import {api} from '../api';
 import OriginalView from './OriginalView';
 import './chat.css';
 
+const host=u=>{try{return new URL(u).hostname}catch{return u}};
 function Ref({c,i,active,refEl,onOpen}){
   const [open,setOpen]=useState(false);
   useEffect(()=>{if(active)setOpen(true)},[active]);
-  const long=(c.text||'').length>140;
+  const long=(c.text||'').length>140,web=!c.doc_id&&/^https?:/.test(c.uri||'');
   return <article ref={refEl} className={'cx-ref'+(active?' active':'')}>
     <header><span className="n">{i}</span><b title={c.source}>{c.source}</b>{c.page!=null&&<em>第 {c.page} 頁</em>}{c.score!=null&&<em title="相關度">{Math.round(c.score*100)}%</em>}</header>
-    <p className={open?'':'clamp'}>{c.text||'（無內容片段）'}</p>
+    {web?<p className="host">{host(c.uri)}</p>:<p className={open?'':'clamp'}>{c.text||'（無內容片段）'}</p>}
     <footer>
       {long&&<button type="button" onClick={()=>setOpen(o=>!o)}>{open?<>收合<CaretUp size={12}/></>:<>展開<CaretDown size={12}/></>}</button>}
       {c.doc_id&&<button type="button" className="open" onClick={onOpen}><ArrowSquareOut size={13}/>在文件中查看</button>}
+      {web&&<a className="open" href={c.uri} target="_blank" rel="noreferrer noopener"><ArrowSquareOut size={13}/>開啟網頁</a>}
     </footer>
   </article>;
 }
