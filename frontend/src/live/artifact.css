@@ -68,3 +68,8 @@
 .cx-md pre.ax-code,.conversation .cx-md pre.ax-code{margin:0;border:0;border-radius:0;background:none;padding:12px 24px 26px}
 .conversation .cx-md .ax-code code,.cx-md .ax-code code{font-size:inherit!important;line-height:inherit;color:inherit}
 .conversation .cx-md .ax-md p,.conversation .cx-md .ax-md li{font-size:16px}
+
+/* tooltips open BELOW the icon (the card clips anything above it) and stay inside the card's right edge */
+.ax-btn[data-tip]::after{top:calc(100% + 6px)!important;bottom:auto!important;right:0!important;left:auto!important;transform:none!important}
+.ax-actions .ax-btn:not(:last-child)[data-tip]::after{right:auto!important;left:50%!important;transform:translateX(-50%)!important}
+.ax-actions .ax-btn:last-child[data-tip]::after{right:0!important}

@@ -118,3 +118,22 @@ html,body{overscroll-behavior:none}
 .tools-menu .source-option{width:100%}
 .scope-chip{background:#eef3f0}
 .bottom-composer .composer-popover.tools-menu{max-height:min(70vh,560px)}
+
+/* home screen: the Medisense menu opens upward so it is never hidden below the viewport */
+.welcome .quick-composer-wrap .composer-popover.agent-picker{top:auto!important;bottom:calc(100% + 8px)!important;max-height:min(60vh,460px);overflow:auto}
+
+/* growing input: more text -> taller box; expand icon at the top right; controls stay at the bottom edge */
+.quick-composer-wrap .composer{position:relative}
+.quick-composer-wrap .composer textarea{resize:none;overflow-y:hidden}
+.composer-expand{position:absolute;top:8px;right:10px;width:32px;height:32px;display:grid;place-items:center;border-radius:50%!important;color:#5d6d64;z-index:3;background:transparent}
+.composer-expand:hover{background:#eef3f0}
+.quick-composer-wrap .composer.tall textarea{padding-right:40px}
+
+/* once the text needs more than one line the box becomes: text on top using the full width, the control bar on its own
+   row underneath (ChatGPT): [Medisense] [+] ................ [model] [send] */
+.bottom-composer .quick-composer-wrap .composer.tall{flex-wrap:wrap;align-items:center;row-gap:6px}
+.bottom-composer .quick-composer-wrap .composer.tall textarea{order:0;flex:1 1 100%;width:100%;padding:8px 40px 8px 6px}
+.bottom-composer .quick-composer-wrap .composer.tall .web-chip{order:4;margin-left:auto}
+.bottom-composer .quick-composer-wrap .composer.tall .model-anchor{margin-left:auto}
+.bottom-composer .quick-composer-wrap .composer.tall .web-chip+.spacer+.model-anchor{margin-left:0}
+.quick-composer-wrap .composer.tall textarea{padding-right:40px}

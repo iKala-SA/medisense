@@ -82,7 +82,6 @@ export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mo
   }),[onCite,canSave,notify,mock]);
   return <div className="cx-answer">
     <Who name={m.agent}/>
-    {m.trace?.length>0&&<ThinkingBlock trace={m.trace} ms={m.ms}/>}
     <div className="cx-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]} components={comps}>{md}</Markdown></div>
     {n>0&&<div className="cx-refs">{m.citations.map((c,i)=><button key={i} type="button" onClick={()=>onCite(i+1)} title={c.source}><FileText size={13}/><b>{i+1}</b><span>{c.source}</span></button>)}</div>}
     <div className="cx-foot">
