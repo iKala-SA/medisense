@@ -224,6 +224,13 @@ html,body{overscroll-behavior:none}
 
 .tool-submenu.voice-langs{max-height:220px;overflow-y:auto;overscroll-behavior:contain}
 
+/* sidebar hover: a light wash (clearly lighter than the selected item), on the nav items and on 最近項目 alike */
+.shell aside nav button:not(.active):hover{background:#f4f5f7!important}
+.shell aside .recents button{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 10px;border-radius:12px;text-align:left;background:transparent;transition:background .15s}
+.shell aside .recents button:hover{background:#f4f5f7!important}
+.shell aside .recents button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shell aside nav button:hover,.shell aside .recents button:hover,.shell aside .sidebar-settings:hover,.shell aside .profile:hover{filter:none!important}
+
 /* ===== "+" menu, Gemini style: roomy rounded panel; a row with an arrow opens a SECOND floating panel to its right ===== */
 .quick-composer-wrap .tools-menu{width:290px;padding:10px;border-radius:24px!important;overflow:visible!important;max-height:none!important}
 .tools-menu>button{width:100%;display:flex;align-items:center;gap:14px;height:48px;padding:0 14px;border-radius:14px!important;font-size:15.5px;color:#1f242b;text-align:left}
@@ -257,8 +264,21 @@ html,body{overscroll-behavior:none}
 .scope-menu>button.source-option>span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
 .scope-menu b{font-size:15px;font-weight:500}.scope-menu small{font-size:12.5px;color:#8a919c;line-height:1.4;background:none!important}
 
+/* ===== One continuous canvas (Gemini Enterprise): no sidebar edge, one background, and on the home screen a soft green glow behind the input ===== */
+html{background:#fcfcfc}
+body,#root{background:transparent!important}
+.shell,.shell main,.main-shell,.card-theme .main-shell,.chat-page,.card-page,.card-theme,.conversation,.chat-layout{background:transparent!important}
+.shell aside,.card-theme aside,.shell.card-theme aside{background:transparent!important;border-right:0!important;box-shadow:none!important}
+.quick-topbar{background:transparent!important}
+.shell aside .quick-brand,.quick-topbar .quick-brand.mini{background:transparent!important;border:0!important}
+.shell aside nav button.active{background:rgba(31,134,86,.09)!important}
+.shell aside nav button:not(.active):hover,.shell aside .recents button:hover{background:rgba(20,30,25,.045)!important}
 /* the divider line above 最近項目 stays very faint so the rail still reads as a list */
 .shell aside hr,.shell aside .recents{border-color:rgba(20,30,25,.06)}
+
+/* a hairline between the sidebar and the page (ChatGPT): same background on both sides, only the line separates them */
+.shell aside,.card-theme aside,.shell.card-theme aside{border-right:1px solid rgba(0,0,0,.08)!important}
+
 
 /* ===== Menus (Gemini Enterprise): airy white panels, 28px corners, soft shadow; they hang below their button and scroll inside ===== */
 .quick-composer-wrap.pop-down .composer-popover{top:calc(100% + 10px)!important;bottom:auto!important}
