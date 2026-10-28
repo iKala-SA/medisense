@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import db
 from ..auth import User, current_user, require_admin
+from ..config import settings
 from ..engine import deid
 from ..schemas import FeedbackIn, FeedbackOut
 
@@ -48,8 +49,10 @@ def rate(body: FeedbackIn, user: User = Depends(current_user)):
             "question": question[:SNAPSHOT], "answer": msg.get("content", "")[:SNAPSHOT],  # both already de-identified (option B)
             "models": sorted({t.get("model") for t in meta.get("trace", []) if t.get("model")}),
             "sources": [c.get("source", "") for c in meta.get("citations", [])],
-            "uid": user.uid, "user_email": user.email, "created_at": prior.get("created_at") or now, "updated_at": now})
+            "uid": user.uid, "user_email": user.email, "created_at": prior.get("created_at") or now, "updated_at": now,
+            "expire_at": db.expiry(settings().feedback_retention_days)})
     sess["feedback"] = ratings
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
     ref.set(sess)
     db.audit(user.uid, "chat.feedback", user.email, session_id=body.session_id, message_index=body.message_index,
              rating=body.rating, reasons=list(dict.fromkeys(body.reasons)) if body.rating == "down" else [])

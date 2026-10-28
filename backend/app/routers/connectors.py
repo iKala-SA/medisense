@@ -88,6 +88,18 @@ def stats(user: User = Depends(current_user)):
                           invocations_today=inv, mcp_nodes=sum(1 for d in docs if d.get("type") == "mcp" and d.get("status") == "active"))
 
 
+def _guard_redaction(body: ConnectorIn, cur: dict | None, user: User) -> None:
+    """Results of a connector reach the model de-identified. Turning that OFF sends raw text to a cloud model, so only an admin
+    may do it, with a reason, and it is audited (connector.deid_off). Keeping an already-off connector off is not a change."""
+    was_on = True if cur is None else bool(cur.get("redact_pii", True))
+    if body.redact_pii or not was_on:
+        return
+    if user.role != "admin":
+        raise HTTPException(403, "only an admin can switch de-identification off for a connector")
+    if not body.redact_off_reason.strip():
+        raise HTTPException(422, "a reason is required to switch de-identification off")
+
+
 @router.get("", response_model=list[ConnectorOut])
 def list_connectors(user: User = Depends(current_user)):
     usage = _usage()
@@ -99,6 +111,7 @@ def list_connectors(user: User = Depends(current_user)):
 def create_connector(body: ConnectorIn, user: User = Depends(current_user)):
     _check_type(body.type)
     _admin_only_type(body.type, user)
+    _guard_redaction(body, None, user)
     ref = db.client().collection("connectors").document()
     allowed = set(eng.secret_fields(body.type))
     # A secret sent in config by an older client is still stored as a secret, never as config.
@@ -109,6 +122,8 @@ def create_connector(body: ConnectorIn, user: User = Depends(current_user)):
             "owner_email": user.email, "status": "unverified", "last_test": None, "created_at": db.now(), "updated_at": db.now()}
     ref.set(data)
     db.audit(user.uid, "connector.create", user.email, connector_id=ref.id, type=body.type, label=body.label)
+    if not body.redact_pii:
+        db.audit(user.uid, "connector.deid_off", user.email, connector_id=ref.id, label=body.label, reason=body.redact_off_reason.strip())
     return _out(ref.get())
 
 
@@ -125,6 +140,7 @@ def update_connector(connector_id: str, body: ConnectorIn, user: User = Depends(
     cur = snap.to_dict() or {}
     if body.type != cur.get("type"):
         raise HTTPException(422, "connector type cannot be changed; create a new connector")
+    _guard_redaction(body, cur, user)
     stored = dict(cur.get("secrets") or {})
     allowed = set(eng.secret_fields(body.type))
     cur_config = cur.get("config") or {}
@@ -140,6 +156,9 @@ def update_connector(connector_id: str, body: ConnectorIn, user: User = Depends(
                            "redact_pii": body.redact_pii, "audit_payloads": body.audit_payloads, "updated_at": db.now(),
                            **({"status": "unverified"} if changed_creds else {})})
     db.audit(user.uid, "connector.update", user.email, connector_id=connector_id, credentials_changed=bool(body.secrets))
+    if cur.get("redact_pii", True) != body.redact_pii:
+        db.audit(user.uid, "connector.deid_off" if not body.redact_pii else "connector.deid_on", user.email, connector_id=connector_id,
+                 label=body.label, reason=body.redact_off_reason.strip())
     return _out(snap.reference.get(), _usage())
 
 

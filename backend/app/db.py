@@ -5,7 +5,7 @@ agents/{agentId}/versions/{n}    immutable snapshot on publish
 agents/{agentId}/knowledge/{id}  LEGACY per-agent files (before the library; see scripts/migrate_knowledge_library.py)
 documents/{docId}                hospital knowledge library: name, category, department, gcs_uri, deid_uri, rag_file, version, pii(none|found|unknown), pii_types[]
 config/knowledge                 {rag_corpus}: the single hospital RAG corpus
-sessions/{sessionId}             test-chat / channel conversations, pseudonymized content only
+sessions/{sessionId}             test-chat / channel conversations, pseudonymized content only; expire_at = TTL (180 d after the last message)
 audit/{autoId}                   who did what, when (append-only)
 usage/{autoId}                   one row per LLM call: tokens, cost, served model (no prompt text)
 usage_daily/{day}_{agentId}      per-agent daily rollup read by the admin monitoring dashboard
@@ -34,6 +34,13 @@ def client() -> firestore.Client:
 
 def now() -> datetime:
     return datetime.now(UTC)
+
+
+def expiry(days: int) -> datetime | None:
+    """`expire_at` for a TTL-managed document: `days` from now, or None when retention is off (0)."""
+    from datetime import timedelta
+
+    return now() + timedelta(days=days) if days > 0 else None
 
 
 def audit(actor_uid: str, action: str, actor_email: str = "", **details) -> None:

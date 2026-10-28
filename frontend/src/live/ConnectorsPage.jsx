@@ -99,8 +99,8 @@ function Setup({me,notify,types,typeId,existing,onBack,onSaved,onDeleted}){
   const [form,setForm]=useState(()=>{
     const cfg={};
     if(isNew)for(const f of spec.fields)if(f.kind!=='secret'&&f.default!=null)cfg[f.key]=f.default;
-    return existing?{label:existing.label,scope:existing.scope||'',config:existing.config||{},secrets:{},redact_pii:existing.redact_pii,audit_payloads:existing.audit_payloads}
-      :{label:shortName(spec),scope:'',config:cfg,secrets:{},redact_pii:true,audit_payloads:true};
+    return existing?{label:existing.label,scope:existing.scope||'',config:existing.config||{},secrets:{},redact_pii:existing.redact_pii,redact_off_reason:'',audit_payloads:existing.audit_payloads}
+      :{label:shortName(spec),scope:'',config:cfg,secrets:{},redact_pii:true,redact_off_reason:'',audit_payloads:true};
   });
   const [cur,setCur]=useState(existing);
   const [busy,setBusy]=useState('');
@@ -113,12 +113,13 @@ function Setup({me,notify,types,typeId,existing,onBack,onSaved,onDeleted}){
 
   const save=async()=>{
     if(!form.label.trim()){notify('請填寫連接器識別名稱');return null}
+    if(!form.redact_pii&&existing?.redact_pii!==false&&!form.redact_off_reason.trim()){notify('關閉去識別化需要填寫原因');return null}
     const missing=spec.fields.filter(f=>f.required&&(f.kind==='secret'?!(form.secrets[f.key]||stored.includes(f.key)):!form.config[f.key]||(Array.isArray(form.config[f.key])&&!form.config[f.key].length)));
     if(missing.length){notify('必填欄位：'+missing.map(f=>f.label).join('、'));return null}
     setBusy('save');
     try{
       const secrets=Object.fromEntries(Object.entries(form.secrets).filter(([,v])=>v));
-      const body={type:spec.id,label:form.label.trim(),scope:form.scope,config:form.config,secrets,redact_pii:form.redact_pii,audit_payloads:form.audit_payloads};
+      const body={type:spec.id,label:form.label.trim(),scope:form.scope,config:form.config,secrets,redact_pii:form.redact_pii,redact_off_reason:form.redact_off_reason,audit_payloads:form.audit_payloads};
       const c=isNew&&!cur?await api.createConnector(body):await api.updateConnector(cur.id,body);
       setCur(c);setForm(x=>({...x,secrets:{}}));notify('連接器已儲存');onSaved(c);return c;
     }catch(e){notify('儲存失敗：'+errText(e));return null}finally{setBusy('')}
@@ -159,7 +160,12 @@ function Setup({me,notify,types,typeId,existing,onBack,onSaved,onDeleted}){
     :<><section className="panel"><h2>伺服器與端點</h2>{server.length?server.map(f=><SpecField key={f.key} f={f} {...fp}/>):<p className="muted small">此類型沒有非機密的端點設定。</p>}</section>
     <section className="panel"><h2>授權憑證</h2>{cred.length?cred.map(f=><SpecField key={f.key} f={f} {...fp}/>):<p className="muted small">此類型不需要憑證。</p>}</section></>}
     <section className="panel"><h2>合規設定</h2>
-      {[['redact_pii','送出前去識別化','以 Sensitive Data Protection 取代姓名、病歷號、身分證等識別資訊。'],['audit_payloads','記錄 Payload 至稽核日誌','每次工具呼叫的參數與結果狀態寫入稽核集合。']].map(([k,t,d])=><div className="lv-p-switch-row" key={k}><div><b>{t}</b>{d}</div><input type="checkbox" role="switch" aria-label={t} disabled={!editable||!!busy} checked={form[k]} onChange={e=>setForm(x=>({...x,[k]:e.target.checked}))}/></div>)}
+      {[['redact_pii','送出前去識別化','以 Sensitive Data Protection 取代姓名、病歷號、身分證等識別資訊。'],['audit_payloads','記錄 Payload 至稽核日誌','每次工具呼叫的參數與結果狀態寫入稽核集合。']].map(([k,t,d])=><div className="lv-p-switch-row" key={k}><div><b>{t}</b>{d}</div><input type="checkbox" role="switch" aria-label={t} disabled={!editable||!!busy||(k==='redact_pii'&&me?.role!=='admin'&&form.redact_pii)} checked={form[k]} onChange={e=>{
+        const on=e.target.checked;
+        if(k==='redact_pii'&&!on&&!window.confirm('關閉後，這個連接器回傳的內容會「原樣」送給模型（可能是雲端模型），其中的病人姓名、病歷號等不會被遮蔽。確定要關閉嗎？'))return;
+        setForm(x=>({...x,[k]:on}))}}/></div>)}
+      {me?.role!=='admin'&&form.redact_pii&&<p className="lv-p-hint">只有管理員可以關閉去識別化。</p>}
+      {!form.redact_pii&&<div className="lv-o-banner bad" style={{marginTop:10}} role="alert"><Warning size={15}/><div><b>去識別化已關閉。</b>此連接器的結果會原樣送給模型，且每次呼叫都在稽核記錄標註「未去識別化」。{existing?.redact_pii===false?'':<><br/>原因（必填，會寫入稽核）：<input style={{width:'100%',marginTop:6}} maxLength={200} value={form.redact_off_reason} onChange={e=>setForm(x=>({...x,redact_off_reason:e.target.value}))} placeholder="例如：此系統只回傳設備狀態，不含任何個資" aria-label="關閉去識別化的原因"/></>}</div></div>}
     </section>
     {test&&<div className={'lv-p-test'+(test.ok?'':' err')}><b>{test.ok?'測試通過':'測試失敗'}</b>：{test.message} <span className="lv-p-meta">{test.ms} ms{test.at?' · '+fmtTime(test.at):''}</span>
       {test.tools?.length>0&&<div className="lv-p-chips">{test.tools.map(t=><span key={t.id} className="badge" title={t.description}>{t.id}</span>)}</div>}</div>}

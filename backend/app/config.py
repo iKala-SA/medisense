@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # feature is off (fail closed). Must be the same on every Cloud Run instance.
     download_signing_key: str = ""
     original_link_ttl_seconds: int = 120
+    # Retention (days). Firestore deletes a document once its `expire_at` passes (TTL policy: infra/11-retention-ttl.sh).
+    # Every write pushes `expire_at` out again, so an active conversation stays; 0 disables expiry for that collection.
+    session_retention_days: int = 180
+    feedback_retention_days: int = 365
 
     litellm_base_url: str
     litellm_api_key: str

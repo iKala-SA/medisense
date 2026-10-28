@@ -170,6 +170,7 @@ async def add_attachment(file: UploadFile = File(...), session_id: str | None = 
     att = {"id": uuid.uuid4().hex[:12], "name": filename, "chars": len(text), "text": text, "at": db.now()}
     sess["attachments"] = [*(sess.get("attachments") or []), att]
     sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
     ref.set(sess)
     db.audit(user.uid, "chat.attach", user.email, session_id=sid, file=filename, chars=len(text))
     return AttachmentOut(session_id=sid, attachment_id=att["id"], name=filename, chars=len(text), snippet=text[:SNIPPET])
