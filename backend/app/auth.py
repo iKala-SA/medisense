@@ -43,6 +43,7 @@ class User:
     name: str
     role: str  # "admin" | "builder" | "user"
     department: str = ""
+    original_view: bool = False  # may open original files that contain personal data (an admin grants it per account)
 
 
 def is_bootstrap_admin(email: str) -> bool:
@@ -133,7 +134,7 @@ def current_user(token: str = Depends(_bearer)) -> User:
     if account.get("status") == "suspended" and not is_bootstrap_admin(email):
         raise HTTPException(403, "account suspended")
     return User(uid=claims["uid"], email=email, name=name, role=effective_role(account),
-                department=account.get("department", ""))
+                department=account.get("department", ""), original_view=bool(account.get("original_view", False)))
 
 
 def require_builder(user: User = Depends(current_user)) -> User:

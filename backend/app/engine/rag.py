@@ -172,6 +172,30 @@ def retrieve(corpus_name: str, rag_files: list[str], query: str, top_k: int | No
             "source": unquote(c.source_display_name or "") or (c.source_uri or "").rsplit("/", 1)[-1],
             "uri": c.source_uri or "",
             "score": c.score,
+            "page": _first_page(c),
         }
         for c in ctxs
     ]
+
+
+def _first_page(ctx) -> int | None:
+    """First page of a retrieved chunk when the service reports a page span (paged files only)."""
+    span = getattr(getattr(ctx, "chunk", None), "page_span", None)
+    page = getattr(span, "first_page", None)
+    return int(page) if page else None
+
+
+def library_index() -> dict[str, str]:
+    """Key -> library document id for indexed documents, keyed by ragFile id and by display name, so a retrieved
+    chunk (whose source_uri format may vary) can link back to its document."""
+    from google.cloud import firestore
+
+    out: dict[str, str] = {}
+    q = db.client().collection("documents").where(filter=firestore.FieldFilter("status", "==", "indexed"))
+    for d in q.stream():
+        row = d.to_dict() or {}
+        if row.get("rag_file"):
+            out[file_id(row["rag_file"])] = d.id
+        if row.get("name"):
+            out.setdefault("name:" + str(row["name"]), d.id)
+    return out

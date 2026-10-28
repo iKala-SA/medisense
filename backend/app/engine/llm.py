@@ -67,8 +67,8 @@ def _registry() -> list[dict]:
 
 
 def reset_registry_cache() -> None:
-    global _registry_cache
-    _registry_cache = None
+    global _registry_cache, _catalog_cache
+    _registry_cache = _catalog_cache = None
 
 
 def _registry_match(m: str) -> dict | None:
@@ -116,6 +116,8 @@ class Completion:
     completion_tokens: int
     cost_usd: float
     ms: int
+    reasoning: str = ""  # the model's own thought summary when it returns one (empty otherwise)
+    tool_calls: tuple = ()  # ({id, name, arguments: JSON string}, ...) when the model chose to call tools
 
 
 def _id_token(audience: str) -> str | None:
@@ -136,13 +138,19 @@ def _client() -> OpenAI:
                   default_headers=headers, timeout=120)
 
 
+MAX_THINKING_CHARS = 8000
+
+
 def complete(*, group: str, system: str, messages: list[dict], agent_id: str, user_id: str,
-             temperature: float = 0.3, top_p: float | None = None, json_mode: bool = False) -> Completion:
-    """One chat completion through the proxy. `group` is a LiteLLM model group alias."""
-    if group not in GROUPS:  # "auto" is resolved by engine/routing before this point; never send it to LiteLLM
+             temperature: float = 0.3, top_p: float | None = None, json_mode: bool = False,
+             think: str | None = None, model: str | None = None, on_delta=None, tools: list[dict] | None = None) -> Completion:
+    """One chat completion through the proxy. `group` is a LiteLLM model group alias; `model` pins one exact
+    LiteLLM model_name instead (the user picked it in the chat box). `on_delta(kind, text)` turns on streaming:
+    kind is "text" (answer tokens) or "thought" (thought-summary tokens)."""
+    if group not in GROUPS and not model:  # "auto" is resolved by engine/routing before this point; never send it to LiteLLM
         group = "fast"
     if routing.sovereign_only():  # 僅院內模型 backstop: callers already pick sovereign, but no path may reach a cloud group
-        group = "sovereign"
+        group, model = "sovereign", None
     client = _client()
     t0 = time.perf_counter()
     kwargs: dict = {}
@@ -150,8 +158,13 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         kwargs["top_p"] = top_p
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    resp = client.chat.completions.create(
-        model=group,
+    if tools:  # the model decides which of these to call (engine/agent.py runs the loop)
+        kwargs["tools"], kwargs["tool_choice"] = tools, "auto"
+    if think:  # low | medium | high: ask thinking-capable models to return their thought summary (others ignore it: drop_params)
+        kwargs["reasoning_effort"] = think
+    target = model or group
+    request = dict(
+        model=target,
         messages=[{"role": "system", "content": system}, *messages],
         temperature=temperature,
         user=user_id,
@@ -159,13 +172,51 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         extra_body={"metadata": {"agent_id": agent_id, "model_group": group, "tags": [f"agent:{agent_id}"]}},
         **kwargs,
     )
-    text = resp.choices[0].message.content or ""
-    model = normalize_model(getattr(resp, "model", None) or group)
-    usage = getattr(resp, "usage", None)
+    if on_delta:
+        text, reasoning, served, usage, calls = _stream(client, request, on_delta)
+    else:
+        resp = client.chat.completions.create(**request)
+        msg = resp.choices[0].message
+        text = msg.content or ""
+        reasoning = _reasoning_of(msg)
+        served, usage = getattr(resp, "model", None), getattr(resp, "usage", None)
+        calls = tuple({"id": t.id, "name": t.function.name, "arguments": t.function.arguments or "{}"} for t in (getattr(msg, "tool_calls", None) or []))
+    model = normalize_model(served or target)
     p_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
     c_tok = int(getattr(usage, "completion_tokens", 0) or 0)
     return Completion(text=text, model=model, prompt_tokens=p_tok, completion_tokens=c_tok,
-                      cost_usd=cost_usd(model, p_tok, c_tok), ms=int((time.perf_counter() - t0) * 1000))
+                      cost_usd=cost_usd(model, p_tok, c_tok), ms=int((time.perf_counter() - t0) * 1000),
+                      reasoning=reasoning[:MAX_THINKING_CHARS], tool_calls=calls)
+
+
+def _reasoning_of(obj) -> str:
+    return str(getattr(obj, "reasoning_content", None) or (getattr(obj, "model_extra", None) or {}).get("reasoning_content") or "")
+
+
+def _stream(client: OpenAI, request: dict, on_delta) -> tuple[str, str, str | None, object, tuple]:
+    """Same call with stream=True: forwards tokens to on_delta, returns (text, thought, served model, usage, tool calls)."""
+    parts: list[str] = []
+    thoughts: list[str] = []
+    calls: dict[int, dict] = {}
+    served, usage = None, None
+    for chunk in client.chat.completions.create(**request, stream=True, stream_options={"include_usage": True}):
+        served = getattr(chunk, "model", None) or served
+        usage = getattr(chunk, "usage", None) or usage
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        for tc in delta.tool_calls or []:  # arguments may arrive in pieces; the id/name arrive once
+            slot = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+            slot["id"] = tc.id or slot["id"]
+            slot["name"] = (tc.function.name if tc.function and tc.function.name else slot["name"])
+            slot["arguments"] += (tc.function.arguments or "") if tc.function else ""
+        if t := _reasoning_of(delta):
+            thoughts.append(t)
+            on_delta("thought", t)
+        if delta.content:
+            parts.append(delta.content)
+            on_delta("text", delta.content)
+    return "".join(parts), "".join(thoughts), served, usage, tuple(calls[i] for i in sorted(calls))
 
 
 def reset_client_cache() -> None:
@@ -177,6 +228,42 @@ GROUPS = ("fast", "reasoning", "budget", "sovereign")  # real LiteLLM model_name
 SELECTABLE_GROUPS = (*GROUPS, "auto")  # what agents and nodes can select; "auto" resolves to one of GROUPS (engine/routing.py)
 _ROUTING_TTL = 300.0
 _routing_cache: tuple[float, list[dict]] | None = None
+
+
+def _proxy_get(path: str):
+    import httpx
+
+    s = settings()
+    headers = {"Authorization": f"Bearer {s.litellm_api_key}"}
+    tok = _id_token(s.litellm_base_url)
+    if tok:
+        headers["X-Serverless-Authorization"] = f"Bearer {tok}"
+    with httpx.Client(timeout=10, headers=headers) as h:
+        return h.get(f"{s.litellm_base_url.rstrip('/')}{path}").raise_for_status().json()
+
+
+_catalog_cache: tuple[float, list[dict]] | None = None
+
+
+def model_catalog() -> list[dict]:
+    """Individual models the proxy can serve right now (every LiteLLM model_name that is not a group alias):
+    [{id, model}]. The chat box lists these so a pick is the exact model that answers. Cached 5 min; [] on any
+    proxy problem (the box then offers Auto and the groups only)."""
+    global _catalog_cache
+    if _catalog_cache and time.monotonic() - _catalog_cache[0] < _ROUTING_TTL:
+        return _catalog_cache[1]
+    try:
+        info = _proxy_get("/model/info").get("data", [])
+    except Exception:  # noqa: BLE001 - listing must never break the chat page
+        info = []
+    seen: dict[str, str] = {}
+    for m in info:
+        name = str(m.get("model_name") or "")
+        if name and name not in SELECTABLE_GROUPS:
+            seen.setdefault(name, str((m.get("litellm_params") or {}).get("model") or name))
+    out = [{"id": k, "model": v} for k, v in sorted(seen.items())]
+    _catalog_cache = (time.monotonic(), out)
+    return out
 
 
 def routing_table() -> list[dict]:
