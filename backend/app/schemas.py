@@ -759,7 +759,12 @@ class SessionSummary(BaseModel):
     title: str = ""
     agent_id: str = ""
     updated_at: Any = None
+    created_at: Any = None
     message_count: int = 0
+    project_id: str = ""  # "" = not in a project
+    pinned: bool = False
+    locked: bool = False  # read-only: no new messages, cannot be deleted until unlocked
+    archived: bool = False  # hidden from the recent list
 
 
 class SessionPage(BaseModel):
@@ -819,7 +824,22 @@ class SaveToSpaceOut(BaseModel):
 
 
 class SessionPatch(BaseModel):
-    title: str = Field(min_length=1, max_length=80)
+    title: str | None = Field(default=None, min_length=1, max_length=80)
+    project_id: str | None = Field(default=None, max_length=64)  # "" takes the chat out of its project
+    pinned: bool | None = None
+    locked: bool | None = None
+    archived: bool | None = None
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class ProjectOut(BaseModel):
+    id: str
+    name: str
+    created_at: Any = None
+    updated_at: Any = None
 
 
 class ChatRequest(BaseModel):
@@ -828,6 +848,7 @@ class ChatRequest(BaseModel):
     agent_id: str | None = None
     model_group: ModelGroup = "auto"
     model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
+    project_id: str | None = Field(default=None, max_length=64)  # new conversations only: file the chat under this project
     web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅院內模型)
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see

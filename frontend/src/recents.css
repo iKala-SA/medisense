@@ -1,0 +1,116 @@
+/* Sidebar 專案 / 最近項目, row menus, dialogs and the project page (ChatGPT-style) */
+.shell aside .recents.rc{display:block;margin:10px 0 0;padding:6px 8px 0;border:0;gap:0;overflow-y:auto;min-height:0;flex:1 1 auto}
+.rc-sec{display:flex;flex-direction:column;margin-bottom:12px}
+.rc-head{display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 4px 0 8px;color:#8e9097;font-size:13px}
+.rc-head>span:first-child,.rc-title span{font-size:13px;font-weight:400;color:#8e9097}
+.shell aside .rc .rc-title{display:inline-flex;align-items:center;gap:4px;width:auto;height:28px;padding:0;background:none;color:#8e9097;font-size:13px}
+.rc-tools{display:flex;align-items:center;gap:0}
+.shell aside .rc .rc-ico{display:grid;place-items:center;width:28px;height:28px;padding:0;border-radius:8px;color:#5d6068;background:none}
+.shell aside .rc .rc-ico:hover,.shell aside .rc .rc-ico.on{background:rgba(0,0,0,.06)}
+.rc-empty{margin:2px 0;padding:6px 8px;font-size:13.5px;color:#b3b5bb}
+.rc-empty.big{font-size:14px;padding:18px 4px}
+.rc-row{position:relative;display:flex;align-items:center;border-radius:10px}
+.rc-row:hover,.rc-row.menu-open,.rc-row.active{background:rgba(0,0,0,.05)}
+.shell aside .rc .rc-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:36px;padding:0 8px;background:none;border-radius:10px;font-size:14px;font-weight:400;color:#1f2024;text-align:left}
+.shell aside .rc .rc-main:hover{background:none;filter:none}
+.rc-main>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-main>small{flex:none;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9a9ca3;font-size:12px}
+.rc-main>svg{flex:none;color:#5d6068}
+.shell aside .rc .rc-dots{flex:none;display:grid;place-items:center;width:28px;height:28px;margin-right:4px;padding:0;border-radius:8px;color:#5d6068;background:none;opacity:0;transition:opacity .12s}
+.rc-row:hover .rc-dots,.rc-row.menu-open .rc-dots,.rc-dots:focus-visible,.rc-dots[aria-expanded=true]{opacity:1}
+.shell aside .rc .rc-dots:hover{background:rgba(0,0,0,.07)}
+.rc-rename{flex:1;min-width:0;height:34px;margin:1px 4px;padding:0 8px;border:1.5px solid #9fb5aa;border-radius:9px;font:inherit;font-size:14px;outline:0;background:#fff}
+/* menus */
+.rc-dismiss{position:fixed;inset:0;z-index:90;background:transparent}
+.rc-menu{position:fixed;z-index:91;padding:6px;background:#fff;border-radius:18px;box-shadow:0 10px 36px rgba(20,24,32,.16),0 0 0 1px rgba(20,24,32,.06);font-size:14.5px}
+.rc-menu hr{margin:6px 8px;border:0;border-top:1px solid #e8e9ec}
+.rc-cap{margin:2px 0 0;padding:6px 12px 2px;font-size:13px;color:#9a9ca3}
+.rc-item{display:flex;align-items:center;gap:12px;width:100%;height:38px;padding:0 12px;border-radius:10px;background:none;font-size:14.5px;color:#1f2024;text-align:left;cursor:pointer}
+.rc-item:hover:not(:disabled){background:#f3f3f4}
+.rc-item>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-item svg{flex:none}.rc-item .rc-caret{color:#8e9097}.rc-item .rc-check{color:#1f2024}
+.rc-item.danger,.rc-item.danger svg{color:#d93a3a}
+.rc-fly{position:relative}
+.rc-menu.rc-sub{position:absolute;left:calc(100% + 4px);top:-6px;min-width:190px;max-height:60vh;overflow-y:auto}
+/* dialogs */
+.rc-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:rgba(20,24,32,.38)}
+.rc-dialog{width:min(420px,calc(100vw - 32px));padding:22px 24px 20px;background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(20,24,32,.25)}
+.rc-dialog h3{margin:0 0 8px;font-size:17px;font-weight:600}
+.rc-dialog p{margin:0 0 18px;font-size:14px;line-height:1.55;color:#5d6068}
+.rc-dialog input{width:100%;height:42px;margin:0 0 18px;padding:0 12px;border:1.5px solid #c9ced6;border-radius:10px;font:inherit;font-size:14.5px;outline:0}
+.rc-dialog input:focus{border-color:#1f8656}
+.rc-dialog>div{display:flex;justify-content:flex-end;gap:10px}
+.rc-dialog button{height:38px;padding:0 18px;border-radius:999px;font-size:14px;font-weight:500}
+.rc-dialog .ghost{background:#fff;border:1px solid #d9dce1;color:#1f2024}
+.rc-dialog .danger{background:#d93a3a;color:#fff}
+.rc-dialog .primary{background:#1f2024;color:#fff}
+.rc-dialog .primary:disabled{opacity:.4}
+/* project page */
+.rc-page{max-width:760px;margin:0 auto;padding:8px 0 40px}
+.rc-page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.rc-page-head h1{display:flex;align-items:center;gap:10px;margin:0;font-size:26px;font-weight:600}
+.rc-page-head>span{display:flex;gap:8px}
+.rc-ghost{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid #e0e2e6;border-radius:999px;background:#fff;font-size:13px;color:#35363b}
+.rc-ghost.danger{color:#d93a3a}
+.rc-start{display:flex;align-items:center;gap:10px;width:100%;height:56px;margin-bottom:26px;padding:0 20px;border:1px solid #e0e2e6;border-radius:20px;background:#fff;font-size:15px;color:#5d6068;text-align:left}
+.rc-start:hover{background:#fafafa}
+.rc-page h2{margin:0 0 6px;font-size:15px;font-weight:600;color:#5d6068}
+.rc-list .rc-row{border-bottom:1px solid #f0f1f3;border-radius:0}
+.rc-list .rc-main{height:48px;font-size:15px}
+
+/* a chat inside a project: folder + project name at the top left of the chat area (ChatGPT) */
+.project-crumb{position:fixed;top:8px;left:calc(var(--side-w,288px) + 18px);z-index:21;display:inline-flex;align-items:center;gap:8px;max-width:min(320px,40vw);height:32px;padding:0 10px 0 6px;border-radius:10px;background:none;font-size:16px;color:#1f2024}
+.project-crumb:hover{background:rgba(0,0,0,.05)}
+.project-crumb svg{flex:none}.project-crumb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shell.collapsed .project-crumb{left:84px}
+@media(max-width:800px){.project-crumb{left:78px}}
+.shell aside .rc .rc-main:hover,.shell aside .rc .rc-title:hover,.shell aside .rc .rc-dots:hover,.shell aside .rc .rc-ico:hover{background:none!important}
+.shell aside .rc .rc-dots:hover,.shell aside .rc .rc-ico:hover{background:rgba(0,0,0,.07)!important}
+.shell aside .rc .rc-title{flex:none}
+.shell aside .rc .rc-title span{overflow:visible;text-overflow:clip}
+.shell aside .rc .rc-ico{width:26px}
+/* … sits over the end of the row instead of reserving space (like ChatGPT) */
+.shell aside .rc .rc-dots{position:absolute;right:4px;top:4px;margin:0;background:#f1f1f2}
+.rc-list .rc-main{flex:1;display:flex;align-items:center;gap:8px;padding:0 8px;background:none;border:0;text-align:left;color:#1f2024}
+.rc-list .rc-main>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-list .rc-main>small{color:#9a9ca3;font-size:12px}
+.rc-list .rc-dots{position:absolute;right:6px;top:10px;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;color:#5d6068;background:none}
+.rc-list .rc-dots:hover{background:#eee}
+.rc-list .rc-row:hover{background:#fafafa}
+.rc-list .rc-dots{opacity:1}
+/* main menu: one continuous list, no section label or gap */
+.shell aside .nav-group.flat+.nav-group.flat{margin-top:0}
+.rc-flag{flex:none;color:#9a9ca3}
+.rc-menu hr+hr{display:none}
+.rc-item:disabled{opacity:.45;cursor:default}
+/* resizable sidebar: width comes from --side-w (set on .shell); collapsed and phone layouts keep their own widths */
+@media(min-width:801px){
+  .shell:not(.collapsed) aside{width:var(--side-w,288px)!important}
+  .shell:not(.collapsed) .main-shell{margin-left:var(--side-w,288px)!important;width:calc(100% - var(--side-w,288px))!important}
+  .shell:not(.collapsed) .quick-topbar{left:var(--side-w,288px)!important}
+}
+.side-resizer{position:fixed;top:0;bottom:0;left:calc(var(--side-w,288px) - 4px);width:9px;z-index:35;cursor:col-resize;touch-action:none}
+.side-resizer::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent;transition:background .15s}
+.side-resizer:hover::after,.side-resizer.dragging::after,.side-resizer:focus-visible::after{background:#1f8656}
+.shell.collapsed .side-resizer{display:none}
+@media(max-width:800px){.side-resizer{display:none}}
+body.side-resizing{cursor:col-resize;user-select:none}
+body.side-resizing .shell aside,body.side-resizing .shell .main-shell,body.side-resizing .shell .quick-topbar{transition:none!important}
+.rc-row.active .rc-dots{opacity:1}
+@media(hover:none){.shell aside .rc .rc-dots{opacity:1}}
+/* hover reveal must out-rank the base `opacity:0` rule above */
+.shell aside .rc .rc-row:hover .rc-dots,.shell aside .rc .rc-row.menu-open .rc-dots,.shell aside .rc .rc-row.active .rc-dots,.shell aside .rc .rc-dots:focus-visible,.shell aside .rc .rc-dots[aria-expanded=true]{opacity:1}
+.shell aside .rc .rc-dots{width:30px;height:30px;top:3px;color:#1f2024;background:#ececee}
+.shell aside .rc .rc-dots svg{width:22px;height:22px}
+.shell aside .rc .rc-dots:hover{background:#e2e2e5!important}
+.rc-menu{overscroll-behavior:contain}
+/* slim sidebar gutters (ChatGPT): 8px at the edge, rows carry their own 10px inner padding */
+@media(min-width:801px){
+  .shell:not(.collapsed) aside{padding-left:8px!important;padding-right:8px!important}
+  .shell:not(.collapsed) aside .quick-brand{padding-left:8px}
+}
+.shell aside .recents.rc{padding:4px 0 0}
+.rc-head{padding:0 2px 0 10px}
+.shell aside .rc .rc-main{padding:0 10px}
+.shell aside .rc .rc-dots{right:2px}
+.rc-sec{margin-bottom:10px}
