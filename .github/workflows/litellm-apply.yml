@@ -48,6 +48,7 @@ jobs:
         run: |
           source infra/env.sh
           export BUILD_FLAGS="--gcs-source-staging-dir=gs://${PROJECT_ID}_cloudbuild/source --suppress-logs"
+          export CI_BUILD_ASYNC=1
           YES=1 RENDER_DOC=litellm_deploy bash infra/09-apply-litellm-config.sh
 
       - name: Commit litellm/config.yaml

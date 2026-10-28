@@ -12,7 +12,24 @@ IMAGE="${IMAGE:-${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/litellm:$(date
 # bucket itself, so it passes an explicit --gcs-source-staging-dir (skips the project-wide bucket-ownership listing)
 # and --suppress-logs (streaming the default logs bucket needs project Viewer); the build status still decides success.
 # shellcheck disable=SC2086
-if [ -z "${IMAGE_PREBUILT:-}" ]; then gcloud builds submit --tag "$IMAGE" ${BUILD_FLAGS:-} .; fi
+if [ -z "${IMAGE_PREBUILT:-}" ]; then
+  if [ -n "${CI_BUILD_ASYNC:-}" ]; then
+    # Even with --suppress-logs, `builds submit` reads the default logs bucket after the build and exits 1 if the caller
+    # cannot (the CI SA can't), although the build SUCCEEDED. So submit async and poll the status ourselves.
+    BUILD_ID="$(gcloud builds submit --tag "$IMAGE" --async --format='value(id)' ${BUILD_FLAGS:-} .)"
+    echo "Cloud Build $BUILD_ID: https://console.cloud.google.com/cloud-build/builds/${BUILD_ID}?project=${PROJECT_ID}"
+    while :; do
+      STATUS="$(gcloud builds describe "$BUILD_ID" --format='value(status)')"
+      case "$STATUS" in
+        SUCCESS) break ;;
+        QUEUED|WORKING|PENDING) sleep 5 ;;
+        *) echo "Cloud Build $BUILD_ID ended with $STATUS" >&2; exit 1 ;;
+      esac
+    done
+  else
+    gcloud builds submit --tag "$IMAGE" ${BUILD_FLAGS:-} .
+  fi
+fi
 
 # EXTRA_SECRETS="ENV=secret:latest,..." mounts the provider secrets named in a rendered registry config (infra/09).
 gcloud run deploy "$LITELLM_SERVICE" \
