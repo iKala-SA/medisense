@@ -277,7 +277,7 @@ body,#root{background:transparent!important}
 .shell aside hr,.shell aside .recents{border-color:rgba(20,30,25,.06)}
 
 /* a hairline between the sidebar and the page (ChatGPT): same background on both sides, only the line separates them */
-.shell aside,.card-theme aside,.shell.card-theme aside{border-right:1px solid rgba(0,0,0,.08)!important}
+.shell aside,.card-theme aside,.shell.card-theme aside{border-right:1px solid rgba(0,0,0,.045)!important}
 
 
 /* ===== Menus (Gemini Enterprise): airy white panels, 28px corners, soft shadow; they hang below their button and scroll inside ===== */
