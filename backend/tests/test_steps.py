@@ -1,7 +1,7 @@
 from app.engine import steps as se
 from app.schemas import AgentIn, Step
 
-from .conftest import ADMIN, BUILDER
+from .conftest import ADMIN, BUILDER, PLAIN
 
 
 def S(id, type="llm_generate", title=None, **config):
@@ -54,3 +54,36 @@ def test_publish_is_blocked_by_step_errors(fs, as_user):
     assert r.status_code == 422 and "提示詞" in r.text
     c.put(f"/api/agents/{a['id']}", json={"name": "B", "steps": [{"id": "s1", "type": "llm_generate", "title": "寫信", "config": {"prompt": "寫信"}}]})
     assert c.post(f"/api/agents/{a['id']}/publish").status_code == 200
+
+
+def test_draft_by_conversation_keeps_only_what_the_platform_understands(fs, as_user, monkeypatch):
+    import json
+
+    from app.engine import llm
+
+    fs.put("connectors/c1", {"name": "Slack 通報", "type": "slack", "enabled": True, "config": {}})
+    seen = {}
+    reply = {"reply": "好了", "agent": {"name": "客訴彙整", "description": "d", "instructions": "你是客服助理", "icon": "📬",
+             "opening_questions": ["a", "b", "c", "d", "e"],
+             "capabilities": {"web_search": True, "spaces": ["bogus"], "connectors": [{"connector_id": "c1", "action": "send_message"}, {"connector_id": "zzz", "action": "x"}],
+                              "model_pref": "quality"},
+             "steps": [{"id": "s 1", "type": "text_input", "title": "信箱"},
+                       {"id": "s2", "type": "llm_generate", "title": "分類", "config": {"prompt": "分類 {{s1}}"}},
+                       {"id": "s3", "type": "research", "title": "深度"},
+                       {"id": "s4", "type": "action", "title": "發送", "config": {"connector_id": "zzz", "action": "x", "prompt": "p"}},
+                       {"id": "s5", "type": "action", "title": "通報", "config": {"connector_id": "c1", "action": "send_message", "prompt": "通報 {{s2}}"}}]}}
+
+    def fake(**kw):
+        seen.update(kw)
+        return llm.Completion("```json\n" + json.dumps(reply, ensure_ascii=False) + "\n```", "gemini-3-flash", 1, 1, 0.0, 1)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t.replace("王小明", "[PERSON]"))
+    out = as_user(BUILDER).post("/api/agents/draft", json={"message": "王小明 要每天彙整客訴"}).json()
+    a = out["agent"]
+    assert a["name"] == "客訴彙整" and len(a["opening_questions"]) == 4 and a["capabilities"]["spaces"] == []
+    assert [c["connector_id"] for c in a["capabilities"]["connectors"]] == ["c1"]  # the invented connector is dropped
+    assert [s["id"] for s in a["steps"]] == ["s1", "s2", "s5"]  # unsupported type and the step on an invented connector are dropped
+    assert out["problems"] == [] and "[PERSON]" in seen["messages"][-1]["content"] and "Slack 通報" in seen["messages"][-1]["content"]
+    assert as_user(PLAIN).post("/api/agents/draft", json={"message": "x"}).status_code == 403

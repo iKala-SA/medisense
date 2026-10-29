@@ -16,7 +16,7 @@ from .. import db, sharing
 from ..auth import User, current_user, require_admin, require_builder
 from ..engine import steps as step_engine
 from ..engine.flow import validate_flow
-from ..schemas import AgentActivity, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share, StepsIn
+from ..schemas import AgentActivity, AgentDraftIn, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share, StepsIn
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 ACTIVITY_CAP = 50000  # agent.run audit rows read for today's sandbox activity
@@ -139,6 +139,28 @@ def create_agent(body: AgentIn, user: User = Depends(require_builder)):
 @router.get("/{agent_id}", response_model=AgentOut)
 def get_agent(agent_id: str, user: User = Depends(current_user)):
     return _doc_to_out(load_visible(agent_id, user))
+
+
+@router.post("/draft")
+def draft_agent(body: AgentDraftIn, user: User = Depends(require_builder)):
+    """Build / edit an agent by conversation. Nothing is saved: the client shows the draft and saves it when the user says so."""
+    from ..engine import agent_builder, connectors as conn_engine
+    from .spaces import _viewable
+
+    c = db.client()
+    rows = []
+    for d in c.collection("connectors").stream():
+        x = d.to_dict() or {}
+        acts = conn_engine.TYPES.get(x.get("type", ""), {}).get("actions")
+        if isinstance(acts, list) and x.get("enabled", True):
+            rows.append({"id": d.id, "label": x.get("name") or x.get("type", ""), "actions": [{"id": a["id"], "label": a["label"]} for a in acts]})
+    spaces = [{"id": d.id, "name": (d.to_dict() or {}).get("name", "")} for d in c.collection("spaces").stream() if _viewable(user, d.to_dict() or {})]
+    try:
+        out = agent_builder.draft(body.message, current=body.current, history=body.history, connector_rows=rows, space_rows=spaces, user_id=user.uid)
+    except ValueError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    db.audit(user.uid, "agent.draft", user.email, steps=len(out["agent"]["steps"]))
+    return out
 
 
 @router.post("/validate-steps")

@@ -140,6 +140,12 @@ class StepsIn(BaseModel):
     steps: list[Step] = Field(default_factory=list, max_length=60)
 
 
+class AgentDraftIn(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    current: dict[str, Any] | None = None  # the draft being edited (name, instructions, capabilities, steps, ...)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
+
+
 class StepRunIn(BaseModel):
     inputs: dict[str, str] = Field(default_factory=dict)  # input step id -> the typed value, or the uploaded file's id
     use_published: bool = True  # False = test the draft (owner / editors only)
