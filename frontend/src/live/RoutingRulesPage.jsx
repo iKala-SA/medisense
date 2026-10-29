@@ -6,7 +6,7 @@ import {errText,useOnce} from './pkit';
 import {LiveGroupTable} from './ModelRegistryPage';
 import './ops.css';
 
-/* 路由: hospital-wide switches (僅院內模型, Model Armor) + a LIVE test through the gateway. Model choice for "auto" is the
+/* 路由: hospital-wide switches (僅本地模型, Model Armor) + a LIVE test through the gateway. Model choice for "auto" is the
    gateway's smart-router (模型 page); the old rule list was retired with it. */
 const SAMPLES=[
   ['一般問題','請用一句話說明高血壓的衛教重點'],
@@ -96,7 +96,7 @@ export default function RoutingRulesPage({me,notify}){
         開啟後，每個請求在路由前先經 Google Cloud Model Armor 檢查（提示注入／越獄、惡意網址、有害內容、敏感資料）。命中時回傳 HTTP 400，不會呼叫任何模型。
       </Switch>
       {!draft.model_armor&&<div className="lv-o-banner"><Warning size={16}/><div>關閉後提示不經檢查即送往模型。建議僅在測試時關閉。</div></div>}
-      <Switch on={draft.sovereign_only} onChange={v=>edit({sovereign_only:v})} label="僅院內模型" icon={<Lock size={22}/>}>
+      <Switch on={draft.sovereign_only} onChange={v=>edit({sovereign_only:v})} label="僅本地模型" icon={<Lock size={22}/>}>
         開啟後，所有 Agent 與對話一律使用 sovereign（院內／地端）模型，覆蓋 smart-router 與 Agent、節點指定的群組；失敗時不回退雲端。
       </Switch>
       {draft.sovereign_only&&sovMissing&&<div className="lv-o-banner bad"><Warning size={16}/><div><b>目前 Medisense Model Gateway 沒有可用的 sovereign 模型。</b>啟用後所有請求都會失敗（不會改用雲端）。請先在「模型」頁新增地端模型並套用到 Medisense Model Gateway。</div></div>}
@@ -105,7 +105,7 @@ export default function RoutingRulesPage({me,notify}){
     </div>
     <section className="panel lv-o-card"><h3><Flask/>測試</h3>
       <p className="muted small">以<b>已發布</b>的設定實際送出一次請求（與 auto Agent 相同路徑：Model Armor → smart-router → 模型），會產生模型費用。測試內容不會寫入稽核記錄。</p>
-      <span className={'lv-o-status '+(base.model_armor?'ok':'warn')} style={{margin:'8px 0'}}><i/>Model Armor 目前{base.model_armor?'開啟':'關閉'}{base.sovereign_only?' · 僅院內模型':''}</span>
+      <span className={'lv-o-status '+(base.model_armor?'ok':'warn')} style={{margin:'8px 0'}}><i/>Model Armor 目前{base.model_armor?'開啟':'關閉'}{base.sovereign_only?' · 僅本地模型':''}</span>
       {dirty&&<div className="lv-o-banner" style={{marginTop:6}}><Warning size={15}/><div>草稿尚未發布，測試仍使用已發布的設定。</div></div>}
       <textarea aria-label="測試提示" rows={5} style={{width:'100%'}} value={text} onChange={e=>{setText(e.target.value);setRes(null)}}/>
       <div className="lv-o-samples">{SAMPLES.map(([a,b])=><button key={a} onClick={()=>{setText(b);setRes(null)}}>{a}</button>)}</div>
@@ -116,7 +116,7 @@ export default function RoutingRulesPage({me,notify}){
     <LiveGroupTable groups={groups} failed={gfail}/>
     <div className="notice"><Info/>Agent 的成本上限與「僅用院內模型」仍在路由之後生效：成本上限低於 reasoning 的 Agent 不使用 smart-router，改用其上限群組。</div>
     <h2 style={{fontSize:16,margin:'28px 0 10px'}}>其他全院設定（立即生效，不需發布）</h2>
-    <label className={'panel lv-o-sovereign'+(feat?.web_search?' on':'')}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.web_search} onChange={e=>setWeb(e.target.checked)}/><div><b><Globe size={14} style={{verticalAlign:-2,marginRight:4}}/>允許網路搜尋（對外連線）</b><span className="muted small">預設關閉。勾選後，使用者可在輸入框「＋」選單自行開啟 Web 搜尋；開啟時模型可能把<b>已去識別化的搜尋詞</b>送到 Google 查詢，結果附網頁來源。「僅院內模型」開啟時，網路搜尋一律停用。變更立即生效並寫入稽核記錄。{feat?.updated_by&&<> 上次由 {feat.updated_by} 變更。</>}</span>
+    <label className={'panel lv-o-sovereign'+(feat?.web_search?' on':'')}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.web_search} onChange={e=>setWeb(e.target.checked)}/><div><b><Globe size={14} style={{verticalAlign:-2,marginRight:4}}/>允許網路搜尋（對外連線）</b><span className="muted small">預設關閉。勾選後，使用者可在輸入框「＋」選單自行開啟 Web 搜尋；開啟時模型可能把<b>已去識別化的搜尋詞</b>送到 Google 查詢，結果附網頁來源。「僅本地模型」開啟時，網路搜尋一律停用。變更立即生效並寫入稽核記錄。{feat?.updated_by&&<> 上次由 {feat.updated_by} 變更。</>}</span>
       {feat===null&&<span className="small muted">讀取目前設定中…</span>}
       {feat===false&&<span className="small" role="alert" style={{color:'#b3261e'}}>無法讀取此設定，暫時無法變更：{featErr||'未知錯誤'}　<button type="button" className="lv-linkbtn" onClick={e=>{e.preventDefault();loadFeat()}}>重試</button></span>}</div></label>
     <label className={'panel lv-o-sovereign'+(feat?.voice_input?' on':'')} style={{marginTop:10}}><input type="checkbox" disabled={feat===null||feat===false||featBusy} checked={!!feat?.voice_input} onChange={e=>setVoice(e.target.checked)}/><div><b>允許語音輸入（麥克風）</b><span className="muted small">預設關閉。開放後輸入框會出現麥克風，使用者可口述問題。語音辨識由瀏覽器提供，<b>錄到的聲音會送到瀏覽器廠商的語音服務</b>（Chrome／Edge 是 Google，Safari 是 Apple），且不會先去識別化；Firefox 不支援。變更立即生效並寫入稽核記錄。</span></div></label>

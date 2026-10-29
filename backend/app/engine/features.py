@@ -4,7 +4,7 @@
                 service (Google for Chrome/Edge, Apple for Safari): patient details spoken aloud are NOT de-identified before that.
   rag_*_distance  how close a retrieved passage must be to reach the model at all (see rag_thresholds)
   web_search  may chat turns send (masked) search terms to Google when the USER also switches 網路搜尋 on?
-              Outbound by nature, so it is an admin decision, not just a user preference. 僅院內模型 still overrides it.
+              Outbound by nature, so it is an admin decision, not just a user preference. 僅本地模型 still overrides it.
 
 Read through a short cache; a failed read keeps the last good value and, before any good read, stays OFF (fail closed).
 """
