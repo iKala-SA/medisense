@@ -99,3 +99,9 @@ def test_images_blocked_under_hospital_only_models_and_deleted_with_the_chat(fs,
     r = c.post("/api/chat", json={"message": "hi", "session_id": sid})
     assert r.status_code == 409 and "圖片" in r.text
     assert c.delete(f"/api/sessions/{sid}").status_code == 204 and st.deleted  # blobs go with the conversation
+
+
+def test_images_black_out_all_text_by_default():
+    from app.config import settings
+
+    assert settings().image_redact_all_text is True

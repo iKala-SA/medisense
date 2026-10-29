@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # Sensitive Data Protection inspect template (infoTypes + likelihood), e.g.
     # projects/<p>/locations/global/inspectTemplates/<id>. Empty -> deid.FALLBACK_INFO_TYPES.
     dlp_inspect_template: str = ""
-    image_redact_all_text: bool = False  # chat images: black out ALL text found in them, not only personal data (stricter, loses readable content)
+    image_redact_all_text: bool = True  # chat images: black out ALL text found in them, not only personal data (set IMAGE_REDACT_ALL_TEXT=false to redact personal data only)
 
     # Knowledge (Vertex AI RAG Engine). asia-east1 is a Preview region for RAG Engine (checked 2026-10-24).
     rag_enabled: bool = True

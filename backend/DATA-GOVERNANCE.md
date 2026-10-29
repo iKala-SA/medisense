@@ -8,7 +8,7 @@ keep our own copies. Vendor contracts (no training, retention, zero-retention op
 | De-identify before any model sees text (messages, retrieved passages, connector results, saved blocks, feedback text) | `engine/deid.py` and callers | always on, no switch |
 | 僅院內模型 (nothing leaves the hospital) | 路由 admin page | admin switch |
 | Web search is off unless an admin allows it, and the term is masked again | 路由 admin page, `engine/agent.py` | admin switch + user toggle |
-| **Images in chat**: personal data written in an image is blacked out with Sensitive Data Protection (`redact_image`) before the image is stored or shown to a model; the original is never kept; a redaction error rejects the upload; images are removed with their conversation and by a bucket lifecycle rule | `engine/deid.redact_image`, `engine/chat_images.py`, `infra/11-retention-ttl.sh`; audit `chat.attach_image` | `IMAGE_REDACT_ALL_TEXT=true` blacks out all text; faces and handwriting are not detected |
+| **Images in chat**: personal data written in an image is blacked out with Sensitive Data Protection (`redact_image`) before the image is stored or shown to a model; the original is never kept; a redaction error rejects the upload; images are removed with their conversation and by a bucket lifecycle rule | `engine/deid.redact_image`, `engine/chat_images.py`, `infra/11-retention-ttl.sh`; audit `chat.attach_image` | by default ALL text in an image is blacked out (`IMAGE_REDACT_ALL_TEXT=false` redacts personal data only); faces and handwriting are not detected |
 | **Connector de-identification** can only be switched off by an admin, with a reason; each call is audited with `redacted` | 連接器 → 合規設定; audit `connector.deid_off` / `connector.deid_on` / `connector.invoke` | admin |
 | **Retention**: conversations expire 180 days after the last message, feedback after 365 days (Firestore TTL on `expire_at`) | `SESSION_RETENTION_DAYS`, `FEEDBACK_RETENTION_DAYS`; `infra/11-retention-ttl.sh`; `scripts/backfill_expiry.py` for old documents | run the TTL script once; 0 disables |
 | **No outbound calls from the gateway for pricing data**: LiteLLM uses its bundled model-cost map | `LITELLM_LOCAL_MODEL_COST_MAP=True` in `infra/03-deploy-litellm.sh` (reused by 09) | redeploy LiteLLM |
@@ -17,7 +17,7 @@ keep our own copies. Vendor contracts (no training, retention, zero-retention op
 | Usage ledger has no prompt text | `engine/usage.py` | none |
 
 ## Still to confirm outside the code
-- Chat images: try the redaction on real screenshots (lab reports, wristbands, EMR screens) and decide whether `IMAGE_REDACT_ALL_TEXT` should be on; Sensitive Data Protection does not detect faces or handwriting, and images with no recognisable text pass through as they are. Images are not sent to on-prem models (they have no vision).
+- Chat images: all text is blacked out by default (decided 2026-10-29); try it on real screenshots (lab reports, wristbands, EMR screens) to confirm nothing readable is left; Sensitive Data Protection does not detect faces or handwriting, and images with no recognisable text pass through as they are. Images are not sent to on-prem models (they have no vision).
 - Vertex AI project settings: data caching, abuse-monitoring log retention, whether zero retention can be requested, and the terms that
   apply to preview models; `global` is not a Taiwan region.
 - A signed DPA with audit and breach-notification rights for every cloud provider whose models are registered.

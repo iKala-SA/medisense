@@ -714,12 +714,16 @@ class CatalogItemOut(BaseModel):
     deploy: Literal["cloud", "onprem"]
     description: str = ""
     needs_api_base: bool = False
+    needs_secret: bool = False
+    needs_deployment: bool = False
     registered: bool = False
     registered_id: str = ""
 
 
 class CatalogRegisterIn(BaseModel):
-    api_base: str = Field(default="", max_length=300)  # on-prem entries: the address of the hospital's server
+    api_base: str = Field(default="", max_length=300)  # on-prem / Azure: the address of the server or resource
+    secret_name: str = Field(default="", max_length=255, pattern=r"^[A-Za-z0-9_-]*$")  # Azure: Secret Manager NAME, never a key
+    deployment: str = Field(default="", max_length=120, pattern=r"^[A-Za-z0-9._-]*$")  # Azure: the deployment name
 
 
 class SmartRouterIn(BaseModel):
