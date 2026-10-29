@@ -37,6 +37,25 @@ model_list:
     deploy: cloud
     group: budget
     provider: vertex_ai
+- model_name: nova-2-lite
+  litellm_params:
+    model: bedrock/nova-2-lite
+    aws_region_name: os.environ/BEDROCK_REGION
+    aws_role_name: os.environ/BEDROCK_ROLE_ARN
+    aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
+    aws_session_name: tcvgh-litellm
+  model_info:
+    deploy: cloud
+    group: budget
+    provider: bedrock
+- model_name: gemma-4-12b
+  litellm_params:
+    model: ollama/gemma-4-12b
+    api_base: http://10.140.0.31:11434
+  model_info:
+    deploy: onprem
+    group: sovereign
+    provider: ollama
 - model_name: fast
   litellm_params:
     model: vertex_ai/gemini-2.5-flash
@@ -52,6 +71,10 @@ model_list:
     model: vertex_ai/gemini-3-flash-preview
     vertex_project: os.environ/VERTEX_PROJECT
     vertex_location: os.environ/VERTEX_LOCATION
+- model_name: sovereign
+  litellm_params:
+    model: ollama/gemma-4-12b
+    api_base: http://10.140.0.31:11434
 - model_name: smart-router
   litellm_params:
     model: auto_router/complexity_router
@@ -59,7 +82,7 @@ model_list:
       tiers:
         SIMPLE: gemini-3-flash
         MEDIUM: gemini-2.5-flash
-        COMPLEX: gemini-3-flash
+        COMPLEX: gemini-2.5-flash
         REASONING: gemini-3-flash
       classifier_type: heuristic
     complexity_router_default_model: gemini-2.5-flash
@@ -75,6 +98,7 @@ router_settings:
   - reasoning:
     - fast
   - budget:
+    - nova-2-lite
     - fast
   context_window_fallbacks:
   - fast:
