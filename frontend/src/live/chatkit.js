@@ -11,13 +11,20 @@ export function modelLabel(id){
 }
 
 /* /api/models -> composer options. Every model the proxy really serves is listed and pinned by its own id, so the
-   model picked here is the model that answers. The sovereign group is kept as 院內模型 once on-prem is connected. */
+   model picked here is the model that answers. Entries the admin registered carry the 模型 page's own name /
+   provider / 地端|雲端 / group (backend llm.model_catalog), so the chat box reads exactly like that page; a
+   hand-written gateway entry falls back to a label derived from its model id. The sovereign group is kept as
+   院內模型 once on-prem is connected. */
 export function buildOptions(groups,models){
   const opts=[{id:'auto',name:'Auto · 智慧路由',provider:'自動選擇',desc:'依任務內容套用管理員的路由規則'}];
   const tier=Object.fromEntries((groups||[]).flatMap(g=>(g.models||[]).map(m=>[m.replace(/^.*\//,''),GROUP_LABEL[g.id]||g.id])));
   for(const m of models||[]){
     const raw=m.model.replace(/^.*\//,'');
-    opts.push({id:m.id,pin:true,name:modelLabel(raw),provider:providerOf(raw),desc:tier[raw]||'指定模型'});
+    const registered=!!m.name;
+    const group=registered?(GROUP_LABEL[m.group]||m.group||''):(tier[raw]||'');
+    opts.push({id:m.id,pin:true,name:registered?m.name:modelLabel(raw),provider:registered?(m.provider||providerOf(raw)):providerOf(raw),
+      deploy:registered?m.deploy:undefined,desc:group||'指定模型',
+      note:registered?[m.deploy==='onprem'?'地端':'雲端',group].filter(Boolean).join(' · '):''});
   }
   for(const g of groups||[])if(g.id==='sovereign')opts.push({id:'sovereign',name:GROUP_LABEL.sovereign,provider:'院內',desc:'資料不出院',disabled:!g.configured,note:g.configured?'':'尚未連接'});
   if(!(models||[]).length)for(const g of groups||[])if(g.id!=='sovereign'&&g.configured)opts.push({id:g.id,name:g.models?.[0]?modelLabel(g.models[0]):GROUP_LABEL[g.id]||g.id,provider:g.models?.[0]?providerOf(g.models[0]):'',desc:GROUP_LABEL[g.id]||g.id});
