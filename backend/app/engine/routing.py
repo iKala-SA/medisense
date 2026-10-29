@@ -2,7 +2,7 @@
 
   {version, sovereign_only, model_armor}
 
-sovereign_only (僅院內模型) overrides everything: every call goes to `sovereign`, which LiteLLM serves on-prem only
+sovereign_only (僅本地模型) overrides everything: every call goes to `sovereign`, which LiteLLM serves on-prem only
 with no cloud fallback. engine/flow.pick_group and llm.complete both enforce it, so it covers agents and nodes that
 pin a group, not just "auto".
 
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 SMART_ROUTER = "smart-router"  # LiteLLM model_name, see engine/litellm_config.py
 MODEL_ARMOR_GUARDRAIL = "model-armor"  # guardrail_name in litellm/config.yaml
 DEFAULT_CONFIG: dict = {"version": 0, "sovereign_only": False, "model_armor": True}
-SOVEREIGN_REASON = "僅院內模型：全院設定，所有請求使用 sovereign，不回退雲端"
+SOVEREIGN_REASON = "僅本地模型：全院設定，所有請求使用 sovereign，不回退雲端"
 _TTL = 60.0
 _cache: tuple[float, dict] | None = None
 

@@ -23,6 +23,10 @@ export LITELLM_SA="tcvgh-litellm-sa"
 export LITELLM_INGRESS="all"                      # sandbox: public run.app URL (IAM required) for the Agent Runtime POC; TCVGH: internal
 export BEDROCK_ROLE_ARN="arn:aws:iam::628893726885:role/tcvgh-litellm-bedrock"  # keyless Bedrock (nova-2-lite)
 export BEDROCK_WEB_IDENTITY_TOKEN="oidc/google/tcvgh-litellm-bedrock"
+export BEDROCK_REGION="ap-northeast-1"            # the only region the tcvgh-litellm-bedrock role may call (jp. profile)
+# On-prem stand-in: Ollama (Gemma 4 12B, tool-capable) on VM tcvgh-onprem-gemma (asia-east1-a, Spot L4, internal IP only, infra/12-ollama-vm.sh).
+# LiteLLM reaches it via Direct VPC egress; the firewall rule allow-ollama-internal admits only the default subnet.
+export OLLAMA_API_BASE="http://10.140.0.31:11434"
 export BACKEND_SA="tcvgh-backend-sa"
 # Model Armor template LiteLLM screens prompts with (before smart-router/any model; on/off = 路由 page). Sandbox: us-central1, so
 # prompts leave Taiwan for the check; TCVGH should use a template in asia-east1.

@@ -137,7 +137,7 @@ def test_sovereign_only_overrides_everything(fs, monkeypatch):
     for agent in (AgentIn(name="a", model_group="auto"), AgentIn(name="a", model_group="fast"),
                   AgentIn(name="a", model_group="reasoning", routing={"max_cost_tier": "budget"})):
         g, note = pick_group(agent, pinned, "analyze: 比較")
-        assert g == "sovereign" and "僅院內模型" in note
+        assert g == "sovereign" and "僅本地模型" in note
 
     sent: dict = {}
     monkeypatch.setattr(llm, "_client", fake_client(sent, model="gpt-oss-120b"))

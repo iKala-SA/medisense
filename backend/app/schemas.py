@@ -657,7 +657,7 @@ class SpaceDocuments(BaseModel):
 
 # ------------------------------------------------------------------ routing rules (config/routing)
 class RoutingConfigIn(BaseModel):
-    # 僅院內模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of agent or node groups,
+    # 僅本地模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of agent or node groups,
     # and nothing falls back to a cloud model.
     sovereign_only: bool = False
     # Model Armor: every LLM call is screened by the gateway's `model-armor` guardrail before routing.
@@ -876,7 +876,7 @@ class ChatRequest(BaseModel):
     model_group: ModelGroup = "auto"
     model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
     project_id: str | None = Field(default=None, max_length=64)  # new conversations only: file the chat under this project
-    web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅院內模型)
+    web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅本地模型)
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
     knowledge_scope: Literal["general", "selected", "all"] = "selected"
