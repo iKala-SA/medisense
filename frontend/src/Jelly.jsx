@@ -15,8 +15,8 @@ export function Jelly({size=88,animated=false,circle=true,className=''}){
    circle) -> 2 blinks -> 2 eyebrow hops -> swim to the middle -> smile. Plays once; reduced-motion shows the final pose. */
 const BODY='#44d497',INK='#2b2328';
 const BROW_L='M173 73 Q188 63 203 67',BROW_R='M300 103 Q316 112 320 127',MOUTH_WIPE='M181 203 Q210 228 239 205';  // covers the painted smile; its dash retracts left -> right like a swoosh
-export function JellyIntro({size=120}){
-  return <span className="ji" style={{width:size,height:size}} aria-hidden="true">
+export function JellyIntro({size=120,settled=false}){
+  return <span className={'ji'+(settled?' settled':'')} style={{width:size,height:size}} aria-hidden="true">
     <span className="ji-fig"><span className="ji-float">
       <img src={SRC} alt="" draggable="false"/>
       <svg viewBox="0 0 360 360">
