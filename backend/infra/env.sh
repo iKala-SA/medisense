@@ -24,7 +24,7 @@ export LITELLM_INGRESS="all"                      # sandbox: public run.app URL 
 export BEDROCK_ROLE_ARN="arn:aws:iam::628893726885:role/tcvgh-litellm-bedrock"  # keyless Bedrock (nova-2-lite)
 export BEDROCK_WEB_IDENTITY_TOKEN="oidc/google/tcvgh-litellm-bedrock"
 export BEDROCK_REGION="ap-northeast-1"            # the only region the tcvgh-litellm-bedrock role may call (jp. profile)
-# On-prem stand-in: Ollama (Gemma 3) on VM tcvgh-onprem-gemma (asia-east1-a, Spot L4, internal IP only, infra/12-ollama-vm.sh).
+# On-prem stand-in: Ollama (Gemma 4 12B, tool-capable) on VM tcvgh-onprem-gemma (asia-east1-a, Spot L4, internal IP only, infra/12-ollama-vm.sh).
 # LiteLLM reaches it via Direct VPC egress; the firewall rule allow-ollama-internal admits only the default subnet.
 export OLLAMA_API_BASE="http://10.140.0.31:11434"
 export BACKEND_SA="tcvgh-backend-sa"
