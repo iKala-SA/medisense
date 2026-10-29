@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from ..schemas import AgentIn, Citation, CitationPassage, FlowNode, StepTrace
-from . import connectors, deid, features, routing
+from . import connectors, deid, features, llm, routing
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
 log = logging.getLogger(__name__)
@@ -194,10 +194,19 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     system = f"{skill_prefix}\n\n{base}" if skill_prefix else base
     system = f"{system}\n\n現在時間：{datetime.now(TAIPEI):%Y-%m-%d %H:%M}（Asia/Taipei）。回答與搜尋「今天」「最新」等問題時以此為準。"
 
-    sovereign = agent.routing.sovereign_only or routing.sovereign_only()  # nothing may leave the hospital
+    # Decide the model first: whether web search may be offered depends on it (nothing leaves the hospital when the
+    # turn runs on-prem: the hospital-wide / agent 僅院內模型 switch, an llm node in the `sovereign` group, or a pinned
+    # on-prem model such as gemma-4-12b. The web tool itself is answered by Gemini grounding on the `fast` group).
+    llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
+    group, note = pick_group(agent, llm_node, user_message)
+    think = THINK.get(group)
+    if pin_model:
+        group, note, think = pin_model, "使用者指定模型", ("medium" if "pro" in pin_model else None)
     web_blocked = ""
-    if web_search and sovereign:
+    if web_search and (agent.routing.sovereign_only or routing.sovereign_only()):
         web_blocked = "僅本地模型已啟用，網路搜尋已停用"
+    elif web_search and (group == "sovereign" or (pin_model and llm.is_onprem(pin_model))):
+        web_blocked = "此回合使用院內模型，網路搜尋已停用"
     elif web_search and not features.web_search_enabled():
         web_blocked = "管理員尚未開放網路搜尋"
     web_on = web_search and not web_blocked
@@ -206,11 +215,6 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     system = f"{system}\n\n{LANG_GUIDE}\n{FORMAT_GUIDE}"
     if specs:
         system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
-    llm_node = next((n for n in flow.nodes if n.type == "llm"), FlowNode(id="llm", type="llm", data={}))
-    group, note = pick_group(agent, llm_node, user_message)
-    think = THINK.get(group)
-    if pin_model:
-        group, note, think = pin_model, "使用者指定模型", ("medium" if "pro" in pin_model else None)
     approval = next((n for n in flow.nodes if n.type == "approval"), None)
     structured_node = next((n for n in flow.nodes if n.type == "structured_output"), None)
 

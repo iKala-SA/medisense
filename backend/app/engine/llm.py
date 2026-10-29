@@ -35,7 +35,7 @@ PRICES: tuple[tuple[str, float, float], ...] = (
     ("gemma", 0.0, 0.0),
 )
 # Primary model per group, mirrors litellm/config.yaml. A served model outside this is a fallback.
-PRIMARY: dict[str, str] = {"fast": "gemini-3-flash", "reasoning": "gemini-3.1-pro", "budget": "gemini-3-flash", "sovereign": "gemma-3-12b"}
+PRIMARY: dict[str, str] = {"fast": "gemini-3-flash", "reasoning": "gemini-3.1-pro", "budget": "gemini-3-flash", "sovereign": "gemma-4-12b"}
 
 
 def normalize_model(model: str) -> str:
@@ -76,6 +76,22 @@ def _registry_match(m: str) -> dict | None:
         if normalize_model(str(r["litellm_model"])) in m or m in normalize_model(str(r["litellm_model"])):
             return r
     return None
+
+
+ONPREM_PROVIDERS = ("ollama", "ollama_chat", "hosted_vllm", "vllm")  # LiteLLM prefixes that only ever point inside the hospital
+
+
+def is_onprem(model: str) -> bool:
+    """True when a pinned model_name is served on-prem: the gateway catalog shows an on-prem provider prefix for it
+    (covers hand-written config entries too), or an admin registry row with deploy=onprem renders to that name
+    (the renderer slugs the row's name) or to the same LiteLLM model."""
+    from .litellm_config import _slug  # pure module, no I/O
+
+    target = next((str(c["model"]) for c in model_catalog() if c["id"] == model), "")
+    if target.split("/", 1)[0] in ONPREM_PROVIDERS:
+        return True
+    return any(r.get("deploy") == "onprem" and (_slug(str(r.get("name", ""))) == model or (target and str(r.get("litellm_model")) == target))
+               for r in _registry())
 
 
 def cost_usd(model: str, prompt_tokens: int, completion_tokens: int) -> float:

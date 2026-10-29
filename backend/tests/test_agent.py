@@ -197,6 +197,42 @@ def test_web_search_is_refused_under_sovereign_only_and_the_user_is_told(fs, mon
     assert sent[0]["tools"] is None and "網路搜尋已停用" in r.trace[1].summary
 
 
+def test_web_search_is_skipped_when_the_llm_node_is_sovereign(fs, monkeypatch):
+    # Not the hospital-wide switch: the agent's own llm node runs on the on-prem group, so the turn must stay inside.
+    _web_rig(monkeypatch)
+    sent = []
+    monkeypatch.setattr(llm, "complete", lambda **kw: sent.append(kw) or llm.Completion("ok", "gemma-4-12b", 1, 1, 0.0, 1))
+    flow = {"nodes": [{"id": "llm", "type": "llm", "data": {"group": "sovereign"}}], "edges": []}
+    r = rt.run_agent(AgentIn(name="M", flow=flow), agent_id="a", user_id="u", user_message="x", history=[], web_search=True)
+    assert sent[0]["group"] == "sovereign" and sent[0]["tools"] is None
+    assert r.trace[1].type == "web_search" and "院內模型" in r.trace[1].summary and "已停用" in r.trace[1].summary
+
+
+def test_web_search_is_skipped_when_the_user_pins_an_onprem_model(fs, monkeypatch):
+    _web_rig(monkeypatch)
+    sent = []
+    monkeypatch.setattr(llm, "complete", lambda **kw: sent.append(kw) or llm.Completion("ok", "gemma-4-12b", 1, 1, 0.0, 1))
+    monkeypatch.setattr(llm, "is_onprem", lambda m: m == "gemma-4-12b")
+    r = rt.run_agent(AgentIn(name="M"), agent_id="a", user_id="u", user_message="x", history=[], web_search=True, pin_model="gemma-4-12b")
+    assert sent[0]["model"] == "gemma-4-12b" and sent[0]["tools"] is None and "已停用" in r.trace[1].summary
+    sent.clear()
+    r = rt.run_agent(AgentIn(name="M"), agent_id="a", user_id="u", user_message="x", history=[], web_search=True, pin_model="gemini-2.5-flash")
+    assert [x["function"]["name"] for x in sent[0]["tools"]] == ["web_search"]  # a cloud pick keeps the tool
+
+
+def test_is_onprem_reads_registry_then_gateway_catalog(monkeypatch):
+    monkeypatch.setattr(llm, "_registry", lambda: [
+        {"name": "Gemma 4 12B", "litellm_model": "ollama_chat/gemma4:12b", "deploy": "onprem", "group": "sovereign"},
+        {"name": "gpt-oss", "litellm_model": "openai/gpt-oss-120b", "deploy": "onprem", "group": "sovereign"}])
+    monkeypatch.setattr(llm, "model_catalog", lambda: [{"id": "nova-2-lite", "model": "bedrock/jp.amazon.nova-2-lite-v1:0"},
+                                                       {"id": "local-vllm", "model": "hosted_vllm/x"},
+                                                       {"id": "oss-alias", "model": "openai/gpt-oss-120b"}])
+    assert llm.is_onprem("gemma-4-12b")  # registry row, matched by its rendered slug
+    assert llm.is_onprem("local-vllm")  # not in the registry: on-prem provider prefix in the gateway catalog
+    assert llm.is_onprem("oss-alias")  # openai-compatible on-prem server: same LiteLLM model as an onprem registry row
+    assert not llm.is_onprem("nova-2-lite") and not llm.is_onprem("unknown")
+
+
 def test_web_search_needs_the_admin_switch_too(fs, monkeypatch):
     _web_rig(monkeypatch, enabled=False)
     sent = []
