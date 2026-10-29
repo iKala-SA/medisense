@@ -152,8 +152,8 @@ def _system(agent: AgentIn, kind: str) -> str:
 
 
 def flow_lang() -> str:
-    from .agent import FORMAT_GUIDE, LANG_GUIDE
-    return f"{LANG_GUIDE}\n{FORMAT_GUIDE}"
+    from .agent import LANG_GUIDE
+    return LANG_GUIDE  # not FORMAT_GUIDE: its ~~~document blocks are for the chat view, a step output is plain text for the next step
 
 
 class StepFailed(Exception):

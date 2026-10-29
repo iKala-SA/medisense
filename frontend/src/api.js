@@ -51,6 +51,13 @@ export const api={
   deleteAgent:id=>call(`/api/agents/${id}`,{method:'DELETE'}),
   run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',body:body({message,session_id,use_published,version})}),
   approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',body:body({session_id,approve})}),
+  draftAgent:(message,current,history)=>call('/api/agents/draft',{method:'POST',body:body({message,current,history})}),
+  validateSteps:steps=>call('/api/agents/validate-steps',{method:'POST',body:body({steps})}),
+  startStepRun:(id,inputs,use_published=false,version)=>call(`/api/agents/${id}/step-runs`,{method:'POST',body:body({inputs,use_published,version})}),
+  listStepRuns:id=>call(`/api/agents/${id}/step-runs`),
+  getStepRun:id=>call(`/api/step-runs/${id}`),
+  approveStepRun:(id,approve)=>call(`/api/step-runs/${id}/approve`,{method:'POST',body:body({approve})}),
+  uploadRunFile:(agentId,file)=>{const fd=new FormData();fd.append('file',file);return call(`/api/agents/${agentId}/run-files`,{method:'POST',body:fd},false)},
   // knowledge
   listDocs:()=>call('/api/knowledge'),
   uploadDoc:(file,category,department)=>{const fd=new FormData();fd.append('file',file);fd.append('category',category);fd.append('department',department);return call('/api/knowledge',{method:'POST',body:fd},false)},

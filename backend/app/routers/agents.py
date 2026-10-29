@@ -153,7 +153,7 @@ def draft_agent(body: AgentDraftIn, user: User = Depends(require_builder)):
         x = d.to_dict() or {}
         acts = conn_engine.TYPES.get(x.get("type", ""), {}).get("actions")
         if isinstance(acts, list) and x.get("enabled", True):
-            rows.append({"id": d.id, "label": x.get("name") or x.get("type", ""), "actions": [{"id": a["id"], "label": a["label"]} for a in acts]})
+            rows.append({"id": d.id, "label": x.get("label") or x.get("name") or x.get("type", ""), "actions": [{"id": a["id"], "label": a["label"]} for a in acts]})
     spaces = [{"id": d.id, "name": (d.to_dict() or {}).get("name", "")} for d in c.collection("spaces").stream() if _viewable(user, d.to_dict() or {})]
     try:
         out = agent_builder.draft(body.message, current=body.current, history=body.history, connector_rows=rows, space_rows=spaces, user_id=user.uid)

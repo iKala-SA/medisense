@@ -37,6 +37,7 @@ def test_a_run_follows_the_steps_and_resolves_references(fs, as_user, monkeypatc
     assert run["status"] == "succeeded" and [s["status"] for s in run["steps"]] == ["succeeded", "succeeded"]
     assert run["steps"][1]["input"] == "寫給東元的信" and "東元" in run["result"]
     assert "你是流程助理" in calls[0]["system"]  # the agent's instructions reach every AI step
+    assert "~~~document" not in calls[0]["system"]  # step outputs are plain text
     assert c.get(f"/api/step-runs/{run['id']}").json()["status"] == "succeeded"
     assert as_user(BUILDER2).get(f"/api/step-runs/{run['id']}").status_code == 404 and as_user(ADMIN).get(f"/api/step-runs/{run['id']}").status_code == 404
     assert [x["id"] for x in c.get(f"/api/agents/{aid}/step-runs").json()] == [run["id"]]

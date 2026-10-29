@@ -150,7 +150,7 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
         spec = connectors_engine.TYPES.get(d.get("type", ""), {})
         acts = spec.get("actions")
         act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
-        cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("name") or spec.get("label") or d.get("type", ""),
+        cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("label") or d.get("name") or spec.get("label") or d.get("type", ""),
                      "action": (act or {}).get("label") or action})
     return {"id": agent_id, "name": agent.name, "description": agent.description, "connectors": cons,
             "knowledge": bool(rag_files), "documents": len(agent.knowledge_doc_ids)}
