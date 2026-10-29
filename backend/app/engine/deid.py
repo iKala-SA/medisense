@@ -111,14 +111,14 @@ MAX_IMAGE_BYTES = 4_000_000  # Sensitive Data Protection's cap for redact_image
 def redact_image(data: bytes, mime: str) -> bytes:
     """Black out the personal data written in an image (names, ID / record numbers, phone, address, ...) with Sensitive Data
     Protection `redact_image`, and return the redacted image. Only this copy is stored and shown to a model; the original is
-    never kept. Same rule as text: no off switch, an error propagates and the request fails closed. Faces and handwriting are
+    never kept. Image inspection is not offered in asia-east1, so the call goes to IMAGE_DLP_LOCATION (default `global`). Same rule as text: no off switch, an error propagates and the request fails closed. Faces and handwriting are
     NOT detected: the user is told so in the UI. With IMAGE_REDACT_ALL_TEXT every piece of text is blacked out instead."""
     if mime not in IMAGE_TYPES:
         raise ValueError(f"unsupported image type {mime}")
     s = settings()
     types = [{"name": t} for t in FALLBACK_INFO_TYPES]
     req: dict = {
-        "parent": f"projects/{s.google_cloud_project}/locations/{s.region}",
+        "parent": f"projects/{s.google_cloud_project}/locations/{s.image_dlp_location}",
         "byte_item": {"type_": getattr(dlp_v2.ByteContentItem.BytesType, IMAGE_TYPES[mime]), "data": data},
         "inspect_config": {"info_types": types, "min_likelihood": "POSSIBLE"},
         "image_redaction_configs": [{"redact_all_text": True}] if s.image_redact_all_text else [{"info_type": t} for t in types],

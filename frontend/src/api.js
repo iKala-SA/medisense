@@ -127,7 +127,7 @@ export const api={
   testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),
   // model registry (admin)
   modelCatalog:()=>call('/api/model-registry/catalog'),
-  registerCatalogModel:(key,api_base='')=>call(`/api/model-registry/catalog/${key}/register`,{method:'POST',body:body({api_base})}),
+  registerCatalogModel:(key,b={})=>call(`/api/model-registry/catalog/${key}/register`,{method:'POST',body:body(b)}),
   listModelRegistry:()=>call('/api/model-registry'),
   createModelEntry:m=>call('/api/model-registry',{method:'POST',body:body(m)}),
   updateModelEntry:(id,m)=>call(`/api/model-registry/${id}`,{method:'PUT',body:body(m)}),

@@ -33,3 +33,22 @@ def test_catalog_is_admin_only_and_any_provider_can_be_applied(fs, as_user):
     azure = {"name": "GPT", "provider": "azure", "litellm_model": "azure/gpt-5.4", "group": "reasoning"}
     assert c.post("/api/model-registry", json=azure).status_code == 201
     assert c.get("/api/model-registry/providers").status_code in (404, 405, 422)
+
+
+def test_claude_models_come_through_vertex_and_azure_needs_its_three_fields(fs, as_user):
+    c = as_user(ADMIN)
+    r = c.post("/api/model-registry/catalog/claude-sonnet-5-5/register", json={})
+    assert r.status_code == 201 and r.json()["litellm_model"] == "vertex_ai/claude-sonnet-5-5" and not r.json()["secret_name"]
+    az = "/api/model-registry/catalog/azure-openai/register"
+    assert c.post(az, json={"api_base": "https://x.openai.azure.com", "secret_name": "azure-key"}).status_code == 422  # no deployment
+    assert c.post(az, json={"deployment": "gpt-5", "secret_name": "azure-key"}).status_code == 422  # no endpoint
+    assert c.post(az, json={"deployment": "gpt-5", "api_base": "https://x.openai.azure.com"}).status_code == 422  # no secret name
+    assert c.post(az, json={"deployment": "gpt-5", "api_base": "https://x.openai.azure.com", "secret_name": "sk-real key!"}).status_code == 422
+    ok = c.post(az, json={"deployment": "gpt-5", "api_base": "https://x.openai.azure.com", "secret_name": "azure-key"})
+    assert ok.status_code == 201, ok.text
+    row = ok.json()
+    assert row["litellm_model"] == "azure/gpt-5" and row["secret_name"] == "azure-key" and row["name"].endswith("（gpt-5）")
+    assert c.post(az, json={"deployment": "gpt-5", "api_base": "https://x.openai.azure.com", "secret_name": "azure-key"}).status_code == 409
+    assert c.post(az, json={"deployment": "gpt-5-mini", "api_base": "https://x.openai.azure.com", "secret_name": "azure-key"}).status_code == 201
+    yaml = fs.store["config/litellm_render"]["yaml"]
+    assert "azure/gpt-5" in yaml and "AZURE_KEY" in yaml and "vertex_ai/claude-sonnet-5-5" in yaml
