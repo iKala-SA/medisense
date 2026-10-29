@@ -1,5 +1,5 @@
 import React,{useState,useMemo,useEffect} from 'react';
-import {Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise,ArrowSquareOut} from '@phosphor-icons/react';
+import {Sparkle,CheckCircle,Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise,ArrowSquareOut} from '@phosphor-icons/react';
 import {api} from '../api';
 import {Toggle,ListToolbar,Empty} from '../ListKit';
 import {errText,useOnce,fmtTime} from './pkit';
@@ -26,27 +26,28 @@ export function LiveGroupTable({groups,failed}){
   </div>;
 }
 
-/* Cloud providers the security review has approved: a cloud model whose provider is not on this list cannot be enabled or deployed. */
-function ProviderApproval({notify,models}){
-  const [list,setList]=useState(null),[draft,setDraft]=useState(''),[busy,setBusy]=useState(false),[who,setWho]=useState('');
-  useEffect(()=>{api.modelProviders().then(r=>{setList(r.approved||[]);setWho(r.updated_by||'')}).catch(e=>{setList(false);notify('無法載入已核准供應商：'+errText(e))})},[]);// eslint-disable-line
-  const used=[...new Set((models||[]).filter(m=>m.deploy==='cloud'&&m.enabled).map(m=>String(m.litellm_model).split('/')[0].toLowerCase()))];
-  const pending=list?used.filter(p=>!list.includes(p)):[];
-  async function save(next,msg){
-    if(next.length<list.length&&!window.confirm('移除後，使用這個供應商的已啟用模型將無法再儲存或部署。確定？'))return;
-    setBusy(true);
-    try{const r=await api.saveModelProviders(next);setList(r.approved);setWho(r.updated_by||'');setDraft('');notify(msg)}catch(e){notify('儲存失敗：'+errText(e))}finally{setBusy(false)}
-  }
-  if(list===null)return null;
-  if(list===false)return <div className="lv-o-banner bad"><Warning size={16}/><div>無法載入已核准的雲端供應商清單。</div></div>;
-  return <section className="panel lv-o-card" style={{margin:'0 0 14px'}}><h3><Lock size={15} style={{verticalAlign:-2,marginRight:6}}/>已核准的雲端供應商</h3>
-    <p className="muted small" style={{margin:'4px 0 10px'}}>只有通過資安審核的雲端供應商，其模型才能啟用並套用到 LiteLLM（供應商是模型字串 <span className="lv-o-mono">litellm_model</span> 斜線前的部分，例如 vertex_ai、azure、bedrock）。地端模型不受此限。每次變更都會寫入稽核記錄。</p>
-    <div className="lv-p-chips" style={{marginTop:0}}>{list.map(p=><span key={p} className="badge">{p}<button type="button" aria-label={'移除 '+p} disabled={busy} onClick={()=>save(list.filter(x=>x!==p),'已移除供應商 '+p)} style={{marginLeft:6}}>×</button></span>)}{!list.length&&<span className="muted small">尚未核准任何雲端供應商</span>}</div>
-    <div className="inline" style={{marginTop:10,gap:8,alignItems:'center'}}><input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="供應商名稱，例如 azure" style={{width:220}} aria-label="新增供應商"/>
-      <button className="btn" disabled={busy||!/^[A-Za-z0-9_-]{2,40}$/.test(draft.trim())||list.includes(draft.trim().toLowerCase())} onClick={()=>save([...list,draft.trim().toLowerCase()],'已核准供應商 '+draft.trim().toLowerCase())}>核准</button>
-      {who&&<span className="muted small">上次由 {who} 變更</span>}</div>
-    {pending.length>0&&<div className="lv-o-banner" style={{marginTop:10}}><Warning size={15}/><div>已啟用的模型使用了<b>尚未核准</b>的供應商：{pending.join('、')}。在核准前，這些模型無法套用到 LiteLLM。</div></div>}
-  </section>;
+/* 可選模型: models that can be registered with one click. Registering adds it to the registry; 套用到 LiteLLM makes it usable. */
+function CatalogView({items,onRegister,pending,onApply,busy}){
+  const [ask,setAsk]=useState(null),[base,setBase]=useState(''),[err,setErr]=useState('');
+  if(items===null)return <div className="lv-o-loading">載入中…</div>;
+  const reg=async(m,api_base)=>{setErr('');try{await onRegister(m,api_base);setAsk(null);setBase('')}catch(e){setErr(errText(e))}};
+  return <>
+    {pending&&<div className="lv-o-banner"><Info size={16}/><div>已註冊的模型<b>尚未套用到 LiteLLM</b>，套用後才能在對話中選用。</div><button className="btn primary" disabled={!!busy} onClick={onApply} style={{marginLeft:'auto'}}><UploadSimple/>套用到 LiteLLM</button></div>}
+    <div className="mc-grid">{items.map(m=><div className={'mc-card'+(m.registered?' on':'')} key={m.key}>
+      <span className="mc-ico">{m.deploy==='onprem'?<Cpu size={20}/>:<Sparkle size={20} weight="fill" color="#4285f4"/>}</span>
+      <div className="mc-txt"><b>{m.name}</b><small>{m.description}</small>
+        <span className="mc-tags"><span className="badge">{m.provider}</span><span className="badge">{m.deploy==='onprem'?'地端':'雲端'}</span><span className="badge">{m.group}</span></span></div>
+      {m.registered?<span className="mc-done"><CheckCircle size={18} weight="fill"/>已註冊</span>
+        :<button className="btn primary mc-btn" disabled={!!busy} onClick={()=>m.needs_api_base?(setAsk(m),setBase(''),setErr('')):reg(m,'')}>註冊</button>}
+    </div>)}</div>
+    {err&&!ask&&<p className="lv-o-err" role="alert" style={{marginTop:10}}>{err}</p>}
+    {ask&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAsk(null)}}><form className="modal" role="dialog" aria-modal="true" aria-label={'註冊 '+ask.name} onSubmit={e=>{e.preventDefault();if(!base.trim()){setErr('請填寫伺服器位址');return}reg(ask,base.trim())}}>
+      <h2>註冊 {ask.name}</h2><p className="muted small">這是院內自架的模型。請填寫伺服器的 OpenAI 相容 API 位址，例如 <span className="lv-o-mono">http://10.0.0.5:8001/v1</span>。</p>
+      <div className="field"><label>API 位址</label><input autoFocus value={base} onChange={e=>setBase(e.target.value)} placeholder="http://vllm.internal:8000/v1"/></div>
+      {err&&<p className="lv-o-err" role="alert">{err}</p>}
+      <div className="modal-actions"><button type="button" className="btn" onClick={()=>setAsk(null)}>取消</button><button className="btn primary">註冊</button></div>
+    </form></div>}
+  </>;
 }
 
 function validate(f){
@@ -129,12 +130,14 @@ function SmartRouterCard({items,smart,onSaved,notify}){
 export default function ModelRegistryPage({me,notify}){
   const admin=me?.role==='admin';
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false);
-  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('registry');
-  const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState(''),[smart,setSmart]=useState(null);
+  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false);
+  const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
+  async function loadCat(){try{setCat(await api.modelCatalog())}catch(e){setCat([]);notify('無法載入可選模型：'+errText(e))}}
+  async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 LiteLLM`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}
-    if(admin){load();api.litellmDeploy().then(setDeploy).catch(()=>{});api.getSmartRouter().then(setSmart).catch(()=>{})}
+    if(admin){load();loadCat();api.litellmDeploy().then(setDeploy).catch(()=>{})}
   });
   // Follow the GitHub Actions run until it finishes.
   useEffect(()=>{

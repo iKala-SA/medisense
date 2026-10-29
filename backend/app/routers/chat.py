@@ -14,16 +14,17 @@ import queue
 import re
 import threading
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from google.cloud import firestore
 
 from .. import db
 from ..auth import User, current_user, require_builder
 from ..config import settings
-from ..engine import deid, llm
+from ..engine import chat_images, deid, llm, routing
 from ..engine.extract import NoTextError, extract_text
 from ..schemas import DEPARTMENTS, AgentIn, AttachmentOut, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments
 from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
@@ -73,6 +74,9 @@ def _attachment_context(sess: dict) -> str:
     atts = sess.get("attachments") or []
     if not atts:
         return ""
+    atts = [a for a in atts if a.get("kind") != "image"]  # images travel as image parts of the message, not as text
+    if not atts:
+        return ""
     body = "\n\n".join(f"[附件：{a.get('name', '')}]\n{a.get('text', '')}" for a in atts)
     return f"以下為使用者上傳的附件內容（已去識別化），回答時可引用：\n{body}"
 
@@ -108,6 +112,9 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         raise HTTPException(403, "not your session")
     if existing.get("locked"):
         raise HTTPException(409, "conversation is locked")
+    images = chat_images.parts_for(existing.get("attachments") or [])
+    if images and (agent.routing.sovereign_only or routing.sovereign_only()):
+        raise HTTPException(409, "僅院內模型不支援圖片，請移除圖片或關閉「僅院內模型」")
     extra = {"kind": "chat", "agent_id": agent_id}
     if body.project_id and not existing.get("project_id"):  # only a conversation without a project can be filed
         own_project(body.project_id, user)
@@ -115,9 +122,9 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
                 audit_action="chat.run",
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": body.web_search, "knowledge_docs": len(doc_ids),
-                             "attachments": len(existing.get("attachments") or [])},
+                             "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing), session_extra=extra,
-                pin_model=body.model, web_search=body.web_search)
+                pin_model=body.model, web_search=body.web_search, images=images or None)
 
 
 @router.post("", response_model=RunResponse)
@@ -161,6 +168,8 @@ async def chat_stream(body: ChatRequest, user: User = Depends(current_user)):
 async def add_attachment(file: UploadFile = File(...), session_id: str | None = Form(None), user: User = Depends(current_user)):
     """Extract text from an upload (same types and MAX_UPLOAD_MB limit as the knowledge library), de-identify it,
     store the masked text on the session (created if session_id is omitted) and return a snippet."""
+    if Path(file.filename or "").suffix.lower() in IMAGE_SUFFIXES:
+        return await _add_image(file, session_id, user)
     filename, suffix, data = await _read_upload(file)
     sid = session_id or uuid.uuid4().hex
     ref = db.client().collection("sessions").document(sid)
@@ -181,6 +190,65 @@ async def add_attachment(file: UploadFile = File(...), session_id: str | None = 
     ref.set(sess)
     db.audit(user.uid, "chat.attach", user.email, session_id=sid, file=filename, chars=len(text))
     return AttachmentOut(session_id=sid, attachment_id=att["id"], name=filename, chars=len(text), snippet=text[:SNIPPET])
+
+
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp"}
+
+
+async def _add_image(file: UploadFile, session_id: str | None, user: User) -> AttachmentOut:
+    """A pasted / picked image: type checked from its bytes, personal data blacked out (fail closed), only that copy kept."""
+    name = Path(file.filename or "image.png").name
+    data = await file.read()
+    if len(data) > deid.MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"image exceeds {deid.MAX_IMAGE_BYTES // 1_000_000} MB")
+    mime = chat_images.sniff(data)
+    if not mime:
+        raise HTTPException(415, "unsupported image; use PNG, JPEG or BMP")
+    sid = session_id or uuid.uuid4().hex
+    ref = db.client().collection("sessions").document(sid)
+    sess = ref.get().to_dict() or {"agent_id": "", "uid": user.uid, "messages": [], "created_at": db.now(), "kind": "chat"}
+    if sess.get("uid") != user.uid:
+        raise HTTPException(403, "not your session")
+    atts = sess.get("attachments") or []
+    if len(atts) >= MAX_ATTACHMENTS or sum(1 for a in atts if a.get("kind") == "image") >= chat_images.MAX_IMAGES:
+        raise HTTPException(409, f"at most {chat_images.MAX_IMAGES} images per conversation")
+    try:
+        aid, path = await run_in_threadpool(chat_images.save, user.uid, sid, data, mime)
+    except Exception as exc:  # noqa: BLE001 - redaction failed: nothing is stored and nothing reaches a model
+        log.exception("image redaction failed")
+        raise HTTPException(502, "圖片的個資遮蔽失敗，未上傳；請稍後再試") from exc
+    sess["attachments"] = [*atts, {"id": aid, "name": name, "chars": 0, "kind": "image", "mime": mime, "blob": path, "text": "", "at": db.now()}]
+    sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
+    ref.set(sess)
+    db.audit(user.uid, "chat.attach_image", user.email, session_id=sid, file=name, bytes=len(data))
+    return AttachmentOut(session_id=sid, attachment_id=aid, name=name, chars=0, snippet="", kind="image")
+
+
+@router.get("/attachments/{session_id}/{att_id}/image")
+def attachment_image(session_id: str, att_id: str, user: User = Depends(current_user)):
+    """The stored (redacted) copy of one of the caller's own images, for the thumbnail."""
+    sess = db.client().collection("sessions").document(session_id).get().to_dict() or {}
+    att = next((a for a in sess.get("attachments") or [] if a.get("id") == att_id and a.get("kind") == "image"), None)
+    if not att or sess.get("uid") != user.uid:
+        raise HTTPException(404, "image not found")
+    return Response(chat_images.load(att["blob"]), media_type=att.get("mime", "image/png"), headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.delete("/attachments/{session_id}/{att_id}", status_code=204)
+def remove_attachment(session_id: str, att_id: str, user: User = Depends(current_user)):
+    ref = db.client().collection("sessions").document(session_id)
+    sess = ref.get().to_dict() or {}
+    atts = sess.get("attachments") or []
+    att = next((a for a in atts if a.get("id") == att_id), None)
+    if not att or sess.get("uid") != user.uid:
+        raise HTTPException(404, "attachment not found")
+    if sess.get("locked"):
+        raise HTTPException(409, "conversation is locked")
+    ref.update({"attachments": [a for a in atts if a.get("id") != att_id]})
+    if att.get("blob"):
+        chat_images.delete([att["blob"]])
+    db.audit(user.uid, "chat.attach_remove", user.email, session_id=session_id, attachment_id=att_id)
 
 
 ALLOWED_LIBRARY = (".pdf", ".txt", ".md", ".docx", ".pptx", ".html", ".csv", ".json")

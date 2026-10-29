@@ -5,6 +5,7 @@ from app.engine import litellm_config as lc
 
 from .conftest import ADMIN, BUILDER, PLAIN
 
+# (the registry no longer has an approved-provider list: models are registered from the catalog, see test_model_catalog.py)
 CLOUD = {"name": "Gemini Flash", "provider": "vertex", "litellm_model": "vertex_ai/gemini-3-flash-preview", "group": "fast"}
 AZURE = {"name": "GPT", "provider": "azure", "litellm_model": "azure/gpt-5.4", "group": "reasoning"}
 
@@ -40,41 +41,6 @@ def test_retention_can_be_switched_off(fs, as_user, monkeypatch):
     monkeypatch.setattr(settings(), "session_retention_days", 0)
     r = as_user(BUILDER).post("/api/chat", json={"message": "hi", "knowledge_scope": "general"}).json()
     assert fs.store[f"sessions/{r['session_id']}"]["expire_at"] is None
-
-
-def test_unapproved_cloud_providers_cannot_be_enabled_or_deployed(fs, as_user):
-    c = as_user(ADMIN)
-    assert c.get("/api/model-registry/providers").json()["approved"] == ["vertex_ai"]  # the reviewed default
-    assert c.post("/api/model-registry", json=CLOUD).status_code == 201
-    r = c.post("/api/model-registry", json=AZURE)
-    assert r.status_code == 409 and "azure" in r.text and "approved" in r.text
-    assert c.post("/api/model-registry", json={**AZURE, "enabled": False}).status_code == 201  # may be saved disabled
-    onprem = {"name": "oss", "litellm_model": "openai/gpt-oss-120b", "group": "sovereign", "deploy": "onprem", "api_base": "http://10.0.0.5:8001/v1"}
-    assert c.post("/api/model-registry", json=onprem).status_code == 201  # on-prem never needs approval
-    mid = next(m["id"] for m in c.get("/api/model-registry").json() if m["name"] == "GPT")
-    assert c.put(f"/api/model-registry/{mid}", json=AZURE).status_code == 409  # cannot flip it on either
-    r = c.put("/api/model-registry/providers", json={"approved": ["Vertex_AI", "azure", "azure", ""]})
-    assert r.status_code == 200 and r.json()["approved"] == ["vertex_ai", "azure"] and r.json()["updated_by"] == ADMIN.email
-    assert c.put(f"/api/model-registry/{mid}", json=AZURE).status_code == 200
-    assert c.put("/api/model-registry/providers", json={"approved": ["bad name!"]}).status_code == 422
-    assert as_user(BUILDER).put("/api/model-registry/providers", json={"approved": []}).status_code == 403
-
-
-def test_apply_refuses_models_whose_provider_was_unapproved_later(fs, as_user, monkeypatch):
-    c = as_user(ADMIN)
-    c.put("/api/model-registry/providers", json={"approved": ["vertex_ai", "azure"]})
-    for m in (CLOUD, {**CLOUD, "name": "Pro", "group": "reasoning"}, {**CLOUD, "name": "Cheap", "group": "budget"}, AZURE):
-        assert c.post("/api/model-registry", json=m).status_code == 201
-    c.put("/api/model-registry/providers", json={"approved": ["vertex_ai"]})  # the review withdrew azure
-    r = c.post("/api/model-registry/apply")
-    assert r.status_code == 409 and "azure" in r.text
-
-
-def test_provider_helpers():
-    rows = [{"litellm_model": "vertex_ai/x", "deploy": "cloud"}, {"litellm_model": "bedrock/y", "deploy": "cloud"},
-            {"litellm_model": "openai/z", "deploy": "onprem"}, {"litellm_model": "azure/q", "deploy": "cloud", "enabled": False}]
-    assert [lc.provider_of(m) for m in rows] == ["vertex_ai", "bedrock", "openai", "azure"]
-    assert [m["litellm_model"] for m in lc.unapproved(rows, ["vertex_ai"])] == ["bedrock/y"]
 
 
 def _conn(**kw):
