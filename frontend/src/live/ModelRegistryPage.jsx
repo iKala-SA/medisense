@@ -28,22 +28,27 @@ export function LiveGroupTable({groups,failed}){
 
 /* 可選模型: models that can be registered with one click. Registering adds it to the registry; 套用到 Medisense Model Gateway makes it usable. */
 function CatalogView({items,onRegister,pending,onApply,busy}){
-  const [ask,setAsk]=useState(null),[base,setBase]=useState(''),[err,setErr]=useState('');
+  const [ask,setAsk]=useState(null),[f,setF]=useState({api_base:'',secret_name:'',deployment:''}),[err,setErr]=useState('');
+  const needs=m=>m.needs_api_base||m.needs_secret||m.needs_deployment;
   if(items===null)return <div className="lv-o-loading">載入中…</div>;
-  const reg=async(m,api_base)=>{setErr('');try{await onRegister(m,api_base);setAsk(null);setBase('')}catch(e){setErr(errText(e))}};
+  const reg=async(m,body={})=>{setErr('');try{await onRegister(m,body);setAsk(null);setF({api_base:'',secret_name:'',deployment:''})}catch(e){setErr(errText(e))}};
   return <>
     {pending&&<div className="lv-o-banner"><Info size={16}/><div>已註冊的模型<b>尚未套用到 Medisense Model Gateway</b>，套用後才能在對話中選用。</div><button className="btn primary" disabled={!!busy} onClick={onApply} style={{marginLeft:'auto'}}><UploadSimple/>套用到 Medisense Model Gateway</button></div>}
     <div className="mc-grid">{items.map(m=><div className={'mc-card'+(m.registered?' on':'')} key={m.key}>
-      <span className="mc-ico">{m.deploy==='onprem'?<Cpu size={20}/>:<Sparkle size={20} weight="fill" color="#4285f4"/>}</span>
+      <span className="mc-ico">{m.deploy==='onprem'||m.provider==='Azure'?<Cpu size={20}/>:<Sparkle size={20} weight="fill" color={m.provider==='Anthropic'?'#d97757':'#4285f4'}/>}</span>
       <div className="mc-txt"><b>{m.name}</b><small>{m.description}</small>
         <span className="mc-tags"><span className="badge">{m.provider}</span><span className="badge">{m.deploy==='onprem'?'地端':'雲端'}</span><span className="badge">{m.group}</span></span></div>
       {m.registered?<span className="mc-done"><CheckCircle size={18} weight="fill"/>已註冊</span>
-        :<button className="btn primary mc-btn" disabled={!!busy} onClick={()=>m.needs_api_base?(setAsk(m),setBase(''),setErr('')):reg(m,'')}>註冊</button>}
+        :<button className="btn primary mc-btn" disabled={!!busy} onClick={()=>needs(m)?(setAsk(m),setF({api_base:'',secret_name:'',deployment:''}),setErr('')):reg(m)}>註冊</button>}
     </div>)}</div>
     {err&&!ask&&<p className="lv-o-err" role="alert" style={{marginTop:10}}>{err}</p>}
-    {ask&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAsk(null)}}><form className="modal" role="dialog" aria-modal="true" aria-label={'註冊 '+ask.name} onSubmit={e=>{e.preventDefault();if(!base.trim()){setErr('請填寫伺服器位址');return}reg(ask,base.trim())}}>
-      <h2>註冊 {ask.name}</h2><p className="muted small">這是院內自架的模型。請填寫伺服器的 OpenAI 相容 API 位址，例如 <span className="lv-o-mono">http://10.0.0.5:8001/v1</span>。</p>
-      <div className="field"><label>API 位址</label><input autoFocus value={base} onChange={e=>setBase(e.target.value)} placeholder="http://vllm.internal:8000/v1"/></div>
+    {ask&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAsk(null)}}><form className="modal" role="dialog" aria-modal="true" aria-label={'註冊 '+ask.name} onSubmit={e=>{e.preventDefault();
+      if(ask.needs_deployment&&!f.deployment.trim())return setErr('請填寫部署名稱');if(ask.needs_api_base&&!f.api_base.trim())return setErr('請填寫位址');if(ask.needs_secret&&!f.secret_name.trim())return setErr('請填寫 Secret 名稱');
+      reg(ask,{api_base:f.api_base.trim(),secret_name:f.secret_name.trim(),deployment:f.deployment.trim()})}}>
+      <h2>註冊 {ask.name}</h2><p className="muted small">{ask.description}</p>
+      {ask.needs_deployment&&<div className="field"><label>部署名稱（deployment）</label><input autoFocus value={f.deployment} onChange={e=>setF({...f,deployment:e.target.value})} placeholder="例如：gpt-5"/></div>}
+      {ask.needs_api_base&&<div className="field"><label>{ask.deploy==='onprem'?'API 位址（OpenAI 相容）':'資源位址（endpoint）'}</label><input autoFocus={!ask.needs_deployment} value={f.api_base} onChange={e=>setF({...f,api_base:e.target.value})} placeholder={ask.deploy==='onprem'?'http://vllm.internal:8000/v1':'https://貴院資源.openai.azure.com'}/></div>}
+      {ask.needs_secret&&<div className="field"><label>Secret 名稱</label><input value={f.secret_name} autoComplete="off" onChange={e=>setF({...f,secret_name:e.target.value})} placeholder="例如：azure-openai-key"/><span className="lv-o-help"><Lock size={11}/> 只填 Secret Manager 的「名稱」，金鑰內容請由維運人員在 Secret Manager 建立，絕不在此輸入。</span></div>}
       {err&&<p className="lv-o-err" role="alert">{err}</p>}
       <div className="modal-actions"><button type="button" className="btn" onClick={()=>setAsk(null)}>取消</button><button className="btn primary">註冊</button></div>
     </form></div>}
@@ -133,7 +138,7 @@ export default function ModelRegistryPage({me,notify}){
   const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false),[smart,setSmart]=useState(null);
   const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
   async function loadCat(){try{setCat(await api.modelCatalog())}catch(e){setCat([]);notify('無法載入可選模型：'+errText(e))}}
-  async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 Medisense Model Gateway`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
+  async function register(m,body){await api.registerCatalogModel(m.key,body);notify(`已註冊 ${m.name}，尚未套用到 Medisense Model Gateway`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}

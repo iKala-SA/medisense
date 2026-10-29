@@ -43,7 +43,7 @@ export default function RolePermissionsPage({role,onBack}){
     </div></div>
     <p className="subtitle">設定角色對各項資源可執行的操作：建立、讀取、更新與刪除。</p>
 
-    <div className="rl-role-bar">正在設定角色：<b>{role.label}</b><span className={'rl-tag'+(role.custom?' custom':'')}>{role.custom?'自訂':'系統預設'}</span></div>
+    <div className="rl-role-bar">正在設定角色：<b>{role.name}</b><span className={'rl-tag'+(role.custom?' custom':'')}>{role.custom?'自訂':'系統預設'}</span></div>
 
     <div className="lt-toolbar"><label className="search"><MagnifyingGlass size={16}/><input aria-label="搜尋" placeholder="搜尋資源名稱或說明" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>
 

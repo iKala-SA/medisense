@@ -18,7 +18,7 @@ export MODEL_ARMOR_LOCATION="${MODEL_ARMOR_LOCATION:-us-central1}"
 export MODEL_ARMOR_TEMPLATE_ID="${MODEL_ARMOR_TEMPLATE_ID:-esther-modelArmor}"
 # nova-2-lite region (role/token env stay unset locally so LiteLLM uses AWS_PROFILE_NAME).
 export BEDROCK_REGION="${BEDROCK_REGION:-ap-northeast-1}"
-# On-prem Gemma via Ollama. Default: local `ollama serve` (gemma3:4b pulled; gemma-3-12b needs `ollama pull gemma3:12b`).
+# On-prem Gemma via Ollama. Default: local `ollama serve` (needs `ollama pull gemma4:12b`, ~8 GB; gemma3 has no tool template).
 # To use the VM instead: gcloud compute start-iap-tunnel tcvgh-onprem-gemma 11434 --local-host-port=localhost:11435 --zone asia-east1-a
 # then OLLAMA_API_BASE=http://127.0.0.1:11435 ./run-local.sh
 export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://127.0.0.1:11434}"
