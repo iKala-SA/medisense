@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-ModelGroup = Literal["fast", "reasoning", "budget", "sovereign", "auto"]  # "auto" = resolved per call by config/routing
+ModelGroup = Literal["fast", "reasoning", "budget", "sovereign", "auto"]  # "auto" = smart-router (engine/routing.py)
 RealGroup = Literal["fast", "reasoning", "budget", "sovereign"]  # groups that exist as LiteLLM model_name aliases
 # Node palette (matches the Agent Studio design):
 #   input             user message / trigger
@@ -606,28 +606,12 @@ class SpaceDocuments(BaseModel):
 
 
 # ------------------------------------------------------------------ routing rules (config/routing)
-class RoutingRule(BaseModel):
-    id: str = Field(min_length=1, max_length=64)
-    name: str = Field(default="", max_length=120)
-    condition: Literal["complex", "simple", "all"] = "all"
-    group: RealGroup = "fast"
-    enabled: bool = True
-
-
 class RoutingConfigIn(BaseModel):
-    # 僅院內模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of rules, agent or node
-    # groups, and nothing falls back to a cloud model.
+    # 僅院內模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of agent or node groups,
+    # and nothing falls back to a cloud model.
     sovereign_only: bool = False
-    default_group: RealGroup = "fast"
-    fallback_group: RealGroup = "fast"
-    rules: list[RoutingRule] = Field(default_factory=list, max_length=50)
-
-    @model_validator(mode="after")
-    def _unique_ids(self) -> "RoutingConfigIn":
-        ids = [r.id for r in self.rules]
-        if len(ids) != len(set(ids)):
-            raise ValueError("rule ids must be unique")
-        return self
+    # Model Armor: every LLM call is screened by the gateway's `model-armor` guardrail before routing.
+    model_armor: bool = True
 
 
 class RoutingConfigOut(RoutingConfigIn):
@@ -637,13 +621,21 @@ class RoutingConfigOut(RoutingConfigIn):
 
 
 class RoutingTestIn(BaseModel):
-    text: str = Field(default="", max_length=20000)
+    text: str = Field(min_length=1, max_length=20000)
 
 
 class RoutingTestOut(BaseModel):
-    group: str
+    """One live call through the gateway with the SAVED switches, the way an "auto" agent would send it."""
+    ok: bool
+    status: int  # 200, or the gateway's HTTP status (400 when Model Armor blocks)
+    blocked: bool = False  # Model Armor rejected the prompt; no model was called
+    group: str  # model name sent to the gateway (smart-router, fast or sovereign)
     reason: str
-    matched_rule: str | None = None  # rule id, None when the default applied
+    model: str = ""  # model that actually answered
+    text: str = ""
+    error: str = ""
+    model_armor: bool
+    ms: int = 0
 
 
 # ------------------------------------------------------------------ model registry
@@ -667,6 +659,22 @@ class ModelEntryIn(BaseModel):
         if self.deploy == "cloud" and self.group == "sovereign":
             raise ValueError("group 'sovereign' is on-prem only; a cloud model cannot be in it")
         return self
+
+
+class SmartRouterIn(BaseModel):
+    """Auto-routing (LiteLLM complexity router, model_name `smart-router`): each difficulty tier serves one registry
+    model (models/{id}). Rendered into config.yaml only when enabled and all four tiers resolve to enabled models."""
+    enabled: bool = False
+    simple: str = Field(default="", max_length=128)
+    medium: str = Field(default="", max_length=128)
+    complex: str = Field(default="", max_length=128)
+    reasoning: str = Field(default="", max_length=128)
+
+
+class SmartRouterOut(SmartRouterIn):
+    version: int = 0
+    updated_by: str = ""
+    updated_at: Any = None
 
 
 class ModelEntryOut(ModelEntryIn):

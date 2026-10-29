@@ -15,7 +15,7 @@ schedules/{id}                   agent runs on a rhythm: agent_id, frequency, ti
 schedule_locks/{id}_{slot}       one doc per schedule per minute, created atomically so a run happens once
 spaces/{id}                      groups of library documents: type, document_ids[], share, owner_*
 models/{id}                      model registry (provider models, group, deploy, prices, secret NAME)
-config/routing                   admin routing rules for model group "auto"
+config/routing                   hospital-wide switches: sovereign_only (僅院內模型), model_armor
 config/litellm_render            last rendered litellm config.yaml (never deployed by the API)
 (share-able docs also carry share_keys[] = "u:<email>" / "g:<groupId>" for list queries; see sharing.py)
 """

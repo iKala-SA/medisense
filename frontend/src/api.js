@@ -129,6 +129,8 @@ export const api={
   applyModelRegistry:()=>call('/api/model-registry/apply',{method:'POST'}),
   renderedModelConfig:()=>call('/api/model-registry/rendered'),
   litellmDeploy:()=>call('/api/model-registry/deploy'),
+  getSmartRouter:()=>call('/api/model-registry/smart-router'),
+  saveSmartRouter:v=>call('/api/model-registry/smart-router',{method:'PUT',body:body(v)}),
   // sessions + chat
   listSessions:(limit=30,cursor='')=>call(`/api/sessions?${query({limit,cursor})}`),
   getSession:id=>call(`/api/sessions/${id}`),

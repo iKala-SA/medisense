@@ -138,8 +138,12 @@ def _client() -> OpenAI:
 
 def complete(*, group: str, system: str, messages: list[dict], agent_id: str, user_id: str,
              temperature: float = 0.3, top_p: float | None = None, json_mode: bool = False) -> Completion:
-    """One chat completion through the proxy. `group` is a LiteLLM model group alias."""
-    if group not in GROUPS:  # "auto" is resolved by engine/routing before this point; never send it to LiteLLM
+    """One chat completion through the proxy. `group` is a LiteLLM model group alias, `smart-router`, or "auto".
+    While the 路由 page's Model Armor switch is on, the gateway screens the request first; a blocked prompt raises
+    openai.BadRequestError ("Content blocked by Model Armor")."""
+    if group == "auto":  # flow.pick_group resolves it already; direct callers get the same answer
+        group = routing.resolve_auto().group
+    if group not in GROUPS and group != routing.SMART_ROUTER:
         group = "fast"
     if routing.sovereign_only():  # 僅院內模型 backstop: callers already pick sovereign, but no path may reach a cloud group
         group = "sovereign"
@@ -150,17 +154,22 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         kwargs["top_p"] = top_p
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    resp = client.chat.completions.create(
+    extra: dict = {"metadata": {"agent_id": agent_id, "model_group": group, "tags": [f"agent:{agent_id}"]}}
+    if routing.model_armor():  # the guardrail is opt-in per request (default_on: false in litellm/config.yaml)
+        extra["guardrails"] = [routing.MODEL_ARMOR_GUARDRAIL]
+    raw = client.chat.completions.with_raw_response.create(
         model=group,
         messages=[{"role": "system", "content": system}, *messages],
         temperature=temperature,
         user=user_id,
-        # LiteLLM reads these for spend attribution and tag-based routing.
-        extra_body={"metadata": {"agent_id": agent_id, "model_group": group, "tags": [f"agent:{agent_id}"]}},
+        # LiteLLM reads metadata for spend attribution and tag-based routing.
+        extra_body=extra,
         **kwargs,
     )
+    resp = raw.parse()
     text = resp.choices[0].message.content or ""
-    model = normalize_model(getattr(resp, "model", None) or group)
+    # smart-router answers with model="smart-router"; the header names the deployment that really served it.
+    model = normalize_model(raw.headers.get("x-litellm-model-name") or getattr(resp, "model", None) or group)
     usage = getattr(resp, "usage", None)
     p_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
     c_tok = int(getattr(usage, "completion_tokens", 0) or 0)
@@ -174,18 +183,13 @@ def reset_client_cache() -> None:
 
 
 GROUPS = ("fast", "reasoning", "budget", "sovereign")  # real LiteLLM model_name aliases
-SELECTABLE_GROUPS = (*GROUPS, "auto")  # what agents and nodes can select; "auto" resolves to one of GROUPS (engine/routing.py)
+SELECTABLE_GROUPS = (*GROUPS, "auto")  # what agents and nodes can select; "auto" = smart-router or fast (engine/routing.py)
 _ROUTING_TTL = 300.0
 _routing_cache: tuple[float, list[dict]] | None = None
 
 
-def routing_table() -> list[dict]:
-    """What each selectable group really runs, read from the live LiteLLM proxy (/model/info +
-    /router/settings) so the Studio labels cannot drift from litellm/config.yaml. Cached 5 min.
-    [{id, models: [provider model ids], fallbacks: [{name, models}], configured}]"""
-    global _routing_cache
-    if _routing_cache and time.monotonic() - _routing_cache[0] < _ROUTING_TTL:
-        return _routing_cache[1]
+def _gateway() -> tuple[list[dict], list[dict]]:
+    """Live LiteLLM /model/info entries and /router/settings fields."""
     import httpx
 
     s = settings()
@@ -197,6 +201,35 @@ def routing_table() -> list[dict]:
     with httpx.Client(timeout=10, headers=headers) as h:
         info = h.get(f"{base}/model/info").raise_for_status().json().get("data", [])
         fields = h.get(f"{base}/router/settings").raise_for_status().json().get("fields", [])
+    return info, fields
+
+
+_models_cache: tuple[float, frozenset[str]] | None = None
+
+
+def gateway_models() -> frozenset[str]:
+    """model_names the live gateway serves, cached 5 min. Never raises: an unreachable gateway yields an empty set
+    (retried after 30 s), so "auto" degrades to `fast` instead of failing the run here."""
+    global _models_cache
+    if _models_cache and time.monotonic() - _models_cache[0] < _ROUTING_TTL:
+        return _models_cache[1]
+    now = time.monotonic()
+    try:
+        names = frozenset(str(m.get("model_name", "")) for m in _gateway()[0])
+    except Exception:  # noqa: BLE001 - see docstring
+        names, now = frozenset(), now - _ROUTING_TTL + 30  # retry after 30 s
+    _models_cache = (now, names)
+    return names
+
+
+def routing_table() -> list[dict]:
+    """What each selectable group really runs, read from the live LiteLLM proxy (/model/info +
+    /router/settings) so the Studio labels cannot drift from litellm/config.yaml. Cached 5 min.
+    [{id, models: [provider model ids], fallbacks: [{name, models}], configured}]"""
+    global _routing_cache
+    if _routing_cache and time.monotonic() - _routing_cache[0] < _ROUTING_TTL:
+        return _routing_cache[1]
+    info, fields = _gateway()
     members: dict[str, list[str]] = {}
     for m in info:
         model = str((m.get("litellm_params") or {}).get("model") or "")

@@ -50,7 +50,9 @@ def _render(template: str, ctx: dict[str, str]) -> str:
     return _VAR.sub(lambda m: ctx.get(m.group(1), ""), template)
 
 
-COST_TIER = {"budget": 0, "fast": 1, "reasoning": 2}  # sovereign is a data-residency choice, not a cost tier
+# sovereign is a data-residency choice, not a cost tier. smart-router may pick the reasoning tier's model, so an agent
+# capped below reasoning gets its cap group instead.
+COST_TIER = {"budget": 0, "fast": 1, "reasoning": 2, routing.SMART_ROUTER: 2}
 
 
 def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str]:
@@ -59,7 +61,7 @@ def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str
     1. sovereign_only (the hospital-wide 僅院內模型 switch in config/routing, or the agent's own): every step
        on-prem, nothing overrides it, and there is no cloud fallback.
     2. the node's own group, else
-    3. (agent/node group "auto" is resolved through config/routing rules, see engine/routing.py)
+    3. (agent/node group "auto" = smart-router when the gateway serves it, else fast; see engine/routing.py)
        reasoning if the USER's message (not the rendered prompt, which may carry retrieved text)
        contains a reasoning keyword, else
     4. the agent's default group (model_group).
@@ -74,8 +76,8 @@ def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str
         "reasoning" if agent.model_group != "auto" and any(k.lower() in text for k in agent.routing.reasoning_keywords)
         else agent.model_group)
     auto_note = ""
-    if want == "auto":  # resolved by the admin's routing rules (config/routing)
-        res = routing.resolve_auto(user_text)
+    if want == "auto":
+        res = routing.resolve_auto()
         want, auto_note = res.group, f"auto：{res.reason}"
     cap = agent.routing.max_cost_tier
     if want in COST_TIER and COST_TIER[want] > COST_TIER[cap]:

@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from .. import db
 from ..auth import User, require_admin
 from ..engine import github_actions, litellm_config, llm
-from ..schemas import LitellmRenderOut, ModelEntryIn, ModelEntryOut
+from ..schemas import LitellmRenderOut, ModelEntryIn, ModelEntryOut, SmartRouterIn, SmartRouterOut
 
 router = APIRouter(prefix="/api/model-registry", tags=["model-registry"], dependencies=[Depends(require_admin)])
 
@@ -44,13 +44,23 @@ def _rows() -> list[dict]:
     return [{**(d.to_dict() or {}), "id": d.id} for d in _col().stream()]
 
 
+def _smart_ref():
+    return db.client().collection("config").document("smart_router")
+
+
+def _smart() -> dict:
+    snap = _smart_ref().get()
+    return (snap.to_dict() if snap.exists else None) or SmartRouterOut().model_dump()
+
+
 def _render(user: User) -> dict:
     """Render config.yaml from the current registry into config/litellm_render as the next version."""
     rows = _rows()
+    smart = _smart()
     ref = db.client().collection("config").document("litellm_render")
     prev = ref.get()
     version = int(((prev.to_dict() if prev.exists else None) or {}).get("version", 0)) + 1
-    data = {"yaml": litellm_config.render(rows), "version": version, "requested_by": user.email,
+    data = {"yaml": litellm_config.render(rows, smart), "version": version, "requested_by": user.email,
             "requested_at": db.now(), "status": "rendered", "secrets": litellm_config.required_secrets(rows)}
     ref.set(data)
     return data
@@ -119,6 +129,9 @@ def apply_registry(user: User = Depends(require_admin)):
     missing = litellm_config.missing_groups(rows)
     if missing:
         raise HTTPException(409, f"cannot deploy: no enabled model in group(s) {', '.join(missing)}")
+    bad = litellm_config.smart_router_problems(rows, _smart())
+    if bad:
+        raise HTTPException(409, f"cannot deploy: smart router tier(s) {', '.join(bad)} need an enabled model")
     deploy = db.client().collection("config").document("litellm_deploy")
     cur = deploy.get()
     if cur.exists and _refresh(cur.to_dict() or {}).get("status") not in DONE:
@@ -136,6 +149,28 @@ def apply_registry(user: User = Depends(require_admin)):
     db.audit(user.uid, "model.apply", user.email, version=data["version"],
              models=sum(1 for r in rows if r.get("enabled", True)))
     return LitellmRenderOut.model_validate(data)
+
+
+@router.get("/smart-router", response_model=SmartRouterOut)
+def get_smart_router():
+    return SmartRouterOut.model_validate(_smart())
+
+
+@router.put("/smart-router", response_model=SmartRouterOut)
+def put_smart_router(body: SmartRouterIn, user: User = Depends(require_admin)):
+    """Choose the model behind each difficulty tier of `smart-router`; re-renders the config (apply to deploy)."""
+    if body.enabled:
+        bad = litellm_config.smart_router_problems(_rows(), body.model_dump())
+        if bad:
+            raise HTTPException(422, f"choose an enabled model for tier(s): {', '.join(bad)}")
+    snap = _smart_ref().get()
+    version = int(((snap.to_dict() if snap.exists else None) or {}).get("version", 0)) + 1
+    data = {**body.model_dump(), "version": version, "updated_by": user.email, "updated_at": db.now()}
+    _smart_ref().set(data)
+    _render(user)
+    db.audit(user.uid, "model.smart_router", user.email, version=version, enabled=body.enabled,
+             tiers={t: getattr(body, t) for t in litellm_config.SMART_TIERS})
+    return SmartRouterOut.model_validate(data)
 
 
 @router.get("/{mid}", response_model=ModelEntryOut)

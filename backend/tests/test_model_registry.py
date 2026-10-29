@@ -1,4 +1,5 @@
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 import yaml
@@ -61,6 +62,15 @@ def test_render_structure():
 def test_render_empty_registry_is_valid():
     cfg = yaml.safe_load(lc.render([]))
     assert cfg["model_list"] == [] and cfg["router_settings"]["fallbacks"] == []
+
+
+def test_render_keeps_model_armor_guardrail():
+    # Applying a registry version must never drop the screening that litellm/config.yaml has.
+    rendered = yaml.safe_load(lc.render([]))["guardrails"]
+    hand_written = yaml.safe_load((Path(__file__).parents[1] / "litellm/config.yaml").read_text())["guardrails"]
+    assert rendered == hand_written
+    p = rendered[0]["litellm_params"]
+    assert p["mode"] == "pre_call" and p["default_on"] is False and rendered[0]["guardrail_name"] == "model-armor"
 
 
 GROUPS3 = [{**CLOUD, "name": f"M {g}", "group": g} for g in ("fast", "reasoning", "budget")]
@@ -161,3 +171,38 @@ def test_registry_read_never_raises(monkeypatch):
     assert llm.cost_usd("unknown-model", 10, 10) == 0.0
     assert llm.is_fallback("fast", "gemini-3-flash") is False
     llm.reset_registry_cache()
+
+
+def test_render_smart_router():
+    models = [
+        {"id": "a", "name": "Flash", "litellm_model": "vertex_ai/gemini-2.5-flash", "group": "fast"},
+        {"id": "b", "name": "Pro", "litellm_model": "vertex_ai/gemini-3.1-pro-preview", "group": "reasoning"},
+        {"id": "c", "name": "Off", "litellm_model": "x/y", "group": "fast", "enabled": False},
+    ]
+    smart = {"enabled": True, "simple": "a", "medium": "a", "complex": "b", "reasoning": "b"}
+    cfg = yaml.safe_load(lc.render(models, smart))
+    sr = next(m for m in cfg["model_list"] if m["model_name"] == "smart-router")["litellm_params"]
+    assert sr["model"] == "auto_router/complexity_router"
+    assert sr["complexity_router_config"] == {"tiers": {"SIMPLE": "flash", "MEDIUM": "flash", "COMPLEX": "pro", "REASONING": "pro"},
+                                              "classifier_type": "heuristic"}
+    assert sr["complexity_router_default_model"] == "flash"
+    # off / incomplete / pointing at a disabled model: no entry, and the problem is reported
+    assert "smart-router" not in lc.render(models, {**smart, "enabled": False})
+    assert lc.smart_router_problems(models, {**smart, "medium": "c", "simple": ""}) == ["simple", "medium"]
+    assert "smart-router" not in lc.render(models, {**smart, "medium": "c"})
+
+
+def test_smart_router_endpoint_and_apply_guard(fs, as_user, audit_log, gh):
+    c = as_user(ADMIN)
+    assert c.get("/api/model-registry/smart-router").json()["enabled"] is False
+    ids = [c.post("/api/model-registry", json=m).json()["id"] for m in GROUPS3]
+    assert as_user(BUILDER).put("/api/model-registry/smart-router", json={}).status_code == 403
+    assert c.put("/api/model-registry/smart-router", json={"enabled": True, "simple": ids[0]}).status_code == 422
+    body = {"enabled": True, "simple": ids[0], "medium": ids[0], "complex": ids[1], "reasoning": ids[1]}
+    r = c.put("/api/model-registry/smart-router", json=body)
+    assert r.status_code == 200 and r.json()["version"] == 1
+    assert "smart-router" in fs.store["config/litellm_render"]["yaml"]
+    assert any(a["action"] == "model.smart_router" for a in audit_log())
+    c.put(f"/api/model-registry/{ids[1]}", json={**GROUPS3[1], "enabled": False})  # a tier loses its model
+    assert "smart-router" not in fs.store["config/litellm_render"]["yaml"]
+    assert c.post("/api/model-registry/apply").status_code == 409 and gh.dispatched == []

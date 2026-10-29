@@ -25,6 +25,7 @@ PLAIN = User(uid="u-u1", email="user@example.com", name="User", role="user")
 def fs(monkeypatch):
     fake = FakeClient()
     monkeypatch.setattr(db, "client", lambda: fake)
+    monkeypatch.setattr(llm, "gateway_models", lambda: frozenset())  # "auto" -> fast; never call a real gateway
     llm.reset_registry_cache()
     routing.reset_cache()
     from app.auth import _cache
