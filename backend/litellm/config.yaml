@@ -39,7 +39,7 @@ model_list:
     provider: vertex_ai
 - model_name: nova-2-lite
   litellm_params:
-    model: bedrock/nova-2-lite
+    model: bedrock/jp.amazon.nova-2-lite-v1:0
     aws_region_name: os.environ/BEDROCK_REGION
     aws_role_name: os.environ/BEDROCK_ROLE_ARN
     aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
