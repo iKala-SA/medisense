@@ -128,7 +128,7 @@ main,.card-page{padding:24px 28px 40px;max-width:1480px}.page-heading{min-height
 /* List pages (技能 / 排程 / 模型 / 路由) */
 .sidebar-control{justify-content:flex-end}
 .page-heading .btn{flex-shrink:0}
-.lt-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:4px 0 16px;flex-wrap:wrap}.lt-toolbar .search{min-width:260px;height:38px}
+.lt-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:4px 0 16px;flex-wrap:wrap}.lt-toolbar .search{min-width:260px;height:38px}.lt-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .lt{border:1px solid #eaf0ed;border-radius:12px;background:#fff;overflow:hidden}
 .lt-head,.lt-row{display:grid;grid-template-columns:var(--cols);gap:16px;align-items:center;padding:13px 20px}
 .lt-head{background:#f9fcfb;color:#7c6e89;font-size:12px;font-weight:500}

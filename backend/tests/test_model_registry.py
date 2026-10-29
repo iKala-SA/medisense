@@ -59,6 +59,23 @@ def test_render_structure():
                                            {"secret": "onprem-vllm-api-key", "env": "ONPREM_VLLM_API_KEY"}]
 
 
+def test_render_bedrock_and_ollama_match_hand_written_config():
+    # nova-2-lite (keyless Bedrock) and the on-prem Gemma VM must survive an admin apply: the renderer has to emit
+    # exactly the litellm_params litellm/config.yaml carries for them.
+    models = [
+        {"id": "n", "name": "nova-2-lite", "litellm_model": "bedrock/jp.amazon.nova-2-lite-v1:0", "group": "budget", "deploy": "cloud"},
+        {"id": "g", "name": "gemma-4-12b", "litellm_model": "ollama_chat/gemma4:12b", "group": "sovereign", "deploy": "onprem",
+         "api_base": "os.environ/OLLAMA_API_BASE"},
+    ]
+    rendered = {m["model_name"]: m for m in yaml.safe_load(lc.render(models))["model_list"]}
+    hand = {m["model_name"]: m for m in yaml.safe_load((Path(__file__).parents[1] / "litellm/config.yaml").read_text())["model_list"]}
+    for name in ("nova-2-lite", "gemma-4-12b"):
+        assert rendered[name]["litellm_params"] == hand[name]["litellm_params"]
+    assert rendered["sovereign"]["litellm_params"]["api_base"] == "os.environ/OLLAMA_API_BASE"
+    assert "api_key" not in rendered["gemma-4-12b"]["litellm_params"]  # Ollama has no key; network-restricted instead
+    assert lc.required_secrets(models) == []
+
+
 def test_render_empty_registry_is_valid():
     cfg = yaml.safe_load(lc.render([]))
     assert cfg["model_list"] == [] and cfg["router_settings"]["fallbacks"] == []

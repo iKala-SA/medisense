@@ -1,6 +1,6 @@
 # Integration API (Medisense frontend <-> backend) — NEW endpoints
 
-All routes need `Authorization: Bearer <Firebase ID token>` unless noted. Roles: `admin` > `builder` > `user` (run-only).
+All routes need `Authorization: Bearer <Firebase ID token>` unless noted. Roles: `admin` > `builder` > `user` (run-only). The role list (`/api/roles`) shows the system roles `admin`, `builder`, `user` plus custom roles.
 Errors: `{"detail": "..."}` with 401/403/404/409/422/413/415/502. Timestamps are ISO-8601 strings. Existing endpoints are
 unchanged; everything below is additive. Backend cannot be exercised against real Firestore from this repo's tests, see "Notes".
 
@@ -15,6 +15,14 @@ unchanged; everything below is additive. Backend cannot be exercised against rea
 Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edit. Only owner/admin delete or change `share`.
 `my_role` on skills/schedules/spaces = caller's effective access: `owner | admin | edit | use`.
 `PUT .../share` takes a bare `Share` body and returns the full updated object. Group members must exist (422 otherwise).
+
+## Roles (admin-only, read-only so far; reads Firestore `roles`)
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/api/roles?search=&type=all\|system\|custom` | admin | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
+
+Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "suspended", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. Create, update and delete, and the per-resource matrix, are not implemented yet.
 
 ## Sharing
 

@@ -537,6 +537,31 @@ class DirectoryOut(BaseModel):
     groups: list[DirectoryGroup] = Field(default_factory=list)
 
 
+# ------------------------------------------------------------------ roles (admin-only)
+class RoleOut(BaseModel):
+    id: str
+    name: str = ""
+    en: str = ""
+    desc: str = ""
+    custom: bool = False
+    suspended: bool = False
+    member_count: int = 0  # users whose effective role is this id
+    permission_count: int = 0  # len(can); a label count, as the frontend shows it
+    can: list[str] = Field(default_factory=list)  # capability labels shown on the page, e.g. "發布核可"
+
+
+class RoleStats(BaseModel):
+    total_roles: int
+    system_roles: int
+    custom_roles: int
+    assigned_users: int
+
+
+class RoleListOut(BaseModel):
+    roles: list[RoleOut]
+    stats: RoleStats
+
+
 # ------------------------------------------------------------------ skills
 class SkillIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
@@ -632,7 +657,7 @@ class SpaceDocuments(BaseModel):
 
 # ------------------------------------------------------------------ routing rules (config/routing)
 class RoutingConfigIn(BaseModel):
-    # 僅院內模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of agent or node groups,
+    # 僅本地模型: hospital-wide switch. Every LLM call uses `sovereign` (on-prem) regardless of agent or node groups,
     # and nothing falls back to a cloud model.
     sovereign_only: bool = False
     # Model Armor: every LLM call is screened by the gateway's `model-armor` guardrail before routing.
@@ -855,7 +880,7 @@ class ChatRequest(BaseModel):
     model_group: ModelGroup = "auto"
     model: str | None = Field(default=None, max_length=120)  # pin one exact model from GET /api/models `models`
     project_id: str | None = Field(default=None, max_length=64)  # new conversations only: file the chat under this project
-    web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅院內模型)
+    web_search: bool = False  # the user switched 網路搜尋 on: the agent may use web_search (ignored under 僅本地模型)
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
     knowledge_scope: Literal["general", "selected", "all"] = "selected"
