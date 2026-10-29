@@ -18,7 +18,8 @@ keep our own copies. Vendor contracts (no training, retention, zero-retention op
 | Usage ledger has no prompt text | `engine/usage.py` | none |
 
 ## Still to confirm outside the code
-- Chat images: try the redaction on real screenshots (lab reports, wristbands, EMR screens) and decide whether `IMAGE_REDACT_ALL_TEXT` should be on; Sensitive Data Protection does not detect faces or handwriting, and images with no recognisable text pass through as they are. Images are not sent to on-prem models (they have no vision).
+- Chat images are redacted in `global`, not Taiwan (see the images row). Decided 2026-10-29: keep `global`, the feature matters more; revisit if the hospital's policy requires images to stay in Taiwan. Tested 2026-10-29 on a synthetic ID card: personal-data-only mode missed the ID number (`A123456789`), all-text mode blacked out everything, which is why all-text is the default.
+- Chat images: all text is blacked out by default (decided 2026-10-29); try it on real screenshots (lab reports, wristbands, EMR screens) to confirm nothing readable is left; Sensitive Data Protection does not detect faces or handwriting, and images with no recognisable text pass through as they are. Images are not sent to on-prem models (they have no vision).
 - Vertex AI project settings: data caching, abuse-monitoring log retention, whether zero retention can be requested, and the terms that
   apply to preview models; `global` is not a Taiwan region.
 - A signed DPA with audit and breach-notification rights for every cloud provider whose models are registered.
