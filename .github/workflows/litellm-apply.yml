@@ -52,4 +52,11 @@ jobs:
           YES=1 RENDER_DOC=litellm_deploy bash infra/09-apply-litellm-config.sh
 
       - name: Commit litellm/config.yaml
-        run: |D:${GITHUB_REF_NAME}"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add litellm/config.yaml
+          if git diff --cached --quiet; then echo "config.yaml unchanged"; exit 0; fi
+          git commit -m "LiteLLM config v${VERSION} applied from the admin Model registry" -m "Requested by: ${REQUESTED_BY:-unknown}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
