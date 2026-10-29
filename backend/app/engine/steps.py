@@ -206,6 +206,10 @@ def _do_step(st: Step, cfg: dict, ctx: dict[str, str], *, agent: AgentIn, agent_
         from . import rag
         from .capabilities import space_rag_files
         files = space_rag_files(user, [x for x in cfg.get("spaces") or [] if isinstance(x, str)]) if cfg.get("spaces") else rag_files  # 指定資源
+        if not files and agent.kind == "flow":  # a flow has no knowledge settings of its own: PRD 5.3.1 = everything the runner may see
+            from ..routers.chat import _all_visible_doc_ids
+            from ..routers.knowledge import resolve_rag_files
+            files = resolve_rag_files(_all_visible_doc_ids(user))
         if not files:
             return "（此 Agent 沒有設定知識來源）", [], prompt
         chunks = rag.retrieve(rag.hospital_corpus(), files, prompt, top_k=5)

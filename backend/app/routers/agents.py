@@ -16,7 +16,7 @@ from .. import db, sharing
 from ..auth import User, current_user, require_admin, require_builder
 from ..engine import steps as step_engine
 from ..engine.flow import validate_flow
-from ..schemas import AgentActivity, AgentDraftIn, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share, StepsIn
+from ..schemas import AgentActivity, AgentDraftIn, ImproveIn, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share, StepsIn
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 ACTIVITY_CAP = 50000  # agent.run audit rows read for today's sandbox activity
@@ -156,11 +156,21 @@ def draft_agent(body: AgentDraftIn, user: User = Depends(require_builder)):
             rows.append({"id": d.id, "label": x.get("label") or x.get("name") or x.get("type", ""), "actions": [{"id": a["id"], "label": a["label"]} for a in acts]})
     spaces = [{"id": d.id, "name": (d.to_dict() or {}).get("name", "")} for d in c.collection("spaces").stream() if _viewable(user, d.to_dict() or {})]
     try:
-        out = agent_builder.draft(body.message, current=body.current, history=body.history, connector_rows=rows, space_rows=spaces, user_id=user.uid)
+        out = agent_builder.draft(body.message, current=body.current, history=body.history, connector_rows=rows, space_rows=spaces, user_id=user.uid, kind=body.kind)
     except ValueError as exc:
         raise HTTPException(502, str(exc)) from exc
     db.audit(user.uid, "agent.draft", user.email, steps=len(out["agent"]["steps"]))
     return out
+
+
+@router.post("/improve")
+def improve_instructions(body: ImproveIn, user: User = Depends(require_builder)):
+    """The 改進 button: rewrite the role instructions to be clearer and more complete. Nothing is saved."""
+    from ..engine import agent_builder
+    try:
+        return {"instructions": agent_builder.improve(body.instructions, name=body.name, description=body.description, user_id=user.uid)}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, "無法改進指令，請稍後再試") from exc
 
 
 @router.post("/validate-steps")
@@ -177,7 +187,7 @@ def validate(flow: Flow, user: User = Depends(require_builder)):
 def update_agent(agent_id: str, body: AgentIn, user: User = Depends(require_builder)):
     snap = load_editable(agent_id, user)
     # `share` only changes through PUT /{id}/share; skill_ids only when the client sent it (older clients omit it).
-    optional = ("skill_ids", "icon", "opening_questions", "capabilities", "steps", "original_prompt")  # older clients omit these
+    optional = ("skill_ids", "icon", "opening_questions", "capabilities", "steps", "original_prompt", "kind")  # older clients omit these
     skip = {"share"} | {k for k in optional if k not in body.model_fields_set}
     data = {**body.model_dump(exclude=skip), "updated_at": db.now()}
     snap.reference.update(data)

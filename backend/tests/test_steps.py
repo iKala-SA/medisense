@@ -87,3 +87,29 @@ def test_draft_by_conversation_keeps_only_what_the_platform_understands(fs, as_u
     assert [s["id"] for s in a["steps"]] == ["s1", "s2", "s5"]  # unsupported type and the step on an invented connector are dropped
     assert out["problems"] == [] and "[PERSON]" in seen["messages"][-1]["content"] and "Slack 通報" in seen["messages"][-1]["content"]
     assert as_user(PLAIN).post("/api/agents/draft", json={"message": "x"}).status_code == 403
+
+
+def test_agent_kind_drafts_have_no_steps_and_instructions_can_be_improved(fs, as_user, monkeypatch):
+    import json
+
+    from app.engine import llm
+
+    seen = []
+
+    def fake(**kw):
+        seen.append(kw)
+        if kw["agent_id"] == "agent-builder" and "提示詞編輯" in kw["system"]:
+            return llm.Completion("```\n更清楚的指令\n```", "gemini-3-flash", 1, 1, 0.0, 1)
+        return llm.Completion(json.dumps({"reply": "好", "agent": {"name": "培訓", "instructions": "你是培訓助理", "steps": [{"id": "s1", "type": "text_input", "title": "x"}]}}), "gemini-3-flash", 1, 1, 0.0, 1)
+
+    monkeypatch.setattr(llm, "complete", fake)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    c = as_user(BUILDER)
+    out = c.post("/api/agents/draft", json={"message": "培訓助理", "kind": "agent"}).json()
+    assert "聊天代理程式" in seen[0]["system"] and out["agent"]["name"] == "培訓"
+    assert c.post("/api/agents", json={"name": "A", "kind": "agent"}).json()["kind"] == "agent"
+    assert c.post("/api/agents", json={"name": "F", "kind": "flow"}).json()["kind"] == "flow"
+    r = c.post("/api/agents/improve", json={"instructions": "你是助理"}).json()
+    assert r["instructions"] == "更清楚的指令"
+    assert as_user(PLAIN).post("/api/agents/improve", json={"instructions": "x"}).status_code == 403

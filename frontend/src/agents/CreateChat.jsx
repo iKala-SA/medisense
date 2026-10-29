@@ -4,7 +4,7 @@ import {api} from '../api';
 import {errText} from '../live/kit';
 import {STEP_TYPES,TONE,blankAgent} from './stepkit';
 
-const IDEAS=['每週一自動彙整急診科的客訴信，分類後寄給護理長','幫藥劑部做一個查詢院內藥品規範的助理，只能查院內文件','上傳合約後比對內部規範，標出風險條款'];
+const IDEAS=['每週彙整急診科的客訴，分類後整理成週報並通報護理長','輸入藥品名稱，查詢院內規範並產出一頁用藥重點','上傳合約，比對內部規範並標出風險條款'];
 
 /* Build an agent by conversation (PRD §4.1): chat on the left, the settings it produced on the right. Nothing is saved until 「建立草稿」. */
 export default function CreateChat({notify,onBack,onCreated}){
@@ -13,21 +13,21 @@ export default function CreateChat({notify,onBack,onCreated}){
   useEffect(()=>{end.current?.scrollIntoView({block:'end'})},[msgs,busy]);
   const send=async(t=text)=>{
     t=t.trim();if(!t||busy)return;setText('');setMsgs(m=>[...m,{role:'user',content:t}]);said.current.push(t);setBusy(true);
-    try{const r=await api.draftAgent(t,draft,msgs.map(m=>({role:m.role,content:m.content})));setDraft(r.agent);setProblems(r.problems||[]);setMsgs(m=>[...m,{role:'assistant',content:r.reply}])}
+    try{const r=await api.draftAgent(t,draft,msgs.map(m=>({role:m.role,content:m.content})),'flow');setDraft(r.agent);setProblems(r.problems||[]);setMsgs(m=>[...m,{role:'assistant',content:r.reply}])}
     catch(e){setMsgs(m=>[...m,{role:'error',content:'這次沒有成功產生設定：'+errText(e)+'。可以換個說法再試一次。'}])}finally{setBusy(false)}
   };
   const create=async()=>{
     setSaving(true);
-    try{const a=await api.createAgent({...blankAgent(),...draft,original_prompt:said.current.join('\n\n').slice(0,4000)});notify('已建立草稿，可以繼續調整');onCreated(a.id)}
+    try{const a=await api.createAgent({...blankAgent('flow'),...draft,kind:'flow',original_prompt:said.current.join('\n\n').slice(0,4000)});notify('已建立草稿，可以繼續調整');onCreated(a.id)}
     catch(e){notify(errText(e));setSaving(false)}
   };
   const errs=problems.filter(p=>p.level==='error');
   return <div className="ag-create">
-    <header className="ag-ehead slim"><button className="ag-back" onClick={onBack}><ArrowLeft size={14}/>所有 Agent</button><h2>用對話建立 Agent</h2></header>
+    <header className="ag-ehead slim"><button className="ag-back" onClick={onBack}><ArrowLeft size={14}/>所有流程</button><h2>用對話建立流程</h2></header>
     <div className="ag-cgrid">
       <section className="ag-cchat">
         <div className="ag-cmsgs">
-          {!msgs.length&&<div className="ag-cempty"><Sparkle size={26} weight="fill"/><h3>你想建立什麼樣的助理？</h3><p>用一兩句話描述目標，我會產生角色指令、能力與步驟流程，右邊可以即時看到，也能繼續用對話修改。</p>
+          {!msgs.length&&<div className="ag-cempty"><Sparkle size={26} weight="fill"/><h3>你想建立什麼樣的流程？</h3><p>用一兩句話描述要自動化的工作，我會產生步驟，右邊可以即時看到，也能繼續用對話修改。</p>
             <div>{IDEAS.map(i=><button key={i} onClick={()=>send(i)}>{i}</button>)}</div></div>}
           {msgs.map((m,i)=><div key={i} className={'ag-msg '+m.role}>{m.content}</div>)}
           {busy&&<div className="ag-msg assistant"><CircleNotch className="spin" size={14}/> 正在產生設定…</div>}

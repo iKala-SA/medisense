@@ -140,8 +140,15 @@ class StepsIn(BaseModel):
     steps: list[Step] = Field(default_factory=list, max_length=60)
 
 
+class ImproveIn(BaseModel):
+    name: str = Field(default="", max_length=80)
+    description: str = Field(default="", max_length=300)
+    instructions: str = Field(min_length=1, max_length=8000)
+
+
 class AgentDraftIn(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)
+    kind: Literal["agent", "flow"] = "flow"
+    message: str = Field(min_length=1, max_length=50000)
     current: dict[str, Any] | None = None  # the draft being edited (name, instructions, capabilities, steps, ...)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
 
@@ -186,6 +193,7 @@ class AgentIn(BaseModel):
     capabilities: Capabilities = Field(default_factory=Capabilities)
     steps: list[Step] = Field(default_factory=list, max_length=60)  # empty = a pure chat agent
     original_prompt: str = Field(default="", max_length=4000)  # what the creator typed when building it by conversation
+    kind: Literal["agent", "flow"] = "agent"  # agent = a chat persona; flow = a fixed sequence of steps (PRD "流程")
 
     @field_validator("opening_questions", mode="after")
     @classmethod

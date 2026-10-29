@@ -84,7 +84,7 @@ function CardBody({st,steps,connectors,pref}){
 }
 
 /** The canvas column: info banner, the agent card, the step cards, and 「新增步驟」. */
-export default function StepCanvas({steps,setSteps,sel,setSel,connectors,canEdit,agent}){
+export default function StepCanvas({steps,setSteps,sel,setSel,connectors,canEdit,agent,hideAgent=false}){
   const [add,setAdd]=useState(null),[anchor,setAnchor]=useState(null),[drag,setDrag]=useState(null),[over,setOver]=useState(null),[banner,setBanner]=useState(true);
   const problems=useMemo(()=>validate(steps),[steps]);
   const put=(i,type)=>{const s=newStep(type,steps);const n=[...steps];n.splice(i,0,s);setSteps(n);setSel(s.id)};
@@ -95,11 +95,11 @@ export default function StepCanvas({steps,setSteps,sel,setSel,connectors,canEdit
   return <div className="ag-canvascol" data-density={steps.length>=8?'mini':steps.length>=5?'compact':'normal'}>
     {banner&&<div className="ag-info"><Info size={20}/><span>步驟的輸入與輸出都會先去識別化再交給模型；寫入類動作預設要你核准後才會執行。</span><button aria-label="關閉" onClick={()=>setBanner(false)}><X size={16}/></button></div>}
     {errs>0&&<div className="ag-banner err" role="status"><Warning size={16}/><div><b>{errs} 個錯誤，修正後才能發布</b><ul>{problems.filter(p=>p.level==='error').slice(0,5).map((p,i)=><li key={i}><button type="button" onClick={()=>p.step_id&&setSel(p.step_id)}>{p.message}</button></li>)}</ul></div></div>}
-    <div className={'ag-node agentnode'+(sel==='agent'?' on':'')} onClick={()=>setSel('agent')}>
+    {!hideAgent&&<div className={'ag-node agentnode'+(sel==='agent'?' on':'')} onClick={()=>setSel('agent')}>
       <span className="grip off"/><Tile tone="agent"><span className="em">{agent.icon||'✦'}</span></Tile>
       <div className="bd"><h4>Agent 設定</h4><p className="pr">{(agent.instructions||'').slice(0,90)||'尚未填寫角色指令'}</p>
         <div className="chips">{cap.web_search&&<span className="ag-chip">網路搜尋</span>}{cap.connectors.length>0&&<span className="ag-chip">{cap.connectors.length} 個連接器</span>}{cap.spaces.length>0&&<span className="ag-chip">{cap.spaces.length} 個知識空間</span>}<span className="ag-chip">{PREF[cap.model_pref]}</span></div></div>
-    </div>
+    </div>}
     {steps.map((s,i)=>{const m=STEP_TYPES[s.type]||STEP_TYPES.llm_generate,I=m.icon,e=errFor(s.id);return <React.Fragment key={s.id}>
       <div className={'ag-gap'+(over===i?' over':'')} onDragOver={ev=>{if(drag!=null){ev.preventDefault();setOver(i)}}} onDrop={()=>{move(drag,i);setDrag(null);setOver(null)}}>
         {canEdit&&<span className="ag-gapbtn"><button type="button" aria-label="在這裡新增步驟" onClick={e=>{setAnchor(e.currentTarget);setAdd(add===i?null:i)}}><Plus size={14}/></button>{add===i&&<AddMenu anchor={anchor} onPick={t=>put(i,t)} onClose={()=>setAdd(null)}/>}</span>}</div>
@@ -109,7 +109,7 @@ export default function StepCanvas({steps,setSteps,sel,setSel,connectors,canEdit
           <CardBody st={s} steps={steps.slice(0,i)} connectors={connectors} pref={agent.capabilities.model_pref}/></div>
       </div></React.Fragment>})}
     {canEdit&&<div className="ag-addrow"><button type="button" className="ag-addpill" onClick={e=>{setAnchor(e.currentTarget);setAdd(add==='end'?null:'end')}}><Plus size={17}/>新增步驟</button>{add==='end'&&<AddMenu anchor={anchor} onPick={t=>put(steps.length,t)} onClose={()=>setAdd(null)}/>}</div>}
-    {!steps.length&&<p className="ag-muted center">沒有步驟時，這就是一個純對話 Agent。需要固定流程（輸入 → 查資料 → 產出 → 寄送）時，新增步驟。</p>}
+    {!steps.length&&<p className="ag-muted center">還沒有步驟。按「新增步驟」開始建立流程（輸入 → 查資料 → 產出 → 寄送）。</p>}
   </div>;
 }
 

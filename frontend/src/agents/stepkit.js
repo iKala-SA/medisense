@@ -61,10 +61,10 @@ export function summary(st,connectors=[]){
   if(st.type==='action'){const cn=connectors.find(x=>x.id===c.connector_id);return cn?`${cn.name||cn.label} · ${c.action||'未選動作'}`:'尚未選擇連接器'}
   return String(c.prompt||'').replace(REF,m=>'@…').slice(0,80)||'尚未填寫提示詞';
 }
-export const agentToIn=a=>({name:a.name,description:a.description||'',instructions:a.instructions||'',category:a.category,department:a.department||'',code:a.code||'',
+export const agentToIn=a=>({kind:a.kind||'agent',name:a.name,description:a.description||'',instructions:a.instructions||'',category:a.category,department:a.department||'',code:a.code||'',
   model_group:a.model_group,temperature:a.temperature,top_p:a.top_p,routing:a.routing,connectors:a.connectors||[],flow:a.flow,test_cases:a.test_cases||[],
   knowledge_doc_ids:a.knowledge_doc_ids||[],icon:a.icon||'',opening_questions:a.opening_questions||[],capabilities:a.capabilities,steps:a.steps||[],original_prompt:a.original_prompt||'',
   ...(a.skill_ids?{skill_ids:a.skill_ids}:{})});
-export const blankAgent=()=>({name:'新 Agent',description:'',instructions:'你是院內 AI 助理。請以繁體中文回答，語氣專業簡潔；病人資料已去識別化，不要嘗試還原。',category:'clinical',department:'',code:'',model_group:'auto',temperature:0.3,top_p:0.95,
+export const blankAgent=(kind='agent')=>({kind,name:kind==='flow'?'新流程':'新 Agent',description:'',instructions:kind==='flow'?'':'你是院內 AI 助理。請以繁體中文回答，語氣專業簡潔；病人資料已去識別化，不要嘗試還原。',category:'clinical',department:'',code:'',model_group:'auto',temperature:0.3,top_p:0.95,
   routing:{reasoning_keywords:['分析','比較','規劃','為什麼'],sovereign_only:false,max_cost_tier:'reasoning'},connectors:[],flow:{nodes:[],edges:[]},test_cases:[],knowledge_doc_ids:[],icon:'',opening_questions:[],
   capabilities:{web_search:false,spaces:[],connectors:[],model_pref:'balanced',thinking:'low'},steps:[],original_prompt:''});

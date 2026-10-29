@@ -35,7 +35,7 @@ export default function RunDrawer({agent,onClose,notify,onRan,inline}){
       </div>}
       {run&&<><RunView run={run} onChange={setRun} notify={notify}/><button className="ag-btn" onClick={()=>setRun(null)}>重新執行</button></>}
     </>:<div className="ag-minichat">
-      {!chat.length&&<p className="ag-muted">這個 Agent 沒有步驟流程，直接用對話測試它的角色指令與能力。</p>}
+      {!chat.length&&<p className="ag-muted">這個流程還沒有步驟。先到編輯器新增步驟再執行。</p>}
       {chat.map((m,i)=><div key={i} className={'mc-msg '+m.role}>{m.text}</div>)}
       {busy&&<div className="mc-msg assistant"><CircleNotch className="spin" size={14}/> 思考中…</div>}
     </div>}

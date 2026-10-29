@@ -4,7 +4,6 @@ import {api} from '../api';
 import {ShareDialog} from '../live/ShareLive';
 import {PublishTab,VersionsTab} from '../live/PublishTab';
 import {canEditAgent,statusBadges,errText} from '../live/kit';
-import SettingsPanel from './SettingsPanel';
 import StepCanvas,{StepEditPanel,Tile} from './StepsPanel';
 import RunDrawer from './RunDrawer';
 import RunView from './RunView';
@@ -26,12 +25,12 @@ function Runs({id,notify}){
 }
 
 export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChanged,initialTab='設定'}){
-  const [a,setA]=useState(null),[mode,setMode]=useState('edit'),[sel,setSel]=useState(initialTab==='步驟'?null:'agent'),[save,setSave]=useState('saved'),[savedAt,setSavedAt]=useState(null);
+  const [a,setA]=useState(null),[mode,setMode]=useState('edit'),[sel,setSel]=useState(null),[save,setSave]=useState('saved'),[savedAt,setSavedAt]=useState(null);
   const [menu,setMenu]=useState(false),[prompt,setPrompt]=useState(false),[share,setShare]=useState(false),[pub,setPub]=useState(false),[hist,setHist]=useState(false);
   const [lib,setLib]=useState({connectors:[],spaces:[],docs:[],features:null});
   const timer=useRef(null),latest=useRef(null),inflight=useRef(Promise.resolve());
   useEffect(()=>{
-    api.getAgent(id).then(x=>{const v=blankSafe(x);setA(v);latest.current=v;setSavedAt(x.updated_at);if(initialTab==='步驟'&&v.steps[0])setSel(v.steps[0].id)}).catch(e=>{notify(errText(e));onBack()});
+    api.getAgent(id).then(x=>{const v=blankSafe(x);setA(v);latest.current=v;setSavedAt(x.updated_at);if(v.steps[0])setSel(v.steps[0].id)}).catch(e=>{notify(errText(e));onBack()});
     Promise.allSettled([api.listConnectors(),api.listSpaces(),api.listDocs(),api.features()]).then(([c,s,d,f])=>setLib({connectors:c.value||[],spaces:(s.value||[]).map(x=>({id:x.id,name:x.name})),docs:(d.value||[]).filter(x=>x.status!=='failed').map(x=>({id:x.id,name:x.name})),features:f.value||null}));
   },[id]);// eslint-disable-line
   const canEdit=canEditAgent(a,me);
@@ -58,7 +57,6 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
     <button className="ag-btn big primary" onClick={async()=>{await flush();setPub(true)}}>發布</button>
     <div className="ag-menuwrap"><button className="ag-icon" aria-label="更多" aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={22} weight="bold"/></button>
       {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
-        {a.status==='published'&&<button role="menuitem" onClick={()=>onChat(a)}><Eye size={16}/>開始對話</button>}
         {a.original_prompt&&<button role="menuitem" onClick={()=>setPrompt(true)}><Eye size={16}/>查看原始提示詞</button>}
         <button role="menuitem" onClick={()=>download((a.name||'agent')+'.json',agentToIn(a))}><DownloadSimple size={16}/>匯出 JSON</button>
         <button role="menuitem" onClick={duplicate}><Copy size={16}/>複製為新草稿</button>
@@ -66,24 +64,24 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
   </>;
   return <div className="ag-editor v2">
     <header className="ag-top">
-      <button className="ag-back" onClick={back}><ArrowLeft size={14}/>所有 Agent</button>
+      <button className="ag-back" onClick={back}><ArrowLeft size={14}/>所有流程</button>
       <div className="ag-toprow">
         <div className="ag-titlebox">
           <div className="ag-line"><input className="ag-name big" value={a.name} maxLength={50} disabled={!canEdit} aria-label="名稱" onChange={e=>edit({name:e.target.value})}/>
             <button className={'ag-status '+status[1]} onClick={async()=>{await flush();setPub(true)}} title="發布狀態">{status[0]}<CaretDown size={13} weight="bold"/></button>
             <span className={'ag-save '+save} role="status">{save==='saving'?<><CircleNotch className="spin" size={14}/>儲存中</>:save==='dirty'?'編輯中…':save==='error'?<><Warning size={14}/>未儲存</>:<><Check size={14}/>儲存於 {clock(savedAt)}</>}</span></div>
-          <input className="ag-desc" value={a.description||''} maxLength={300} disabled={!canEdit} placeholder="新增描述（顯示在目錄與切換器）" aria-label="描述" onChange={e=>edit({description:e.target.value})}/></div>
+          <input className="ag-desc" value={a.description||''} maxLength={300} disabled={!canEdit} placeholder="新增描述（顯示在目錄）" aria-label="描述" onChange={e=>edit({description:e.target.value})}/></div>
         <div className="ag-tools">{tools}</div>
       </div>
     </header>
     {mode==='edit'?<div className="ag-canvas">
       <div className="ag-left">
-        {sel==='agent'||!sel||!a.steps.some(s=>s.id===sel)
-          ?<div className="ag-editbody"><div className="ag-editcard"><h3><Tile tone="agent" size={40}><span className="em">{a.icon||'✦'}</span></Tile><span className="ttl"><span className="t">Agent 設定</span><small>角色指令與能力</small></span></h3>
-            <SettingsPanel a={a} set={edit} canEdit={canEdit} features={lib.features} connectors={lib.connectors} spaces={lib.spaces} docs={lib.docs}/></div></div>
-          :<StepEditPanel steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} spaces={lib.spaces} canEdit={canEdit}/>}
+        {sel&&a.steps.some(s=>s.id===sel)
+          ?<StepEditPanel steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} spaces={lib.spaces} canEdit={canEdit}/>
+          :<div className="ag-editbody"><div className="ag-editcard"><h3><Tile tone="logic" size={40}><PencilSimple size={20}/></Tile><span className="ttl"><span className="t">編輯步驟</span><small>流程</small></span></h3>
+            <p className="ag-muted">從右邊選一個步驟來編輯它的設定，或按「新增步驟」開始建立流程。每個步驟都可以用 @ 引用前面步驟的輸出。</p></div></div>}
       </div>
-      <StepCanvas steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel||'agent'} setSel={setSel} connectors={lib.connectors} canEdit={canEdit} agent={a}/>
+      <StepCanvas hideAgent steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} canEdit={canEdit} agent={a}/>
     </div>
     :<div className="ag-canvas run"><RunDrawer inline agent={a} notify={notify} onClose={()=>setMode('edit')}/></div>}
     {hist&&<div className="ag-modal" onClick={()=>setHist(false)}><div className="ag-dialog wide" onClick={e=>e.stopPropagation()}><h3>執行紀錄</h3><Runs id={id} notify={notify}/><div><button className="ag-btn" onClick={()=>setHist(false)}>關閉</button></div></div></div>}
