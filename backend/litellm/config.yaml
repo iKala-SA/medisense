@@ -1,168 +1,98 @@
-# LiteLLM proxy config — the "model gateway & routing" box (column D) of the diagram.
-# Agents never name a vendor model. They pick a GROUP (fast / reasoning / budget / sovereign);
-# the router picks the primary and fails over down the chain. Swapping a model = editing this file.
-#
-# Live now (sandbox): Vertex AI Gemini via the Cloud Run service account (ADC, no API keys).
-# VERIFIED 2026-10-23: no Gemini model answers on the asia-east1 regional endpoint. Gemini 3 Flash /
-# 3.1 Pro are preview IDs on the `global` endpoint only; Gemini 2.5 is on global + US regions.
-# => VERTEX_LOCATION=global. Cloud models only ever see de-identified text (option B), so this is
-#    acceptable, but it must be stated to TCVGH: Gemini inference is not Taiwan-resident today.
-# Live: Bedrock nova-2-lite (keyless OIDC). Commented: on-prem vLLM (needs VPN), Azure OpenAI GPT-5.4 Data Zone, other Bedrock.
-
+# Rendered from the model registry by the Agent Platform admin UI. Do not hand-edit: apply a new
+# registry version instead. Secrets are env references; mount them from Secret Manager (see platform docs).
 model_list:
-  # ---------- Vertex AI, asia-east1 (in-region) ----------
-  - model_name: gemini-3-flash
-    litellm_params:
-      model: vertex_ai/gemini-3-flash-preview
-      vertex_project: os.environ/VERTEX_PROJECT
-      vertex_location: os.environ/VERTEX_LOCATION
-    model_info: { region: global, phi_ok_deidentified: true, capability_tier: fast }
-
-  - model_name: gemini-3.1-pro
-    litellm_params:
-      model: vertex_ai/gemini-3.1-pro-preview
-      vertex_project: os.environ/VERTEX_PROJECT
-      vertex_location: os.environ/VERTEX_LOCATION
-    model_info: { region: global, phi_ok_deidentified: true, capability_tier: reasoning }
-
-  # Known-good fallback.
-  - model_name: gemini-2.5-flash
-    litellm_params:
-      model: vertex_ai/gemini-2.5-flash
-      vertex_project: os.environ/VERTEX_PROJECT
-      vertex_location: os.environ/VERTEX_LOCATION
-    model_info: { region: global, capability_tier: fast }
-
-  # ---------- On-prem vLLM over HA VPN (1x H200). Enable when the tunnel exists. ----------
-  # - model_name: gpt-oss-20b
-  #   litellm_params:
-  #     model: openai/gpt-oss-20b
-  #     api_base: http://10.x.x.x:8000/v1          # private IP across the VPN
-  #     api_key: os.environ/ONPREM_VLLM_API_KEY
-  #     rpm: 60                                     # single-GPU capacity cap
-  #   model_info: { region: on-prem, sovereign: true, capability_tier: fast }
-  # - model_name: gpt-oss-120b
-  #   litellm_params: { model: openai/gpt-oss-120b, api_base: http://10.x.x.x:8001/v1, api_key: os.environ/ONPREM_VLLM_API_KEY, rpm: 30 }
-  #   model_info: { region: on-prem, sovereign: true, capability_tier: reasoning }
-  # - model_name: gemma-4-26b-a4b
-  #   litellm_params: { model: openai/gemma-4-26b-a4b, api_base: http://10.x.x.x:8002/v1, api_key: os.environ/ONPREM_VLLM_API_KEY, rpm: 60 }
-  #   model_info: { region: on-prem, sovereign: true, capability_tier: budget }
-
-  # ---------- Azure OpenAI, Data Zone deployment (outside Taiwan; de-identified text only) ----------
-  # - model_name: gpt-5.4
-  #   litellm_params:
-  #     model: azure/gpt-5.4                        # Azure deployment name
-  #     api_base: https://<resource>.openai.azure.com
-  #     api_key: os.environ/AZURE_OPENAI_API_KEY
-  #     api_version: "2025-04-01-preview"
-  #   model_info: { region: azure-data-zone, capability_tier: reasoning }
-
-  # ---------- Amazon Bedrock, cross-region inference (outside Taiwan; de-identified text only) ----------
-  # - model_name: claude-sonnet-4.6
-  #   litellm_params: { model: bedrock/apac.anthropic.claude-sonnet-4-6, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
-  #   model_info: { region: aws-cross-region, capability_tier: reasoning }
-  # - model_name: claude-haiku-4.5
-  #   litellm_params: { model: bedrock/apac.anthropic.claude-haiku-4-5, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
-  #   model_info: { region: aws-cross-region, capability_tier: budget }
-  # Live 2026-10-27. Standalone model_name (not in any group), so TCVGH agents never route to it.
-  # No `apac.` profile exists for Nova 2 Lite; `jp.` keeps inference in Japan (`global.` would not).
-  # Keyless auth: on Cloud Run the two env vars are set and LiteLLM swaps the service account's Google
-  # ID token for temporary AWS credentials (STS AssumeRoleWithWebIdentity). Locally they are unset and
-  # LiteLLM falls back to AWS_PROFILE_NAME (an `aws login` profile).
-  - model_name: nova-2-lite
-    litellm_params:
-      model: bedrock/jp.amazon.nova-2-lite-v1:0
-      aws_region_name: ap-northeast-1
-      aws_role_name: os.environ/BEDROCK_ROLE_ARN                     # arn:aws:iam::<acct>:role/tcvgh-litellm-bedrock
-      aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN  # oidc/google/<audience>
-      aws_session_name: tcvgh-litellm
-    model_info: { region: aws-jp, capability_tier: budget }
-
-  # ---------- GROUP ALIASES: what agents actually select ----------
-  # A group is just several entries sharing one model_name; the router load-balances across
-  # them and uses `fallbacks` below when one fails. Add the commented models to a group by
-  # giving them the same model_name once they are enabled.
-  - model_name: fast
-    litellm_params: { model: vertex_ai/gemini-3-flash-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
-  - model_name: reasoning
-    litellm_params: { model: vertex_ai/gemini-3.1-pro-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
-  - model_name: budget
-    litellm_params: { model: vertex_ai/gemini-3-flash-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
-  # AUTO-ROUTING: one model name that picks a tier per request from a local, rule-based complexity score
-  # (no extra API call, <1ms). Every tier value must be a model_name defined above. Claude tiers (haiku/sonnet/opus)
-  # need the Bedrock entries enabled first; until then the tiers use the Vertex Gemini models that are live.
-  - model_name: smart-router
-    litellm_params:
-      model: auto_router/complexity_router
-      complexity_router_config:
-        tiers:
-          SIMPLE:    gemini-2.5-flash
-          MEDIUM:    gemini-3-flash
-          COMPLEX:   gemini-3.1-pro
-          REASONING: gemini-3.1-pro
-        classifier_type: heuristic
-        # The built-in keyword lists are English-only, so Chinese prompts all scored SIMPLE (verified 2026-10-28).
-        # These dimensions add to the built-in score; weights tuned on a handful of prompts, retune on real TCVGH traffic.
-        custom_dimensions:
-          - name: zhReasoning
-            weight: 0.3
-            scoring_mode: match_count
-            keywords: [一步一步, 逐步, 分析, 推理, 評估, 比較, 取捨, 權衡, 為什麼, 機轉, 判斷, 鑑別診斷]
-          - name: zhClinicalComplex
-            weight: 0.25
-            scoring_mode: match_count
-            keywords: [交互作用, 併用, 劑量調整, 治療計畫, 共病, 禁忌, 副作用, 檢驗數值, INR, eGFR]
-          - name: zhMultiStep
-            weight: 0.1
-            patterns: ['先.{0,64}(再|然後)', '第一.{0,64}第二']
-          - name: zhTask
-            weight: 0.3
-            keywords: [摘要, 整理, 衛教, 撰寫, 寫成, 翻譯, 改寫]
-      complexity_router_default_model: gemini-3-flash
-  # sovereign has NO cloud member on purpose; until on-prem is connected it returns an error (fail closed).
-  # - model_name: sovereign
-  #   litellm_params: { model: openai/gpt-oss-120b, api_base: http://10.x.x.x:8001/v1, api_key: os.environ/ONPREM_VLLM_API_KEY }
-
+- model_name: gemini-2.5-flash
+  litellm_params:
+    model: vertex_ai/gemini-2.5-flash
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+  model_info:
+    deploy: cloud
+    group: fast
+    provider: vertex_ai
+- model_name: gemini-3-flash
+  litellm_params:
+    model: vertex_ai/gemini-3-flash-preview
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+  model_info:
+    deploy: cloud
+    group: fast
+    provider: vertex_ai
+- model_name: gemini-3.1-pro
+  litellm_params:
+    model: vertex_ai/gemini-3.1-pro-preview
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+  model_info:
+    deploy: cloud
+    group: reasoning
+    provider: vertex_ai
+- model_name: gemini-3-flash-budget
+  litellm_params:
+    model: vertex_ai/gemini-3-flash-preview
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+  model_info:
+    deploy: cloud
+    group: budget
+    provider: vertex_ai
+- model_name: fast
+  litellm_params:
+    model: vertex_ai/gemini-2.5-flash
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+- model_name: reasoning
+  litellm_params:
+    model: vertex_ai/gemini-3.1-pro-preview
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+- model_name: budget
+  litellm_params:
+    model: vertex_ai/gemini-3-flash-preview
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+- model_name: smart-router
+  litellm_params:
+    model: auto_router/complexity_router
+    complexity_router_config:
+      tiers:
+        SIMPLE: gemini-3-flash
+        MEDIUM: gemini-2.5-flash
+        COMPLEX: gemini-3-flash
+        REASONING: gemini-3-flash
+      classifier_type: heuristic
+    complexity_router_default_model: gemini-2.5-flash
 router_settings:
-  routing_strategy: simple-shuffle          # switch to latency-based-routing once Redis exists
+  routing_strategy: simple-shuffle
   num_retries: 2
   timeout: 120
   allowed_fails: 3
   cooldown_time: 60
   fallbacks:
-    - fast: [gemini-2.5-flash]              # later: [gpt-oss-20b, claude-haiku-4.5]
-    - reasoning: [fast]                     # later: [claude-sonnet-4.6, gpt-5.4, gpt-oss-120b]
-    - budget: [fast]                        # later: [nova-2-lite, claude-haiku-4.5]
-    # sovereign: intentionally absent -> never falls back to cloud
+  - fast:
+    - gemini-3-flash
+  - reasoning:
+    - fast
+  - budget:
+    - fast
   context_window_fallbacks:
-    - fast: [reasoning]
-
+  - fast:
+    - reasoning
 litellm_settings:
   drop_params: true
   set_verbose: false
   request_timeout: 120
-  # success_callback: ["gcs_bucket"]        # phase 2: ship spend logs to GCS -> BigQuery
-
-# MODEL ARMOR: screens a request BEFORE routing (pre_call runs in the proxy, ahead of the router), so it covers the
-# groups, smart-router and direct model names alike. A match returns HTTP 400 "Content blocked by Model Armor" and no
-# model is called. default_on: false = opt-in per request: the platform backend sends `guardrails: ["model-armor"]`
-# while the admin 路由 page's Model Armor switch is on (instant, no redeploy). Other callers of this gateway are NOT
-# screened unless they send it too. fail_on_error: true = if Model Armor itself is down, screened requests fail closed.
-# The template is env-driven (03-deploy-litellm.sh): sandbox = esther-modelArmor in us-central1, so screened prompts
-# leave Taiwan for that check. The LiteLLM SA needs roles/modelarmor.user.
 guardrails:
-  - guardrail_name: model-armor
-    litellm_params:
-      guardrail: model_armor
-      mode: pre_call
-      default_on: false
-      template_id: os.environ/MODEL_ARMOR_TEMPLATE_ID
-      project_id: os.environ/MODEL_ARMOR_PROJECT
-      location: os.environ/MODEL_ARMOR_LOCATION
-      mask_request_content: false
-      fail_on_error: true
-
+- guardrail_name: model-armor
+  litellm_params:
+    guardrail: model_armor
+    mode: pre_call
+    default_on: false
+    template_id: os.environ/MODEL_ARMOR_TEMPLATE_ID
+    project_id: os.environ/MODEL_ARMOR_PROJECT
+    location: os.environ/MODEL_ARMOR_LOCATION
+    mask_request_content: false
+    fail_on_error: true
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  # database_url: os.environ/DATABASE_URL  # phase 2: Cloud SQL -> virtual keys, per-agent budgets, spend UI
-  # store_model_in_db: true
