@@ -537,6 +537,31 @@ class DirectoryOut(BaseModel):
     groups: list[DirectoryGroup] = Field(default_factory=list)
 
 
+# ------------------------------------------------------------------ roles (admin-only)
+class RoleOut(BaseModel):
+    id: str
+    name: str = ""
+    en: str = ""
+    desc: str = ""
+    custom: bool = False
+    suspended: bool = False
+    member_count: int = 0  # users whose effective role is this id
+    permission_count: int = 0  # len(can); a label count, as the frontend shows it
+    can: list[str] = Field(default_factory=list)  # capability labels shown on the page, e.g. "發布核可"
+
+
+class RoleStats(BaseModel):
+    total_roles: int
+    system_roles: int
+    custom_roles: int
+    assigned_users: int
+
+
+class RoleListOut(BaseModel):
+    roles: list[RoleOut]
+    stats: RoleStats
+
+
 # ------------------------------------------------------------------ skills
 class SkillIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
