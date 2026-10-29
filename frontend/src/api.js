@@ -124,8 +124,8 @@ export const api={
   saveRouting:r=>call('/api/routing',{method:'PUT',body:body(r)}),
   testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),
   // model registry (admin)
-  modelProviders:()=>call('/api/model-registry/providers'),
-  saveModelProviders:approved=>call('/api/model-registry/providers',{method:'PUT',body:body({approved})}),
+  modelCatalog:()=>call('/api/model-registry/catalog'),
+  registerCatalogModel:(key,api_base='')=>call(`/api/model-registry/catalog/${key}/register`,{method:'POST',body:body({api_base})}),
   listModelRegistry:()=>call('/api/model-registry'),
   createModelEntry:m=>call('/api/model-registry',{method:'POST',body:body(m)}),
   updateModelEntry:(id,m)=>call(`/api/model-registry/${id}`,{method:'PUT',body:body(m)}),
@@ -170,6 +170,7 @@ export const api={
     if(!result)throw new Error('連線中斷，未收到完整回覆');
     return result;
   },
+  chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
