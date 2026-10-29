@@ -1,5 +1,5 @@
 import React,{useState,useMemo,useEffect} from 'react';
-import {Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise,ArrowSquareOut} from '@phosphor-icons/react';
+import {Sparkle,CheckCircle,Cpu,Plus,PencilSimple,Trash,ArrowRight,Info,Warning,Lock,UploadSimple,ClockCounterClockwise,ArrowSquareOut} from '@phosphor-icons/react';
 import {api} from '../api';
 import {Toggle,ListToolbar,Empty} from '../ListKit';
 import {errText,useOnce,fmtTime} from './pkit';
@@ -26,33 +26,34 @@ export function LiveGroupTable({groups,failed}){
   </div>;
 }
 
-/* Cloud providers the security review has approved: a cloud model whose provider is not on this list cannot be enabled or deployed. */
-function ProviderApproval({notify,models}){
-  const [list,setList]=useState(null),[draft,setDraft]=useState(''),[busy,setBusy]=useState(false),[who,setWho]=useState('');
-  useEffect(()=>{api.modelProviders().then(r=>{setList(r.approved||[]);setWho(r.updated_by||'')}).catch(e=>{setList(false);notify('無法載入已核准供應商：'+errText(e))})},[]);// eslint-disable-line
-  const used=[...new Set((models||[]).filter(m=>m.deploy==='cloud'&&m.enabled).map(m=>String(m.litellm_model).split('/')[0].toLowerCase()))];
-  const pending=list?used.filter(p=>!list.includes(p)):[];
-  async function save(next,msg){
-    if(next.length<list.length&&!window.confirm('移除後，使用這個供應商的已啟用模型將無法再儲存或部署。確定？'))return;
-    setBusy(true);
-    try{const r=await api.saveModelProviders(next);setList(r.approved);setWho(r.updated_by||'');setDraft('');notify(msg)}catch(e){notify('儲存失敗：'+errText(e))}finally{setBusy(false)}
-  }
-  if(list===null)return null;
-  if(list===false)return <div className="lv-o-banner bad"><Warning size={16}/><div>無法載入已核准的雲端供應商清單。</div></div>;
-  return <section className="panel lv-o-card" style={{margin:'0 0 14px'}}><h3><Lock size={15} style={{verticalAlign:-2,marginRight:6}}/>已核准的雲端供應商</h3>
-    <p className="muted small" style={{margin:'4px 0 10px'}}>只有通過資安審核的雲端供應商，其模型才能啟用並套用到 LiteLLM（供應商是模型字串 <span className="lv-o-mono">litellm_model</span> 斜線前的部分，例如 vertex_ai、azure、bedrock）。地端模型不受此限。每次變更都會寫入稽核記錄。</p>
-    <div className="lv-p-chips" style={{marginTop:0}}>{list.map(p=><span key={p} className="badge">{p}<button type="button" aria-label={'移除 '+p} disabled={busy} onClick={()=>save(list.filter(x=>x!==p),'已移除供應商 '+p)} style={{marginLeft:6}}>×</button></span>)}{!list.length&&<span className="muted small">尚未核准任何雲端供應商</span>}</div>
-    <div className="inline" style={{marginTop:10,gap:8,alignItems:'center'}}><input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="供應商名稱，例如 azure" style={{width:220}} aria-label="新增供應商"/>
-      <button className="btn" disabled={busy||!/^[A-Za-z0-9_-]{2,40}$/.test(draft.trim())||list.includes(draft.trim().toLowerCase())} onClick={()=>save([...list,draft.trim().toLowerCase()],'已核准供應商 '+draft.trim().toLowerCase())}>核准</button>
-      {who&&<span className="muted small">上次由 {who} 變更</span>}</div>
-    {pending.length>0&&<div className="lv-o-banner" style={{marginTop:10}}><Warning size={15}/><div>已啟用的模型使用了<b>尚未核准</b>的供應商：{pending.join('、')}。在核准前，這些模型無法套用到 LiteLLM。</div></div>}
-  </section>;
+/* 可選模型: models that can be registered with one click. Registering adds it to the registry; 套用到 Medisense Model Gateway makes it usable. */
+function CatalogView({items,onRegister,pending,onApply,busy}){
+  const [ask,setAsk]=useState(null),[base,setBase]=useState(''),[err,setErr]=useState('');
+  if(items===null)return <div className="lv-o-loading">載入中…</div>;
+  const reg=async(m,api_base)=>{setErr('');try{await onRegister(m,api_base);setAsk(null);setBase('')}catch(e){setErr(errText(e))}};
+  return <>
+    {pending&&<div className="lv-o-banner"><Info size={16}/><div>已註冊的模型<b>尚未套用到 Medisense Model Gateway</b>，套用後才能在對話中選用。</div><button className="btn primary" disabled={!!busy} onClick={onApply} style={{marginLeft:'auto'}}><UploadSimple/>套用到 Medisense Model Gateway</button></div>}
+    <div className="mc-grid">{items.map(m=><div className={'mc-card'+(m.registered?' on':'')} key={m.key}>
+      <span className="mc-ico">{m.deploy==='onprem'?<Cpu size={20}/>:<Sparkle size={20} weight="fill" color="#4285f4"/>}</span>
+      <div className="mc-txt"><b>{m.name}</b><small>{m.description}</small>
+        <span className="mc-tags"><span className="badge">{m.provider}</span><span className="badge">{m.deploy==='onprem'?'地端':'雲端'}</span><span className="badge">{m.group}</span></span></div>
+      {m.registered?<span className="mc-done"><CheckCircle size={18} weight="fill"/>已註冊</span>
+        :<button className="btn primary mc-btn" disabled={!!busy} onClick={()=>m.needs_api_base?(setAsk(m),setBase(''),setErr('')):reg(m,'')}>註冊</button>}
+    </div>)}</div>
+    {err&&!ask&&<p className="lv-o-err" role="alert" style={{marginTop:10}}>{err}</p>}
+    {ask&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setAsk(null)}}><form className="modal" role="dialog" aria-modal="true" aria-label={'註冊 '+ask.name} onSubmit={e=>{e.preventDefault();if(!base.trim()){setErr('請填寫伺服器位址');return}reg(ask,base.trim())}}>
+      <h2>註冊 {ask.name}</h2><p className="muted small">這是院內自架的模型。請填寫伺服器的 OpenAI 相容 API 位址，例如 <span className="lv-o-mono">http://10.0.0.5:8001/v1</span>。</p>
+      <div className="field"><label>API 位址</label><input autoFocus value={base} onChange={e=>setBase(e.target.value)} placeholder="http://vllm.internal:8000/v1"/></div>
+      {err&&<p className="lv-o-err" role="alert">{err}</p>}
+      <div className="modal-actions"><button type="button" className="btn" onClick={()=>setAsk(null)}>取消</button><button className="btn primary">註冊</button></div>
+    </form></div>}
+  </>;
 }
 
 function validate(f){
   if(!f.name.trim())return '請輸入名稱';
   if(!f.provider.trim())return '請輸入供應商';
-  if(!f.litellm_model.trim())return '請輸入 LiteLLM 模型字串';
+  if(!f.litellm_model.trim())return '請輸入 Medisense Model Gateway 模型字串';
   if(f.deploy==='onprem'&&f.group!=='sovereign')return '地端模型只能使用 sovereign 群組';
   if(f.deploy==='cloud'&&f.group==='sovereign')return '雲端模型不可使用 sovereign 群組';
   if(f.deploy==='onprem'&&!f.api_base.trim())return '地端模型需填寫 API 位址（api_base）';
@@ -71,7 +72,7 @@ function Editor({init,onClose,onSave}){
     <div className="lv-o-form2">
       <div className="field"><label>名稱</label>{inp('name',{autoFocus:true,placeholder:'例如：Gemini 2.5 Flash'})}</div>
       <div className="field"><label>供應商</label>{inp('provider',{placeholder:'例如：vertex_ai、vllm'})}</div>
-      <div className="field"><label>LiteLLM 模型字串</label>{inp('litellm_model',{placeholder:'例如：vertex_ai/gemini-2.5-flash'})}<span className="lv-o-help">開源／自架模型（vLLM、Ollama 等 OpenAI 相容 API）請用 <span className="lv-o-mono">openai/&lt;模型名稱&gt;</span>，並填 API 位址。</span></div>
+      <div className="field"><label>Medisense Model Gateway 模型字串</label>{inp('litellm_model',{placeholder:'例如：vertex_ai/gemini-2.5-flash'})}<span className="lv-o-help">開源／自架模型（vLLM、Ollama 等 OpenAI 相容 API）請用 <span className="lv-o-mono">openai/&lt;模型名稱&gt;</span>，並填 API 位址。</span></div>
       <div className="field"><label>部署位置</label><select value={f.deploy} onChange={e=>set('deploy',e.target.value)}><option value="cloud">雲端</option><option value="onprem">地端</option></select></div>
       <div className="field"><label>模型群組</label><select value={f.group} onChange={e=>set('group',e.target.value)}>{GROUPS.map(g=><option key={g} value={g} disabled={(f.deploy==='onprem')!==(g==='sovereign')}>{g}</option>)}</select><span className="lv-o-help">地端僅能用 sovereign；雲端不可用 sovereign。</span></div>
       <div className="field"><label>API 位址（api_base）{f.deploy==='onprem'&&' *'}</label>{inp('api_base',{placeholder:'http://vllm.internal:8000/v1'})}</div>
@@ -96,20 +97,52 @@ function CodePanel({title,data}){
   </section>;
 }
 
+const TIERS=[['simple','簡單','問候、定義、短問答'],['medium','中等','一般查詢'],['complex','複雜','技術性、多段落需求'],['reasoning','推理','逐步分析、深度推論']];
+
+/* 智慧路由: the gateway's `smart-router` model scores each request locally and serves it from the model chosen for its tier. */
+function SmartRouterCard({items,smart,onSaved,notify}){
+  const [f,setF]=useState(null),[busy,setBusy]=useState(false);
+  useEffect(()=>{if(smart)setF({enabled:!!smart.enabled,simple:smart.simple||'',medium:smart.medium||'',complex:smart.complex||'',reasoning:smart.reasoning||''})},[smart]);
+  if(!f)return null;
+  const live=(items||[]).filter(m=>m.enabled);
+  const liveIds=new Set(live.map(m=>m.id));
+  const missing=TIERS.filter(([k])=>!liveIds.has(f[k])).map(([,n])=>n);
+  const dirty=!smart||['enabled',...TIERS.map(t=>t[0])].some(k=>f[k]!==(k==='enabled'?!!smart[k]:smart[k]||''));
+  async function save(){
+    setBusy(true);
+    try{const r=await api.saveSmartRouter(f);onSaved(r);notify('智慧路由已儲存，設定檔已更新（尚未套用到 Medisense Model Gateway）')}catch(e){notify('儲存失敗：'+errText(e))}finally{setBusy(false)}
+  }
+  return <section className="panel lv-o-card" style={{marginTop:26}}>
+    <div className="inline" style={{justifyContent:'space-between'}}><h2 style={{fontSize:16,margin:0}}>智慧路由（smart-router）</h2><Toggle on={f.enabled} label="啟用智慧路由" onChange={v=>setF(a=>({...a,enabled:v}))}/></div>
+    <p className="lv-o-help" style={{margin:'6px 0 12px'}}>依問題難度自動挑選模型：Medisense Model Gateway 在本機以規則評分（不額外呼叫模型、延遲 &lt;1ms），再交給下列各難度所選的模型。呼叫時使用模型名稱 <span className="lv-o-mono">smart-router</span>。</p>
+    <div className="lv-o-form2">
+      {TIERS.map(([k,name,hint])=><div className="field" key={k}><label>{name}<span className="lv-o-help"> · {hint}</span></label>
+        <select value={f[k]} onChange={e=>setF(a=>({...a,[k]:e.target.value}))}>
+          <option value="">請選擇模型…</option>
+          {live.map(m=><option key={m.id} value={m.id}>{m.name}（{m.group}）</option>)}
+        </select></div>)}
+    </div>
+    {f.enabled&&missing.length>0&&<p className="lv-o-err" role="alert">請為「{missing.join('、')}」選擇啟用中的模型。</p>}
+    <div className="inline" style={{marginTop:10}}><button className="btn primary" disabled={busy||!dirty||(f.enabled&&missing.length>0)} onClick={save}>{busy?'儲存中…':'儲存智慧路由'}</button><span className="lv-o-help">儲存後仍需按下方「套用到 Medisense Model Gateway」才會部署。</span></div>
+  </section>;
+}
+
 export default function ModelRegistryPage({me,notify}){
   const admin=me?.role==='admin';
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false);
-  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('registry');
+  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false),[smart,setSmart]=useState(null);
   const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
+  async function loadCat(){try{setCat(await api.modelCatalog())}catch(e){setCat([]);notify('無法載入可選模型：'+errText(e))}}
+  async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 Medisense Model Gateway`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}
-    if(admin){load();api.litellmDeploy().then(setDeploy).catch(()=>{})}
+    if(admin){load();loadCat();api.litellmDeploy().then(setDeploy).catch(()=>{});api.getSmartRouter().then(setSmart).catch(()=>{})}
   });
   // Follow the GitHub Actions run until it finishes.
   useEffect(()=>{
     if(deployDone(deploy))return;
-    const t=setTimeout(async()=>{try{const d=await api.litellmDeploy();setDeploy(d);if(d?.status==='deployed')notify(`LiteLLM 已更新為 v${d.version}`);else if(d?.status==='failed')notify('LiteLLM 部署失敗，請查看執行紀錄')}catch{setDeploy(d=>({...d}))}},10000);
+    const t=setTimeout(async()=>{try{const d=await api.litellmDeploy();setDeploy(d);if(d?.status==='deployed')notify(`Medisense Model Gateway 已更新為 v${d.version}`);else if(d?.status==='failed')notify('Medisense Model Gateway 部署失敗，請查看執行紀錄')}catch{setDeploy(d=>({...d}))}},10000);
     return()=>clearTimeout(t);
   },[deploy]);
   const shown=useMemo(()=>(items||[]).filter(m=>(tab==='全部'||(tab==='雲端'?m.deploy==='cloud':m.deploy==='onprem'))&&(!search.trim()||[m.name,m.provider,m.litellm_model,m.group].some(s=>(s||'').toLowerCase().includes(search.trim().toLowerCase())))),[items,tab,search]);
@@ -118,17 +151,17 @@ export default function ModelRegistryPage({me,notify}){
 
   async function save(f){
     if(editing.id)await api.updateModelEntry(editing.id,f);else await api.createModelEntry(f);
-    notify((editing.id?'已更新模型':'已新增模型')+'，設定檔已更新（尚未套用到 LiteLLM）');setEditing(null);await load();setLast(undefined);
+    notify((editing.id?'已更新模型':'已新增模型')+'，設定檔已更新（尚未套用到 Medisense Model Gateway）');setEditing(null);await load();setLast(undefined);
   }
   async function toggle(m,v){
     try{await api.updateModelEntry(m.id,{...pick(m),enabled:v});setItems(a=>a.map(x=>x.id===m.id?{...x,enabled:v}:x));setLast(undefined)}catch(e){notify('更新失敗：'+errText(e))}
   }
   async function remove(){
-    try{await api.deleteModelEntry(del.id);notify('已刪除模型，設定檔已更新（尚未套用到 LiteLLM）');setDel(null);await load();setLast(undefined)}catch(e){notify('刪除失敗：'+errText(e));setDel(null)}
+    try{await api.deleteModelEntry(del.id);notify('已刪除模型，設定檔已更新（尚未套用到 Medisense Model Gateway）');setDel(null);await load();setLast(undefined)}catch(e){notify('刪除失敗：'+errText(e));setDel(null)}
   }
   async function apply(){
     setConfirmApply(false);setBusy('apply');
-    try{const r=await api.applyModelRegistry();setDeploy(r);notify(`已送出部署 v${r.version}，LiteLLM 約需數分鐘更新`)}catch(e){notify('套用失敗：'+errText(e))}finally{setBusy('')}
+    try{const r=await api.applyModelRegistry();setDeploy(r);notify(`已送出部署 v${r.version}，Medisense Model Gateway 約需數分鐘更新`)}catch(e){notify('套用失敗：'+errText(e))}finally{setBusy('')}
   }
   async function showLast(){
     setBusy('last');
@@ -136,13 +169,12 @@ export default function ModelRegistryPage({me,notify}){
   }
   const price=m=>`${m.input_price_per_m??0} / ${m.output_price_per_m??0}`;
   return <div className="lv-o">{heading}
-    <p className="subtitle">管理 LiteLLM 可用的模型登錄（雲端或地端／自架開源模型）。儲存後會更新 LiteLLM 設定檔；按「套用到 LiteLLM」才會重新部署。</p>
-    <div className="lv-o-viewtabs"><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>模型登錄</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
-    {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:<>
-      <ProviderApproval notify={notify} models={items}/>
+    <p className="subtitle">從「可選模型」挑選並註冊，再按「套用到 Medisense Model Gateway」就能在對話中使用。目錄沒有的模型，可到「已註冊」手動新增。</p>
+    <div className="lv-o-viewtabs"><button className={view==='catalog'?'selected':''} onClick={()=>setView('catalog')}>可選模型</button><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>已註冊</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
+    {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:view==='catalog'?<CatalogView items={cat} onRegister={register} pending={pending} onApply={()=>setConfirmApply(true)} busy={busy}/>:<>
       <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋名稱、供應商、模型" tabs={['全部','雲端','地端']} tab={tab} onTab={setTab}/>
       {items===null?<div className="lv-o-loading">載入中…</div>:<div className="lt" style={{'--cols':'minmax(130px,1.3fr) minmax(90px,.8fr) minmax(160px,1.5fr) 100px 70px 60px 110px 84px'}}>
-        <div className="lt-head"><span>名稱</span><span>供應商</span><span>LiteLLM 模型</span><span>群組</span><span>部署</span><span>啟用</span><span>價格 輸入/輸出</span><span/></div>
+        <div className="lt-head"><span>名稱</span><span>供應商</span><span>Medisense Model Gateway 模型</span><span>群組</span><span>部署</span><span>啟用</span><span>價格 輸入/輸出</span><span/></div>
         {shown.map(m=><div className="lt-row" key={m.id}>
           <span><b>{m.name}</b>{m.secret_name&&<span className="lv-o-sub">Secret：{m.secret_name}</span>}</span>
           <span>{m.provider}</span><span className="lv-o-mono">{m.litellm_model}</span>
@@ -154,16 +186,17 @@ export default function ModelRegistryPage({me,notify}){
         {!shown.length&&<Empty text={items.length?'沒有符合條件的模型。':'尚未登錄任何模型。'}/>}
       </div>}
       <p className="lv-o-help" style={{marginTop:6}}>價格單位為每百萬 token（USD），僅在內建價格表查無該模型時用於成本估算。</p>
-      <h2 style={{fontSize:16,margin:'26px 0 10px'}}>套用到 LiteLLM</h2>
-      <div className="lv-o-banner"><Warning size={16}/><div><b>此按鈕會重新部署 LiteLLM。</b>透過 GitHub Actions 執行 <span className="lv-o-mono">infra/09-apply-litellm-config.sh</span>：重建映像檔、更新 Cloud Run，並把 <span className="lv-o-mono">litellm/config.yaml</span> 提交到 main。fast、reasoning、budget 每組至少需一個啟用的模型。</div></div>
-      <div className="inline" style={{marginBottom:16}}><button className="btn primary" disabled={!!busy||!deployDone(deploy)} onClick={()=>setConfirmApply(true)}><UploadSimple/>{busy==='apply'?'送出中…':!deployDone(deploy)?'部署中…':'套用到 LiteLLM'}</button><button className="btn" disabled={!!busy} onClick={showLast}><ClockCounterClockwise/>{busy==='last'?'讀取中…':'查看目前設定檔'}</button></div>
+      <SmartRouterCard items={items} smart={smart} notify={notify} onSaved={r=>{setSmart(r);setLast(undefined)}}/>
+      <h2 style={{fontSize:16,margin:'26px 0 10px'}}>套用到 Medisense Model Gateway</h2>
+      <div className="lv-o-banner"><Warning size={16}/><div><b>此按鈕會重新部署 Medisense Model Gateway。</b>透過 GitHub Actions 執行 <span className="lv-o-mono">infra/09-apply-litellm-config.sh</span>：重建映像檔、更新 Cloud Run，並把 <span className="lv-o-mono">litellm/config.yaml</span> 提交到 main。fast、reasoning、budget 每組至少需一個啟用的模型。</div></div>
+      <div className="inline" style={{marginBottom:16}}><button className="btn primary" disabled={!!busy||!deployDone(deploy)} onClick={()=>setConfirmApply(true)}><UploadSimple/>{busy==='apply'?'送出中…':!deployDone(deploy)?'部署中…':'套用到 Medisense Model Gateway'}</button><button className="btn" disabled={!!busy} onClick={showLast}><ClockCounterClockwise/>{busy==='last'?'讀取中…':'查看目前設定檔'}</button></div>
       {deploy&&<section className="panel lv-o-card" style={{marginBottom:16}}><h3>最近一次部署</h3><p className="small"><span className={'lv-o-status '+(deploy.status==='deployed'?'ok':deploy.status==='failed'?'bad':'warn')}><i/>{DEPLOY_LABEL[deploy.status]||deploy.status}</span> · v{deploy.version} · {deploy.requested_by}{deploy.requested_at?` · ${fmtTime(deploy.requested_at)}`:''}{deploy.run_url&&<> · <a href={deploy.run_url} target="_blank" rel="noreferrer">GitHub Actions 執行紀錄 <ArrowSquareOut size={11}/></a></>}</p></section>}
       {last===null&&<p className="muted small">尚未產生任何設定檔。</p>}
       {last&&<CodePanel title="目前設定檔（下次套用的內容）" data={last}/>}
     </>}
     <div className="notice"><Info/>金鑰內容不會經過此頁；登錄只記錄 Secret Manager 的名稱。</div>
     {editing&&<Editor init={editing} onClose={()=>setEditing(null)} onSave={save}/>}
-    {confirmApply&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setConfirmApply(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認套用"><h2>套用到 LiteLLM</h2><p>將以目前的模型登錄重新部署 LiteLLM（約數分鐘）。部署期間進行中的請求可能短暫失敗；新設定會提交到 GitHub main。確定要套用嗎？</p><div className="modal-actions"><button className="btn" onClick={()=>setConfirmApply(false)}>取消</button><button className="btn primary" onClick={apply}>套用並部署</button></div></div></div>}
-    {del&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setDel(null)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除"><h2>刪除模型</h2><p>確定要刪除「{del.name}」？此動作無法復原；需按「套用到 LiteLLM」後才會反映於 LiteLLM。</p><div className="modal-actions"><button className="btn" onClick={()=>setDel(null)}>取消</button><button className="btn primary" onClick={remove}>刪除</button></div></div></div>}
+    {confirmApply&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setConfirmApply(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認套用"><h2>套用到 Medisense Model Gateway</h2><p>將以目前的模型登錄重新部署 Medisense Model Gateway（約數分鐘）。部署期間進行中的請求可能短暫失敗；新設定會提交到 GitHub main。確定要套用嗎？</p><div className="modal-actions"><button className="btn" onClick={()=>setConfirmApply(false)}>取消</button><button className="btn primary" onClick={apply}>套用並部署</button></div></div></div>}
+    {del&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setDel(null)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除"><h2>刪除模型</h2><p>確定要刪除「{del.name}」？此動作無法復原；需按「套用到 Medisense Model Gateway」後才會反映於 Medisense Model Gateway。</p><div className="modal-actions"><button className="btn" onClick={()=>setDel(null)}>取消</button><button className="btn primary" onClick={remove}>刪除</button></div></div></div>}
   </div>;
 }

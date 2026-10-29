@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Build the LiteLLM image (base image + our config.yaml) in Cloud Build, push to Artifact
-# Registry, deploy to Cloud Run with INTERNAL ingress so only in-VPC callers (the backend,
-# via Direct VPC egress) can reach it. Vertex AI auth = the service account (ADC), no keys.
+# Registry, deploy to Cloud Run. Ingress = LITELLM_INGRESS (default internal: only in-VPC callers, i.e. the backend
+# via Direct VPC egress; the sandbox sets `all` in env.sh, IAM still required). Vertex AI auth = the service account
+# (ADC), no keys. Bedrock is keyless too: BEDROCK_ROLE_ARN + BEDROCK_WEB_IDENTITY_TOKEN let LiteLLM swap the SA's
+# Google ID token for temporary AWS credentials; leave them unset to deploy without Bedrock.
+# Model Armor (config.yaml `guardrails`) screens requests before routing; MODEL_ARMOR_* (env.sh) pick the template;
+# the SA's roles/modelarmor.user is granted in 02-foundation.sh.
 set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
+: "${MODEL_ARMOR_TEMPLATE_ID:?set MODEL_ARMOR_* in infra/env.sh}"
 cd "$(dirname "$0")/../litellm"
 
 # Set IMAGE=<existing tag> to redeploy without rebuilding.
@@ -36,11 +41,11 @@ gcloud run deploy "$LITELLM_SERVICE" \
   --image "$IMAGE" \
   --region "$REGION" \
   --service-account "${LITELLM_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --ingress internal \
+  --ingress "${LITELLM_INGRESS:-internal}" \
   --no-allow-unauthenticated \
   --port 4000 \
-  --cpu 1 --memory 1Gi --min-instances 0 --max-instances 3 --concurrency 40 \
-  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO,LITELLM_LOCAL_MODEL_COST_MAP=True" \
+  --cpu 1 --memory 1Gi --min-instances 1 --max-instances 3 --concurrency 40 \
+  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO,LITELLM_LOCAL_MODEL_COST_MAP=True,MODEL_ARMOR_PROJECT=${MODEL_ARMOR_PROJECT},MODEL_ARMOR_LOCATION=${MODEL_ARMOR_LOCATION},MODEL_ARMOR_TEMPLATE_ID=${MODEL_ARMOR_TEMPLATE_ID}${BEDROCK_ROLE_ARN:+,BEDROCK_ROLE_ARN=$BEDROCK_ROLE_ARN,BEDROCK_WEB_IDENTITY_TOKEN=$BEDROCK_WEB_IDENTITY_TOKEN}" \
   --set-secrets "LITELLM_MASTER_KEY=litellm-master-key:latest${EXTRA_SECRETS:+,$EXTRA_SECRETS}" \
   --args="--config,/app/config.yaml,--port,4000"
 
@@ -49,5 +54,5 @@ gcloud run services add-iam-policy-binding "$LITELLM_SERVICE" --region "$REGION"
   --member="serviceAccount:${BACKEND_SA}@${PROJECT_ID}.iam.gserviceaccount.com" --role=roles/run.invoker >/dev/null
 
 LITELLM_URL="$(gcloud run services describe "$LITELLM_SERVICE" --region "$REGION" --format='value(status.url)')"
-echo "LiteLLM deployed (internal ingress): $LITELLM_URL"
-echo "Note: min-instances is 0 in the sandbox to save cost; set 1 for TCVGH to avoid cold starts."
+echo "LiteLLM deployed (${LITELLM_INGRESS:-internal} ingress): $LITELLM_URL"
+echo "Note: min-instances is 1: a cold start takes ~50 s (backend calls time out), so one instance stays warm."

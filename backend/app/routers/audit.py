@@ -52,7 +52,7 @@ CATEGORY = {
     "schedule.create": "build", "schedule.update": "build", "schedule.delete": "build", "schedule.enable": "build",
     "schedule.disable": "build", "schedule.run": "inference",
     "space.create": "build", "space.update": "build", "space.delete": "build", "space.documents": "build",
-    "routing.update": "build", "model.create": "build", "model.update": "build", "model.delete": "build", "model.apply": "build",
+    "routing.update": "build", "routing.test": "inference", "model.create": "build", "model.update": "build", "model.delete": "build", "model.apply": "build",
     "chat.run": "inference", "chat.attach": "inference", "session.update": "inference", "session.delete": "inference",
 }
 CATEGORIES = {"inference", "connector", "build", "access", "other"}

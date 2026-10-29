@@ -20,7 +20,15 @@ export BACKEND_SERVICE="tcvgh-platform-api"
 
 # Service accounts (short names)
 export LITELLM_SA="tcvgh-litellm-sa"
+export LITELLM_INGRESS="all"                      # sandbox: public run.app URL (IAM required) for the Agent Runtime POC; TCVGH: internal
+export BEDROCK_ROLE_ARN="arn:aws:iam::628893726885:role/tcvgh-litellm-bedrock"  # keyless Bedrock (nova-2-lite)
+export BEDROCK_WEB_IDENTITY_TOKEN="oidc/google/tcvgh-litellm-bedrock"
 export BACKEND_SA="tcvgh-backend-sa"
+# Model Armor template LiteLLM screens prompts with (before smart-router/any model; on/off = 路由 page). Sandbox: us-central1, so
+# prompts leave Taiwan for the check; TCVGH should use a template in asia-east1.
+export MODEL_ARMOR_PROJECT="$PROJECT_ID"
+export MODEL_ARMOR_LOCATION="us-central1"
+export MODEL_ARMOR_TEMPLATE_ID="esther-modelArmor"
 
 # Who may sign in. Comma-separated Google Workspace domains.
 # For the sandbox we allow iKala; for TCVGH replace with their Workspace domain.
