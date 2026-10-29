@@ -6,7 +6,7 @@ keep our own copies. Vendor contracts (no training, retention, zero-retention op
 | Control | Where | Operate it |
 |---|---|---|
 | De-identify before any model sees text (messages, retrieved passages, connector results, saved blocks, feedback text) | `engine/deid.py` and callers | always on, no switch |
-| 僅院內模型 (nothing leaves the hospital) | 路由 admin page | admin switch |
+| 僅本地模型 (nothing leaves the hospital) | 路由 admin page | admin switch |
 | Web search is off unless an admin allows it, and the term is masked again | 路由 admin page, `engine/agent.py` | admin switch + user toggle |
 | **Images in chat**: personal data written in an image is blacked out with Sensitive Data Protection (`redact_image`) before the image is stored or shown to a model; the original is never kept; a redaction error rejects the upload; images are removed with their conversation and by a bucket lifecycle rule | `engine/deid.redact_image`, `engine/chat_images.py`, `infra/11-retention-ttl.sh`; audit `chat.attach_image` | `IMAGE_REDACT_ALL_TEXT=true` blacks out all text; faces and handwriting are not detected |
 | **Connector de-identification** can only be switched off by an admin, with a reason; each call is audited with `redacted` | 連接器 → 合規設定; audit `connector.deid_off` / `connector.deid_on` / `connector.invoke` | admin |

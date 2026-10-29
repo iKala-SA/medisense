@@ -35,7 +35,7 @@ PRICES: tuple[tuple[str, float, float], ...] = (
     ("gemma", 0.0, 0.0),
 )
 # Primary model per group, mirrors litellm/config.yaml. A served model outside this is a fallback.
-PRIMARY: dict[str, str] = {"fast": "gemini-3-flash", "reasoning": "gemini-3.1-pro", "budget": "gemini-3-flash", "sovereign": "gpt-oss"}
+PRIMARY: dict[str, str] = {"fast": "gemini-3-flash", "reasoning": "gemini-3.1-pro", "budget": "gemini-3-flash", "sovereign": "gemma-3-12b"}
 
 
 def normalize_model(model: str) -> str:
@@ -156,7 +156,7 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         group = routing.resolve_auto().group
     if group not in GROUPS and group != routing.SMART_ROUTER and not model:
         group = "fast"
-    if routing.sovereign_only():  # 僅院內模型 backstop: callers already pick sovereign, but no path may reach a cloud group
+    if routing.sovereign_only():  # 僅本地模型 backstop: callers already pick sovereign, but no path may reach a cloud group
         group, model = "sovereign", None
     client = _client()
     t0 = time.perf_counter()

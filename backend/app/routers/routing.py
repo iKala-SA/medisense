@@ -1,4 +1,4 @@
-"""Hospital-wide routing switches (config/routing), admin-only: 僅院內模型 and Model Armor (see engine/routing.py).
+"""Hospital-wide routing switches (config/routing), admin-only: 僅本地模型 and Model Armor (see engine/routing.py).
 Model choice for "auto" is the gateway's smart-router, configured on the 模型 page."""
 import json
 import time

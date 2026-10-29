@@ -41,6 +41,13 @@ def _params(m: dict) -> dict:
     if str(m["litellm_model"]).startswith("vertex_ai/"):
         p["vertex_project"] = "os.environ/VERTEX_PROJECT"
         p["vertex_location"] = "os.environ/VERTEX_LOCATION"
+    elif str(m["litellm_model"]).startswith("bedrock/"):
+        # Keyless Bedrock: LiteLLM swaps the service account's Google ID token for AWS credentials via the role in
+        # BEDROCK_ROLE_ARN (infra/env.sh + 03-deploy-litellm.sh). Unset locally -> LiteLLM uses AWS_PROFILE_NAME.
+        p["aws_region_name"] = "os.environ/BEDROCK_REGION"
+        p["aws_role_name"] = "os.environ/BEDROCK_ROLE_ARN"
+        p["aws_web_identity_token"] = "os.environ/BEDROCK_WEB_IDENTITY_TOKEN"
+        p["aws_session_name"] = "tcvgh-litellm"
     if m.get("api_base"):
         p["api_base"] = m["api_base"]
     if m.get("secret_name"):
