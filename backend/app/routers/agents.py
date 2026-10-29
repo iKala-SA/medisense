@@ -14,8 +14,9 @@ from google.cloud import firestore
 
 from .. import db, sharing
 from ..auth import User, current_user, require_admin, require_builder
+from ..engine import steps as step_engine
 from ..engine.flow import validate_flow
-from ..schemas import AgentActivity, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share
+from ..schemas import AgentActivity, AgentDraftIn, ImproveIn, AgentIn, AgentOut, Flow, HubStats, ReviewDecision, SandboxActivity, Share, StepsIn
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 ACTIVITY_CAP = 50000  # agent.run audit rows read for today's sandbox activity
@@ -140,6 +141,43 @@ def get_agent(agent_id: str, user: User = Depends(current_user)):
     return _doc_to_out(load_visible(agent_id, user))
 
 
+@router.post("/draft")
+def draft_agent(body: AgentDraftIn, user: User = Depends(require_builder)):
+    """Build / edit an agent by conversation. Nothing is saved: the client shows the draft and saves it when the user says so."""
+    from ..engine import agent_builder, connectors as conn_engine
+    from .spaces import _viewable
+
+    c = db.client()
+    rows = []
+    for d in c.collection("connectors").stream():
+        x = d.to_dict() or {}
+        acts = conn_engine.TYPES.get(x.get("type", ""), {}).get("actions")
+        if isinstance(acts, list) and x.get("enabled", True):
+            rows.append({"id": d.id, "label": x.get("label") or x.get("name") or x.get("type", ""), "actions": [{"id": a["id"], "label": a["label"]} for a in acts]})
+    spaces = [{"id": d.id, "name": (d.to_dict() or {}).get("name", "")} for d in c.collection("spaces").stream() if _viewable(user, d.to_dict() or {})]
+    try:
+        out = agent_builder.draft(body.message, current=body.current, history=body.history, connector_rows=rows, space_rows=spaces, user_id=user.uid, kind=body.kind)
+    except ValueError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    db.audit(user.uid, "agent.draft", user.email, steps=len(out["agent"]["steps"]))
+    return out
+
+
+@router.post("/improve")
+def improve_instructions(body: ImproveIn, user: User = Depends(require_builder)):
+    """The 改進 button: rewrite the role instructions to be clearer and more complete. Nothing is saved."""
+    from ..engine import agent_builder
+    try:
+        return {"instructions": agent_builder.improve(body.instructions, name=body.name, description=body.description, user_id=user.uid)}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, "無法改進指令，請稍後再試") from exc
+
+
+@router.post("/validate-steps")
+def validate_step_list(body: StepsIn, user: User = Depends(require_builder)):
+    return {"problems": step_engine.validate_steps(body.steps)}
+
+
 @router.post("/validate")
 def validate(flow: Flow, user: User = Depends(require_builder)):
     return {"problems": validate_flow(flow)}
@@ -149,7 +187,8 @@ def validate(flow: Flow, user: User = Depends(require_builder)):
 def update_agent(agent_id: str, body: AgentIn, user: User = Depends(require_builder)):
     snap = load_editable(agent_id, user)
     # `share` only changes through PUT /{id}/share; skill_ids only when the client sent it (older clients omit it).
-    skip = {"share"} | (set() if "skill_ids" in body.model_fields_set else {"skill_ids"})
+    optional = ("skill_ids", "icon", "opening_questions", "capabilities", "steps", "original_prompt", "kind")  # older clients omit these
+    skip = {"share"} | {k for k in optional if k not in body.model_fields_set}
     data = {**body.model_dump(exclude=skip), "updated_at": db.now()}
     snap.reference.update(data)
     db.audit(user.uid, "agent.update", user.email, agent_id=agent_id)
@@ -174,6 +213,10 @@ def _check_flow(data: dict) -> None:
     problems = validate_flow(Flow.model_validate(data.get("flow") or {}))
     if problems:
         raise HTTPException(422, "; ".join(problems))
+    from ..schemas import Step
+    errs = [p["message"] for p in step_engine.validate_steps([Step.model_validate(x) for x in data.get("steps") or []]) if p["level"] == "error"]
+    if errs:  # PRD §6.4: an agent with step errors cannot be published
+        raise HTTPException(422, "Step 流程有錯誤：" + "；".join(errs))
 
 
 def _go_live(ref, version: int, approver: User) -> None:

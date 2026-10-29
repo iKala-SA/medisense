@@ -96,8 +96,9 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     agent = agent.model_copy(update={"model_group": body.model_group})
 
     doc_ids = []
-    if chosen:  # a picked agent does exactly what it was built to do: its own knowledge, its own connectors, no web, no wider scope
-        pass
+    if chosen:  # a picked agent does exactly what it was built to do: its own knowledge (and spaces, by YOUR rights), its connectors, no wider scope
+        from ..engine.capabilities import rag_files_for
+        rag_files = rag_files_for(agent, user, rag_files)
     elif body.knowledge_scope == "general":  # model only: no retrieval, whatever the agent has attached
         rag_files = []
     elif body.knowledge_scope == "all" and settings().rag_enabled:
@@ -125,10 +126,10 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         extra["project_id"] = body.project_id
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
                 audit_action="chat.run",
-                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": body.web_search and not chosen, "knowledge_docs": len(doc_ids),
+                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing), session_extra=extra,
-                pin_model=body.model, web_search=body.web_search and not chosen, images=images or None)
+                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
 
 
 @router.get("/agents/{agent_id}")
@@ -137,9 +138,10 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
     documents. The chat box shows exactly this (and nothing else) once the agent is chosen."""
     agent, rag_files = _agent_def(agent_id, user, use_published=True)
     cons, seen = [], set()
-    for n in agent.flow.nodes:
-        cid, action = str(n.data.get("connector_id") or ""), str(n.data.get("action") or "")
-        if n.type != "tool" or not cid or (cid, action) in seen:
+    pairs = [(str(n.data.get("connector_id") or ""), str(n.data.get("action") or "")) for n in agent.flow.nodes if n.type == "tool"]
+    pairs += [(c.connector_id, c.action) for c in agent.capabilities.connectors]
+    for cid, action in pairs:
+        if not cid or (cid, action) in seen:
             continue
         seen.add((cid, action))
         snap = db.client().collection("connectors").document(cid).get()
@@ -149,10 +151,14 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
         spec = connectors_engine.TYPES.get(d.get("type", ""), {})
         acts = spec.get("actions")
         act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
-        cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("name") or spec.get("label") or d.get("type", ""),
+        cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("label") or d.get("name") or spec.get("label") or d.get("type", ""),
                      "action": (act or {}).get("label") or action})
-    return {"id": agent_id, "name": agent.name, "description": agent.description, "connectors": cons,
-            "knowledge": bool(rag_files), "documents": len(agent.knowledge_doc_ids)}
+    inputs = [{"id": st.id, "type": st.type, "title": st.title, "placeholder": st.config.get("placeholder", ""), "default": st.config.get("default", ""),
+               "allow_override": st.config.get("allow_override", True), "required": st.config.get("required", True)}
+              for st in agent.steps if st.enabled and st.type in ("text_input", "file_upload")]
+    return {"id": agent_id, "name": agent.name, "description": agent.description, "icon": agent.icon, "opening_questions": agent.opening_questions,
+            "connectors": cons, "web_search": agent.capabilities.web_search, "knowledge": bool(rag_files or agent.capabilities.spaces),
+            "documents": len(agent.knowledge_doc_ids), "has_steps": bool(agent.steps), "inputs": inputs}
 
 
 @router.post("", response_model=RunResponse)

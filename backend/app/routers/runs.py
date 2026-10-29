@@ -105,8 +105,10 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
 @router.post("/run", response_model=RunResponse)
 def run_agent(agent_id: str, body: RunRequest, user: User = Depends(current_user)):
     agent, rag_files = _agent_def(agent_id, user, body.use_published, body.version)
+    from ..engine.capabilities import rag_files_for
+    rag_files = rag_files_for(agent, user, rag_files)  # knowledge spaces, by the runner's own rights (same as chat)
     return execute_run(agent, rag_files, agent_id, user, body.message, body.session_id,
-                       use_published=body.use_published, version=body.version)
+                       use_published=body.use_published, version=body.version, web_search=agent.capabilities.web_search)
 
 
 def _public_pending(p: dict | None) -> dict | None:
