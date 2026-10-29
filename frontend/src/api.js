@@ -93,6 +93,8 @@ export const api={
   updateUser:(email,patch)=>call(`/api/users/${encodeURIComponent(email)}`,{method:'PATCH',body:body(patch)}),
   cancelPreregistration:email=>call(`/api/users/${encodeURIComponent(email)}`,{method:'DELETE'}),
   usersCsv:()=>blob('/api/users/export.csv'),
+  // roles (admin; backend returns mock data for now)
+  listRoles:()=>call('/api/roles'),
   // sharing
   directory:(q='')=>call(`/api/directory?${query({q})}`),
   listGroups:()=>call('/api/groups'),

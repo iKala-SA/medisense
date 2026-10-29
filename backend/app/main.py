@@ -23,6 +23,7 @@ from .routers import (
     oauth_proxy,
     originals,
     projects,
+    roles,
     routing,
     runs,
     schedules,
@@ -51,6 +52,7 @@ app.include_router(groups.directory_router)
 app.include_router(skills.router)
 app.include_router(schedules.router)
 app.include_router(spaces.router)
+app.include_router(roles.router)
 app.include_router(routing.router)
 app.include_router(features.router)
 app.include_router(model_registry.router)

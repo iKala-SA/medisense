@@ -1,5 +1,5 @@
 /* 角色管理頁的統計卡與角色圖示；其餘表格與標籤沿用 admin.css 的 lt / lv 樣式 */
-.rl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 18px}
+.rl-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0 18px}
 .rl-stat{background:#fff;border:1px solid #eaf0ed;border-radius:12px;padding:14px 16px}
 .rl-stat-label{font-size:12px;color:#73737c}
 .rl-stat-value{margin-top:6px;font-size:22px;font-weight:700;letter-spacing:-.3px}

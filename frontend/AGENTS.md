@@ -68,3 +68,26 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 ## Role management page (2026-10-28)
 - Admin sidebar order is 使用者管理 → 角色管理 → 群組管理 → 用量與成本. `RolesPage` (`src/live/RolesPage.jsx`) is read-only: it lists the three fixed roles from `constants.js` with live member counts from `listUsers`. The backend has no roles endpoint, so role definitions are not editable here; role changes stay in 使用者管理.
+
+## User management per FE-USER-SPEC (2026-10-29)
+- Source of truth: `specifications/FE-USER-SPEC.md`. `UsersPage.jsx` tabs are 全部 / 啟用 / 停用 (role tabs and 待註冊 tab removed, so there is no role filter; 待註冊 is still shown in the status column).
+- Toolbar has Group and Role dropdowns (defaults 全部群組 / 全部角色) between search and tabs, all combined with AND.
+- UI label for the `department` field is now 群組 everywhere on the page (list, filter placeholder, pre-register dialog, edit page, savebar summary). The API field name stays `department`, and the options are still the 12 departments from `constants.js`. Note the Group filter is a sharing group (`/api/groups`), a different thing from this field.
+- List table: 姓名 (email shown small below the name), 群組 (shows `department`), 角色, 狀態 (停用 / 啟用 only), 最近登入, arrow. The 固定管理員 label and 待註冊 status are not shown in the list; `StatusBadge` also shows only 停用 / 啟用 on the edit page. Group = sharing group from `/api/groups` (`member_emails`, matched case-insensitively on the client); the users list has no group field.
+- Search matches `name` and `email` only (placeholder 搜尋姓名或電子郵件), per §3.3. 群組 is the `department` concept with no hierarchy; resource-sharing is deferred (§9 #14).
+- Stat cards (§3.2) sit under the subtitle: 使用者人數 / 啟用人數 / 停用人數, computed from all loaded users (not the filtered list), with a 收合統計 / 展開統計 toggle (expanded by default). Styled by `.lv-stats` in `admin.css`.
+- Refresh (§3.1) calls the list API only on click. Users and groups load once on mount, not via an effect that depends on `notify`: App recreates `notify` each render, so such an effect would re-call the API after every failure.
+- Original-file-view options use the spec labels: 不可檢視含個資的原始檔（預設） / 可檢視含個資的原始檔（需填用途）.
+- Open items in spec §9 (e.g. audit deep link, unsaved-change confirm, Firebase sync warning) are not implemented until the owner confirms them.
+
+## Role management wired to /api/roles (2026-10-29)
+- `RolesPage` loads `api.listRoles()` (`GET /api/roles`) once on mount. Rows, stats, search, the 全部 / 系統預設 / 自訂 tabs and the 權限設定 header use the response: `name`, `en`, `desc`, `custom`, `suspended`, `member_count`, `permission_count`, `can`. Filtering is client-side on the loaded list.
+- Icons are chosen in the frontend by role id (`ICON` in `RolesPage.jsx`); unknown ids fall back to a generic icon. The backend does not return icons.
+- The page renders only in live mode, so there is no mock data for it in `src/bk/mock.js`.
+- The backend endpoint `GET /api/roles` is admin-only (`require_admin`) and reads the `roles` collection (system roles fall back to built-in values when no document exists).
+- This supersedes the 2026-10-28 note above: role definitions are no longer hard-coded in the page.
+
+## Role list trimmed (2026-10-29)
+- `RolesPage` lists the system roles `admin`, `builder`, `user` (plus any `roles/{id}` custom documents). `ai-reviewer` and `trainer` are not in the list.
+- Role type (系統預設 / 自訂) follows the API `custom` field, which comes from the stored `roles/{id}` document (fallback: id is not admin/builder/user).
+- 角色管理 and 群組管理 have a 重新整理 button (admin only), matching 使用者管理. Refresh keeps the current list on failure.
