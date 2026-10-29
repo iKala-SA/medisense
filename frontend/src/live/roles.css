@@ -7,7 +7,7 @@
 .rl-role{display:flex;align-items:center;gap:12px;min-width:0}
 .rl-role b{display:block;font-weight:600}
 .rl-role small{display:block;margin-top:2px;font-size:12px;color:#9a98a4;white-space:normal}
-.rl-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;background:#e3f5ec;color:#0f7d58;white-space:nowrap}
+.rl-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;background:#e3f5ec;color:#239660;white-space:nowrap}
 .rl-actions{display:flex;justify-content:flex-end;gap:4px}
 .rl-icon-btn{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#5f6462}
 .rl-icon-btn:not(:disabled):hover{background:#ebebea}
@@ -42,7 +42,7 @@
 .rl-res{display:flex;align-items:center;gap:12px}
 .rl-res b{display:block;font-weight:600}
 .rl-res small{display:block;margin-top:2px;font-size:12px;color:#8b918f}
-.rl-res-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0;background:#e3f5ec;color:#0f7d58;display:inline-flex;align-items:center;justify-content:center}
+.rl-res-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0;background:#e3f5ec;color:#239660;display:inline-flex;align-items:center;justify-content:center}
 .rl-empty{text-align:center;color:#8b918f;padding:24px}
 .rl-card-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid #eaf0ed;font-size:13px;color:#5f6462}
 .rl-icon{width:32px;height:32px;border-radius:8px;background:#ecfaf3;color:#1e6242;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}

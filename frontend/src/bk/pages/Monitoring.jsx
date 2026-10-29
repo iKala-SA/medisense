@@ -18,7 +18,7 @@ const SORTS = [
   { id: "cost_per_call", label: "\u6027\u50F9\u6BD4\u6700\u9AD8 (Cost / Call)" },
   { id: "fallbacks", label: "\u964D\u7D1A\u6700\u591A (Fallbacks)" }
 ];
-const SERIES = ["#1e6242", "#5cd99f", "#23945f", "#c3f1dc", "#7de0b2", "#c9c9d2"];
+const SERIES = ["#1e6242", "#5cd99f", "#239660", "#c3f1dc", "#7de0b2", "#c9c9d2"];
 const PAGE = 10;
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const shift = (d, days) => {
