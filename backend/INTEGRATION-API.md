@@ -1,6 +1,6 @@
 # Integration API (Medisense frontend <-> backend) — NEW endpoints
 
-All routes need `Authorization: Bearer <Firebase ID token>` unless noted. Roles: `admin` > `builder` > `user` (run-only).
+All routes need `Authorization: Bearer <Firebase ID token>` unless noted. Roles: `admin` > `builder` > `user` (run-only). The role list (`/api/roles`) shows the system roles `admin`, `builder`, `user` plus custom roles.
 Errors: `{"detail": "..."}` with 401/403/404/409/422/413/415/502. Timestamps are ISO-8601 strings. Existing endpoints are
 unchanged; everything below is additive. Backend cannot be exercised against real Firestore from this repo's tests, see "Notes".
 
@@ -16,7 +16,7 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 `my_role` on skills/schedules/spaces = caller's effective access: `owner | admin | edit | use`.
 `PUT .../share` takes a bare `Share` body and returns the full updated object. Group members must exist (422 otherwise).
 
-## Roles (admin-only, read-only so far)
+## Roles (admin-only, read-only so far; reads Firestore `roles`)
 
 | Method | Path | Role | Notes |
 |---|---|---|---|

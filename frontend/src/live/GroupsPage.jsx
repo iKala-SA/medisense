@@ -1,5 +1,5 @@
 import React,{useState,useMemo} from 'react';
-import {UsersThree,Plus,PencilSimple,Trash,Lock,X} from '@phosphor-icons/react';
+import {ArrowClockwise,UsersThree,Plus,PencilSimple,Trash,Lock,X} from '@phosphor-icons/react';
 import {api} from '../api';
 import {Empty} from '../ListKit';
 import {errText,useOnce} from './pkit';
@@ -42,14 +42,16 @@ function GroupModal({init,users,onClose,onSave}){
 
 export default function GroupsPage({me,notify}){
   const admin=me?.role==='admin';
-  const [rows,setRows]=useState(null),[users,setUsers]=useState([]),[editing,setEditing]=useState(null),[del,setDel]=useState(null);
-  async function load(){try{const r=await api.listGroups();setRows(Array.isArray(r)?r:(r.groups||[]))}catch(e){setRows([]);notify('無法載入群組：'+errText(e))}}
+  const [rows,setRows]=useState(null),[users,setUsers]=useState([]),[editing,setEditing]=useState(null),[del,setDel]=useState(null),[busy,setBusy]=useState(false);
+  async function load(){try{const r=await api.listGroups();setRows(Array.isArray(r)?r:(r.groups||[]))}catch(e){setRows(d=>d||[]);notify('無法載入群組：'+errText(e))}}
+  async function loadUsers(){try{const r=await api.listUsers();setUsers(r.users||[])}catch(e){notify('無法載入使用者清單（仍可手動輸入電子郵件）：'+errText(e))}}
+  async function refresh(){setBusy(true);try{await Promise.all([load(),loadUsers()])}finally{setBusy(false)}}
   useOnce(async()=>{
     if(!admin)return;
     load();
-    try{const r=await api.listUsers();setUsers(r.users||[])}catch(e){notify('無法載入使用者清單（仍可手動輸入電子郵件）：'+errText(e))}
+    loadUsers();
   });
-  const head=<div className="page-heading"><h1><UsersThree/>群組管理</h1>{admin&&<button className="btn primary" onClick={()=>setEditing({})}><Plus/>新增群組</button>}</div>;
+  const head=<div className="page-heading"><h1><UsersThree/>群組管理</h1>{admin&&<div className="lv-actions"><button className="btn" onClick={refresh} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button><button className="btn primary" onClick={()=>setEditing({})}><Plus/>新增群組</button></div>}</div>;
   if(!admin)return <div className="lv-o">{head}<div className="panel access"><Lock size={36}/><h2>僅限管理員</h2><p>群組僅管理員可建立與編輯。</p></div></div>;
   async function openEdit(g){
     try{const full=await api.listGroups().then(r=>(Array.isArray(r)?r:r.groups||[]).find(x=>x.id===g.id)||g);setEditing({...full,member_emails:full.member_emails||g.member_emails||[]})}catch{setEditing(g)}

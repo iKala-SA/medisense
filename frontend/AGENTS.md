@@ -84,5 +84,10 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - `RolesPage` loads `api.listRoles()` (`GET /api/roles`) once on mount. Rows, stats, search, the 全部 / 系統預設 / 自訂 tabs and the 權限設定 header use the response: `name`, `en`, `desc`, `custom`, `suspended`, `member_count`, `permission_count`, `can`. Filtering is client-side on the loaded list.
 - Icons are chosen in the frontend by role id (`ICON` in `RolesPage.jsx`); unknown ids fall back to a generic icon. The backend does not return icons.
 - The page renders only in live mode, so there is no mock data for it in `src/bk/mock.js`.
-- The backend endpoint currently returns hard-coded mock data without auth (temporary, see `backend/app/routers/roles.py`). Do not deploy until it is restored.
+- The backend endpoint `GET /api/roles` is admin-only (`require_admin`) and reads the `roles` collection (system roles fall back to built-in values when no document exists).
 - This supersedes the 2026-10-28 note above: role definitions are no longer hard-coded in the page.
+
+## Role list trimmed (2026-10-29)
+- `RolesPage` lists the system roles `admin`, `builder`, `user` (plus any `roles/{id}` custom documents). `ai-reviewer` and `trainer` are not in the list.
+- Role type (系統預設 / 自訂) follows the API `custom` field, which comes from the stored `roles/{id}` document (fallback: id is not admin/builder/user).
+- 角色管理 and 群組管理 have a 重新整理 button (admin only), matching 使用者管理. Refresh keeps the current list on failure.

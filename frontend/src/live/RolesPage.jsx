@@ -1,5 +1,5 @@
-import React,{useEffect,useMemo,useState} from 'react';
-import {BookOpen,CheckSquare,DotsThree,IdentificationBadge,Info,Key,PencilSimple,Plus,Prohibit,Shield,Trash,Wrench,User} from '@phosphor-icons/react';
+import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {ArrowClockwise,DotsThree,IdentificationBadge,Info,Key,PencilSimple,Plus,Prohibit,Shield,Trash,Wrench,User} from '@phosphor-icons/react';
 import {api} from '../api';
 import {errText} from './constants';
 import {Loading,Notice} from './shared';
@@ -10,7 +10,7 @@ import './roles.css';
 
 const TABS=['全部','系統預設','自訂'];
 // 圖示由前端依角色 id 對應（後端不回傳圖示）；未知的角色使用通用圖示
-const ICON={admin:Shield,builder:Wrench,user:User,'ai-reviewer':CheckSquare,trainer:BookOpen};
+const ICON={admin:Shield,builder:Wrench,user:User};
 const COLS='2.4fr 1fr .8fr .8fr .8fr .6fr';
 
 // 角色資料由 GET /api/roles 提供（目前為後端假資料）。此頁僅供檢視，不提供編輯。
@@ -20,12 +20,15 @@ export default function RolesPage({me,notify}){
   const [search,setSearch]=useState('');
   const [menuFor,setMenuFor]=useState(null);
   const [permRole,setPermRole]=useState(null);
+  const [busy,setBusy]=useState(false);
   const admin=me?.role==='admin';
 
-  useEffect(()=>{
-    if(!admin)return;
-    api.listRoles().then(setData).catch(e=>{notify?.('載入角色失敗：'+errText(e));setData({roles:[],stats:null})});
-  },[admin]);// eslint-disable-line react-hooks/exhaustive-deps
+  const load=useCallback(()=>{
+    setBusy(true);
+    return api.listRoles().then(setData).catch(e=>{notify?.('載入角色失敗：'+errText(e));setData(d=>d||{roles:[],stats:null})}).finally(()=>setBusy(false));
+  },[notify]);
+  // mount only: `notify` changes identity on every App render (see UsersPage)
+  useEffect(()=>{if(admin)load()},[admin]);// eslint-disable-line react-hooks/exhaustive-deps
 
   // 點擊其他地方或按 Esc 關閉操作選單
   useEffect(()=>{
@@ -46,14 +49,13 @@ export default function RolesPage({me,notify}){
   if(permRole)return <RolePermissionsPage role={permRole} onBack={()=>setPermRole(null)}/>;
 
   return <div className="card-page lv-page rl-page">
-    <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn primary" disabled title="尚未開放線上新增"><Plus/>新增角色</button></div></div>
+    <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button><button className="btn primary" disabled title="尚未開放線上新增"><Plus/>新增角色</button></div></div>
     <p className="subtitle">檢視平台角色的權限範圍與目前指派人數。角色變更請至「使用者管理」進行。</p>
 
     <div className="rl-stats">
       <div className="rl-stat"><div className="rl-stat-label">角色總數</div><div className="rl-stat-value">{stats?.total_roles??'—'}<small>個</small></div></div>
       <div className="rl-stat"><div className="rl-stat-label">系統預設角色</div><div className="rl-stat-value">{stats?.system_roles??'—'}<small>個</small></div></div>
       <div className="rl-stat"><div className="rl-stat-label">自訂角色</div><div className="rl-stat-value">{stats?.custom_roles??'—'}<small>個</small></div></div>
-      <div className="rl-stat"><div className="rl-stat-label">已指派使用者</div><div className="rl-stat-value">{stats?.assigned_users??'—'}<small>人</small></div></div>
     </div>
 
     <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋角色名稱" tabs={TABS} tab={tab} onTab={setTab}/>

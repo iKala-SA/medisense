@@ -10,7 +10,8 @@ audit/{autoId}                   who did what, when (append-only)
 usage/{autoId}                   one row per LLM call: tokens, cost, served model (no prompt text)
 usage_daily/{day}_{agentId}      per-agent daily rollup read by the admin monitoring dashboard
 groups/{id}                      sharing groups: name, description, member_emails[]
-roles/{id}                       overrides for system roles (admin/builder/user) + custom roles: name, en, desc, suspended, can{resource: [actions]}
+roles/{id}                       role definitions: system roles (admin/builder/user) may be overridden; custom roles are the rest.
+                                 id, name, en, desc, custom, suspended, can[labels], created_at, created_by, updated_at, updated_by
 skills/{id}                      reusable instructions: name, description, instructions, enabled, share, owner_*
 schedules/{id}                   agent runs on a rhythm: agent_id, frequency, time, prompt, enabled, last_run, share
 schedule_locks/{id}_{slot}       one doc per schedule per minute, created atomically so a run happens once
