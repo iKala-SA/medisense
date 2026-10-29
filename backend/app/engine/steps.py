@@ -137,7 +137,8 @@ def _clip(s: str) -> str:
 
 
 def _group(agent: AgentIn, step: Step, text: str) -> tuple[str, str]:
-    node = FlowNode(id=step.id, type="llm", data={"group": PREF_GROUP[agent.capabilities.model_pref]})
+    pref = step.config.get("output_pref")  # a step may choose its own 輸出偏好; otherwise the agent's model preference applies
+    node = FlowNode(id=step.id, type="llm", data={"group": PREF_GROUP.get(pref) or PREF_GROUP[agent.capabilities.model_pref]})
     return flow.pick_group(agent, node, text)
 
 
@@ -203,9 +204,11 @@ def _do_step(st: Step, cfg: dict, ctx: dict[str, str], *, agent: AgentIn, agent_
         return _clip(c.text), [{"title": s.get("title", ""), "url": s.get("url", "")} for s in c.sources], prompt
     if st.type == "knowledge_query":
         from . import rag
-        if not rag_files:
+        from .capabilities import space_rag_files
+        files = space_rag_files(user, [x for x in cfg.get("spaces") or [] if isinstance(x, str)]) if cfg.get("spaces") else rag_files  # 指定資源
+        if not files:
             return "（此 Agent 沒有設定知識來源）", [], prompt
-        chunks = rag.retrieve(rag.hospital_corpus(), rag_files, prompt, top_k=5)
+        chunks = rag.retrieve(rag.hospital_corpus(), files, prompt, top_k=5)
         texts = deid.deidentify_many([c["text"] for c in chunks])
         if not chunks:
             return "（在你有權限的知識來源中找不到相關內容）", [], prompt

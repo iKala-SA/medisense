@@ -29,7 +29,7 @@ function fromDOM(el){
 }
 
 /** steps = the steps this prompt may reference (those before the current one). */
-export default function MentionEditor({value,onChange,steps,placeholder,rows=4,loopItem=false}){
+export default function MentionEditor({value,onChange,steps,placeholder,rows=3,invalid=false}){
   const ref=useRef(null),last=useRef(null),[pop,setPop]=useState(null),[sel,setSel]=useState(0);
   const ids=steps.map(s=>s.id).join(',');
   useLayoutEffect(()=>{ // only re-render the DOM when the value changed from outside (typing keeps the caret)
@@ -61,7 +61,7 @@ export default function MentionEditor({value,onChange,steps,placeholder,rows=4,l
     }
   };
   return <div className="mt-wrap">
-    <div ref={ref} className="mt-edit" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" data-placeholder={placeholder}
+    <div ref={ref} className={'mt-edit'+(invalid?' invalid':'')} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" data-placeholder={placeholder}
       style={{minHeight:rows*22}} onInput={onInput} onKeyDown={onKey} onBlur={()=>setTimeout(()=>setPop(null),150)}
       onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'))}}/>
     {pop&&list.length>0&&<div className="mt-pop" role="listbox">{list.map((s,i)=><button key={s.id} type="button" role="option" aria-selected={i===sel} className={i===sel?'on':''} onMouseDown={e=>{e.preventDefault();pick(s)}}><b>@{s.title}</b></button>)}</div>}

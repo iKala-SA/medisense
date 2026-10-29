@@ -115,3 +115,19 @@ def test_inputs_are_deidentified_before_storage_and_a_run_can_continue_in_chat(f
     assert as_user(BUILDER2).post(f"/api/step-runs/{run['id']}/to-chat", json={}).status_code == 404
     waiting = c.post(f"/api/agents/{make(c, [S('s1', 'action', 'x', connector_id='c', action='a', prompt='p')])}/step-runs", json={"use_published": False})
     assert waiting.status_code in (200, 422)
+
+
+def test_a_step_can_pick_its_own_output_preference_and_knowledge_spaces(fs, as_user, monkeypatch):
+    calls = fake_llm(monkeypatch)
+    seen = {}
+    monkeypatch.setattr("app.engine.rag.hospital_corpus", lambda: "corpus")
+    monkeypatch.setattr("app.engine.rag.retrieve", lambda corpus, files, q, top_k=5: (seen.update(files=files) or [{"text": "內容", "source": "辦法.pdf", "uri": "u", "score": 0.1}]))
+    monkeypatch.setattr("app.engine.deid.deidentify_many", lambda xs: xs)
+    fs.put("spaces/sp1", {"name": "S", "type": "org", "document_ids": ["d1"]})
+    fs.put("documents/d1", {"status": "indexed", "rag_file": "projects/p/ragFiles/F1"})
+    c = as_user(BUILDER)
+    aid = make(c, [S("s1", "llm_generate", "快", prompt="x", output_pref="fast"), S("s2", "llm_generate", "多", prompt="y", output_pref="balanced"),
+                   S("s3", "knowledge_query", "查", prompt="辦法", spaces=["sp1"])])
+    run = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": False}).json()
+    assert run["status"] == "succeeded", run
+    assert calls[0]["group"] == "fast" and seen["files"] == ["projects/p/ragFiles/F1"]

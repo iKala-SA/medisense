@@ -224,3 +224,48 @@
 .ag-row2 .own,.ag-row2 .when{color:var(--mut);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ag-row2 .act{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 @media(max-width:900px){.ag-rowh{display:none}.ag-row2{grid-template-columns:1fr auto;padding:12px 16px}.ag-row2 .own,.ag-row2 .when,.ag-row2 .st{display:none}}
+
+/* ===== v3: fit the viewport (no page scroll), compact cards, per-step settings ===== */
+main.card-page:has(.ag-editor.v2){height:calc(100vh - 44px)!important;max-height:calc(100vh - 44px);flex:none!important;padding-bottom:0!important;overflow:hidden}
+.main-shell:has(.ag-editor.v2){height:100vh;overflow:hidden}
+main.card-page:has(.ag-editor.v2)>*{height:100%}
+.ag-root:has(.ag-editor.v2){display:flex;flex-direction:column;padding:8px 0 14px;height:100%}
+.ag-editor.v2{display:flex;flex-direction:column;flex:1;min-height:0}
+.ag-top{padding:0 0 10px}.ag-top .ag-back{padding:0}
+.ag-root input.ag-name.big{font-size:26px}
+.ag-canvas{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);padding:16px;overflow:hidden}
+.ag-canvas.run{overflow:auto}
+.ag-left{position:static;display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:hidden}
+.ag-editbody{flex:1;min-height:0;overflow:auto}
+.ag-editfoot{margin:0;padding:12px 22px;border-top:1px solid #eceef1;background:#fff}
+.ag-canvascol{height:100%;overflow:auto;padding:2px 6px 8px 2px;min-height:0}
+.ag-canvascol::-webkit-scrollbar{width:8px}.ag-canvascol::-webkit-scrollbar-thumb{background:#cfd3d8;border-radius:4px}
+.ag-info{margin-bottom:10px;padding:10px 14px;font-size:13.5px}
+.ag-gap{height:22px}.ag-gap.over{background:linear-gradient(transparent 9px,var(--brand) 9px,var(--brand) 12px,transparent 12px)}
+.ag-addrow{margin-top:14px}.ag-addpill{height:42px;padding:0 20px;font-size:15px}
+/* cards shrink as steps are added */
+[data-density=compact] .ag-node{padding:10px 14px 10px 6px;gap:10px}[data-density=compact] .ag-node .grip{margin:-10px 0 -10px -6px}
+[data-density=compact] .ag-node h4{font-size:16px;margin:0}[data-density=compact] .ag-node p{font-size:13px;line-height:1.5}[data-density=compact] .ag-node p.pr{-webkit-line-clamp:1}
+[data-density=compact] .ag-tile{width:34px!important;height:34px!important;border-radius:10px}[data-density=compact] .ag-gap{height:14px}[data-density=compact] .ag-node .chips{display:none}
+[data-density=mini] .ag-node{padding:6px 12px 6px 4px;gap:10px;align-items:center}[data-density=mini] .ag-node .grip{margin:-6px 0 -6px -4px}
+[data-density=mini] .ag-node h4{font-size:14.5px;margin:0}[data-density=mini] .ag-node p{display:none}[data-density=mini] .ag-node .chips{display:none}
+[data-density=mini] .ag-tile{width:28px!important;height:28px!important;border-radius:8px}[data-density=mini] .ag-tile svg{width:16px;height:16px}[data-density=mini] .ag-gap{height:10px}
+[data-density=mini] .ag-node .bd{flex-direction:row;align-items:center;gap:12px}[data-density=mini] .ag-addrow{margin-top:8px}[data-density=mini] .ag-addpill{height:36px;font-size:14px}
+[data-density=mini] .ag-info,[data-density=compact] .ag-info{display:none}
+/* edit-card widgets */
+.ag-editcard>h3{font-size:19px;margin-bottom:0}.ag-editcard>h3 .ttl{flex:1}.ag-editcard>h3 .ag-switch{margin-left:auto}
+.ag-field>label.bad{color:#c0312f}.ag-field>label svg{vertical-align:-2px;color:#6b6e75;margin-left:2px}
+.ag-count{color:#6b6e75;font-size:12.5px}.ag-help{color:#4a4d54;font-size:12.5px;line-height:1.5}.ag-err{color:#c0312f;font-size:13px;font-weight:500}
+.mt-edit.invalid{border-color:#c0312f;box-shadow:0 0 0 1px #c0312f}
+.ag-srctabs{display:flex;gap:2px;padding:4px;border-radius:12px;background:#f1f2f4;overflow-x:auto}
+.ag-srctabs button{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:9px;background:none;color:#4a4d54;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer}
+.ag-srctabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.14)}.ag-srctabs button:first-child svg{color:#a11cb8}.ag-srctabs button:nth-child(2) svg{color:#6d3df0}.ag-srctabs button:nth-child(3) svg{color:#d1316b}
+.ag-radios{display:flex;flex-direction:column;gap:8px}
+.ag-radios button{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border:1.5px solid #d9dce1;border-radius:14px;background:#fff;text-align:left;cursor:pointer}
+.ag-radios button.on{border-color:var(--brand);background:#f3fbf6}.ag-radios b{font-size:15px;font-weight:600;display:block}.ag-radios small{font-size:13px;color:#4a4d54}
+.ag-radios i{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid #9aa0aa;position:relative}.ag-radios button.on i{border-color:var(--brand)}.ag-radios button.on i::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--brand)}
+.ag-check{display:flex;align-items:center;gap:10px;font-size:14px;color:#2b2e33;cursor:pointer}.ag-root .ag-check input[type=checkbox]{width:18px;height:18px;padding:0;accent-color:#239660;flex:none}
+.ag-checklist{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid #e1e4e8;border-radius:12px;max-height:160px;overflow:auto}
+.ag-canvascol .ag-addrow{position:sticky;bottom:0;padding:10px 0 4px;background:linear-gradient(to top,#f6f7f9 70%,transparent)}
+
+.ag-addmenu{position:static}.ag-addpop{position:fixed;translate:none;z-index:80;top:0;left:0;max-height:min(640px,calc(100vh - 16px))}.ag-addmenu>.ag-dismiss{z-index:79}

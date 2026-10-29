@@ -7,14 +7,14 @@ export const TONE={input:['#e4effd','#1f6fe0'],ai:['#f5e9ff','#a11cb8'],data:['#
 export const STEP_TYPES={
   text_input:{label:'文字輸入',cat:'input',icon:TextT,ready:true,hint:'執行時向使用者收集一段文字'},
   file_upload:{label:'檔案上傳',cat:'input',icon:UploadSimple,ready:true,hint:'執行時請使用者上傳文件'},
-  llm_generate:{label:'通用知識',cat:'ai',icon:Sparkle,ready:true,hint:'用 AI 依提示詞產生內容'},
-  web_search:{label:'網路搜尋',cat:'ai',icon:Globe,ready:true,hint:'搜尋網路並附來源'},
+  llm_generate:{label:'一般知識',cat:'ai',icon:Sparkle,ready:true,hint:'直接從基礎 AI 模型取得回應'},
+  web_search:{label:'Web 搜尋',cat:'ai',icon:Globe,ready:true,hint:'使用 Web 搜尋取得回應'},
   research:{label:'深度研究',cat:'ai',icon:MagnifyingGlassPlus,ready:false,hint:'長時間的深入研究'},
-  agent_call:{label:'呼叫 Agent',cat:'ai',icon:Robot,ready:false,hint:'交給另一個 Agent 處理'},
+  agent_call:{label:'呼叫 Agent',cat:'ai',icon:Robot,ready:false,hint:'從自訂 Agent 取得回應'},
   browser_agent:{label:'UI Agent',cat:'ai',icon:Cursor,ready:false,hint:'操作公開網站'},
   image_generate:{label:'產生圖片',cat:'ai',icon:Image,ready:false,hint:'依描述產生圖片'},
-  knowledge_query:{label:'內部知識查詢',cat:'data',icon:BookOpen,ready:true,hint:'查詢院內知識來源並附引用'},
-  data_insight:{label:'儀表板／資料主題',cat:'data',icon:ChartBar,ready:false,hint:'向儀表板或資料主題取得洞察'},
+  knowledge_query:{label:'內部知識',cat:'ai',icon:BookOpen,ready:true,hint:'查詢院內知識來源並附引用',inMenu:false},
+  data_insight:{label:'儀表板／資料主題',cat:'data',icon:ChartBar,ready:false,hint:'向儀表板或資料主題取得洞察',inMenu:false},
   action:{label:'連接器動作',cat:'action',icon:Lightning,ready:true,hint:'對外部系統執行動作（可要求核准）'},
   reasoning_group:{label:'Reasoning Group',cat:'logic',icon:TreeStructure,ready:false,hint:'迴圈、條件、驗證'},
 };
@@ -25,7 +25,7 @@ export const uid=()=>Math.random().toString(36).slice(2,8);
 export function newStep(type,steps){
   const meta=STEP_TYPES[type],base=meta.label;let n=1,title=base;
   const titles=new Set(steps.map(s=>s.title));while(titles.has(title))title=`${base} ${++n}`;
-  const config={text_input:{placeholder:'',default:'',allow_override:true,required:true},file_upload:{required:true},llm_generate:{prompt:'',creativity:0.3},
+  const config={text_input:{placeholder:'',default:'',allow_override:true,required:true},file_upload:{required:true},llm_generate:{prompt:'',creativity:0.3,output_pref:'balanced'},
     web_search:{prompt:''},knowledge_query:{prompt:''},action:{connector_id:'',action:'',prompt:'',require_approval:true}}[type]||{};
   return {id:'s'+uid(),type,title,description:'',enabled:true,on_error:'stop',config,children:[]};
 }

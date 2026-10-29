@@ -79,9 +79,9 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
     {mode==='edit'?<div className="ag-canvas">
       <div className="ag-left">
         {sel==='agent'||!sel||!a.steps.some(s=>s.id===sel)
-          ?<div className="ag-editcard"><h3><Tile tone="agent" size={40}><span className="em">{a.icon||'✦'}</span></Tile>編輯 Agent</h3>
-            <SettingsPanel a={a} set={edit} canEdit={canEdit} features={lib.features} connectors={lib.connectors} spaces={lib.spaces} docs={lib.docs}/></div>
-          :<StepEditPanel steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} canEdit={canEdit}/>}
+          ?<div className="ag-editbody"><div className="ag-editcard"><h3><Tile tone="agent" size={40}><span className="em">{a.icon||'✦'}</span></Tile><span className="ttl"><span className="t">Agent 設定</span><small>角色指令與能力</small></span></h3>
+            <SettingsPanel a={a} set={edit} canEdit={canEdit} features={lib.features} connectors={lib.connectors} spaces={lib.spaces} docs={lib.docs}/></div></div>
+          :<StepEditPanel steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} spaces={lib.spaces} canEdit={canEdit}/>}
       </div>
       <StepCanvas steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel||'agent'} setSel={setSel} connectors={lib.connectors} canEdit={canEdit} agent={a}/>
     </div>
