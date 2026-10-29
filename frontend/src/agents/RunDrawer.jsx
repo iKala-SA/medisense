@@ -4,7 +4,7 @@ import {api} from '../api';
 import RunView from './RunView';
 
 /* Test run of the DRAFT. Agents with steps: a form made from the input steps, then the run. Chat-only agents: a small chat. */
-export default function RunDrawer({agent,onClose,notify,onRan}){
+export default function RunDrawer({agent,onClose,notify,onRan,inline}){
   const inputs=agent.steps.filter(s=>(s.type==='text_input'||s.type==='file_upload')&&s.enabled);
   const [vals,setVals]=useState(()=>Object.fromEntries(inputs.filter(s=>s.type==='text_input').map(s=>[s.id,s.config?.default||''])));
   const [files,setFiles]=useState({}),[run,setRun]=useState(null),[busy,setBusy]=useState(false);
@@ -20,8 +20,8 @@ export default function RunDrawer({agent,onClose,notify,onRan}){
     try{const r=await api.run(agent.id,text,sid.current||undefined,false);sid.current=r.session_id;setChat(c=>[...c,{role:'assistant',text:r.reply}])}
     catch(e){setChat(c=>[...c,{role:'error',text:e.message}])}finally{setBusy(false)}
   };
-  return <div className="ag-drawer" role="dialog" aria-label="測試執行">
-    <header><h3>{agent.steps.length?'測試執行':'對話測試'}<small>使用目前的草稿</small></h3><button className="ag-icon" aria-label="關閉" onClick={onClose}><X size={18}/></button></header>
+  return <div className={'ag-drawer'+(inline?' inline':'')} role={inline?undefined:'dialog'} aria-label="測試執行">
+    <header><h3>{agent.steps.length?'測試執行':'對話測試'}<small>使用目前的草稿</small></h3>{!inline&&<button className="ag-icon" aria-label="關閉" onClick={onClose}><X size={18}/></button>}</header>
     <div className="ag-drawer-body">
     {agent.steps.length?<>
       {!run&&<div className="ag-form">

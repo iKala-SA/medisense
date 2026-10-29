@@ -1,7 +1,9 @@
 import {TextT,UploadSimple,Sparkle,Globe,BookOpen,Lightning,MagnifyingGlassPlus,Robot,Image,ChartBar,TreeStructure,Cursor} from '@phosphor-icons/react';
 
 /* Step catalogue (PRD §5). `ready` = runs today (phase 1); the others are listed so the creator sees what is coming. */
-export const CATS=[['輸入','input'],['AI 回應','ai'],['資料','data'],['動作','action'],['邏輯','logic']];
+export const CATS=[['使用者輸入','input'],['AI 回應','ai'],['資料洞察','data'],['動作','action'],['流程邏輯','logic']];
+/* colour of each category's icon tile (colourful on purpose, like the reference: input blue, AI purple-pink, data rose, action orange, logic violet) */
+export const TONE={input:['#e4effd','#1f6fe0'],ai:['#f5e9ff','#a11cb8'],data:['#ffe8ef','#d1316b'],action:['#fff0e4','#ef5a1f'],logic:['#efe8ff','#6d3df0'],agent:['#e3f5ea','#239660']};
 export const STEP_TYPES={
   text_input:{label:'文字輸入',cat:'input',icon:TextT,ready:true,hint:'執行時向使用者收集一段文字'},
   file_upload:{label:'檔案上傳',cat:'input',icon:UploadSimple,ready:true,hint:'執行時請使用者上傳文件'},

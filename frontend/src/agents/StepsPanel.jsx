@@ -1,19 +1,24 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Plus,DotsSixVertical,Copy,Trash,Warning,WarningCircle,Eye,EyeSlash,Lock} from '@phosphor-icons/react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {Plus,DotsSixVertical,Copy,Trash,Warning,WarningCircle,Info,X} from '@phosphor-icons/react';
 import {api} from '../api';
 import MentionEditor from './MentionEditor';
-import {CATS,STEP_TYPES,ON_ERROR,newStep,validate,summary,refsOf,uid,REF} from './stepkit';
+import {TONE,CATS,STEP_TYPES,ON_ERROR,newStep,validate,summary,refsOf,uid,REF} from './stepkit';
 
 const Switch=({on,onChange,label})=><button type="button" role="switch" aria-checked={on} aria-label={label} className={'ag-switch'+(on?' on':'')} onClick={()=>onChange(!on)}><span/></button>;
 
+
+export const Tile=({tone,children,size=44})=><span className="ag-tile" style={{width:size,height:size,background:TONE[tone][0],color:TONE[tone][1]}}>{children}</span>;
+
+/* Two-column step picker (reference layout): AI 回應 + 流程邏輯 on the left, 資料洞察 + 動作 + 使用者輸入 on the right. */
 function AddMenu({onPick,onClose}){
-  return <div className="ag-addmenu" role="menu"><div className="ag-dismiss" onClick={onClose}/><div className="ag-addpop">
-    {CATS.map(([label,key])=>{const items=Object.entries(STEP_TYPES).filter(([,m])=>m.cat===key);return <div key={key}><h5>{label}</h5>
-      {items.map(([type,m])=>{const I=m.icon;return <button key={type} type="button" role="menuitem" disabled={!m.ready} onClick={()=>{onPick(type);onClose()}}><I size={17}/><span><b>{m.label}</b><small>{m.ready?m.hint:'即將推出'}</small></span>{!m.ready&&<Lock size={12}/>}</button>})}</div>})}
-  </div></div>;
+  const pop=useRef(null);useLayoutEffect(()=>{const el=pop.current;if(!el)return;el.style.transform='';const r=el.getBoundingClientRect();const dy=r.bottom>window.innerHeight-8?window.innerHeight-8-r.bottom:0;if(dy)el.style.transform=`translateY(${dy}px)`});
+  const col=keys=>keys.map(key=>{const label=CATS.find(c=>c[1]===key)[0];return <div key={key} className="ag-addcat"><h5>{label}</h5>
+    {Object.entries(STEP_TYPES).filter(([,m])=>m.cat===key).map(([type,m])=>{const I=m.icon;return <button key={type} type="button" role="menuitem" disabled={!m.ready} onClick={()=>{onPick(type);onClose()}}>
+      <Tile tone={key} size={40}><I size={20}/></Tile><span><b>{m.label}{!m.ready&&<em>即將推出</em>}</b><small>{m.hint}</small></span></button>})}</div>});
+  return <div className="ag-addmenu" role="menu"><div className="ag-dismiss" onClick={onClose}/><div className="ag-addpop" ref={pop}><div>{col(['ai','logic'])}</div><div>{col(['data','action','input'])}</div></div></div>;
 }
 
-function Config({st,idx,steps,set,connectors,canEdit}){
+export function Config({st,idx,steps,set,connectors,canEdit}){
   const before=steps.slice(0,idx),c=st.config||{},setC=p=>set({config:{...c,...p}});
   const [acts,setActs]=useState([]);
   useEffect(()=>{if(st.type==='action'&&c.connector_id)api.connectorActions(c.connector_id).then(l=>setActs(l||[])).catch(()=>setActs([]));else setActs([])},[st.type,c.connector_id]);
@@ -43,48 +48,69 @@ function Config({st,idx,steps,set,connectors,canEdit}){
   </div>;
 }
 
-export default function StepsPanel({steps,setSteps,connectors,canEdit}){
-  const [sel,setSel]=useState(steps[0]?.id||null),[add,setAdd]=useState(null),[drag,setDrag]=useState(null),[over,setOver]=useState(null);
+
+/* a prompt with its @ references drawn as chips */
+export function PromptView({text,steps}){
+  const out=[];let at=0;const t=text||'';
+  for(const m of t.matchAll(REF)){out.push(t.slice(at,m.index));const st=steps.find(x=>x.id===m[1]);out.push(<span key={m.index} className={'mt'+(st?'':' bad')}>@{st?st.title:'已刪除'}</span>);at=m.index+m[0].length}
+  out.push(t.slice(at));return <>{out}</>;
+}
+const PREF={fast:'快速回應',balanced:'多功能性和效能',quality:'高品質'};
+function CardBody({st,steps,connectors,pref}){
+  const c=st.config||{};
+  if(st.type==='text_input')return <p><b>預留位置：</b>{c.placeholder||'（無）'}{c.default?<span className="sep"><b>預設值：</b>{c.default}</span>:null}</p>;
+  if(st.type==='file_upload')return <p>請使用者在執行時上傳檔案（先去識別化）</p>;
+  if(st.type==='action'){const cn=connectors.find(x=>x.id===c.connector_id);return <><p><b>連接器：</b>{cn?(cn.name||cn.label||cn.type):'尚未選擇'}{c.action?` · ${c.action}`:''}{c.require_approval!==false&&<span className="ag-chip">執行前核准</span>}</p><p className="pr"><b>提示：</b><PromptView text={c.prompt} steps={steps}/></p></>}
+  return <>{st.type==='llm_generate'&&<p><b>輸出偏好：</b>{PREF[pref]}</p>}<p className="pr"><b>提示：</b>{c.prompt?<PromptView text={c.prompt} steps={steps}/>:<em className="warn">尚未填寫</em>}</p></>;
+}
+
+/** The canvas column: info banner, the agent card, the step cards, and 「新增步驟」. */
+export default function StepCanvas({steps,setSteps,sel,setSel,connectors,canEdit,agent}){
+  const [add,setAdd]=useState(null),[drag,setDrag]=useState(null),[over,setOver]=useState(null),[banner,setBanner]=useState(true);
   const problems=useMemo(()=>validate(steps),[steps]);
-  const idx=steps.findIndex(s=>s.id===sel),st=steps[idx];
-  useEffect(()=>{if(!steps.some(s=>s.id===sel))setSel(steps[0]?.id||null)},[steps.length]);// eslint-disable-line
   const put=(i,type)=>{const s=newStep(type,steps);const n=[...steps];n.splice(i,0,s);setSteps(n);setSel(s.id)};
+  const move=(from,to)=>{if(from===to||from+1===to)return;const n=[...steps],[m]=n.splice(from,1);n.splice(to>from?to-1:to,0,m);setSteps(n)};
+  const errFor=id=>problems.filter(p=>p.step_id===id);
+  const errs=problems.filter(p=>p.level==='error').length;
+  const cap=agent.capabilities;
+  return <div className="ag-canvascol">
+    {banner&&<div className="ag-info"><Info size={20}/><span>步驟的輸入與輸出都會先去識別化再交給模型；寫入類動作預設要你核准後才會執行。</span><button aria-label="關閉" onClick={()=>setBanner(false)}><X size={16}/></button></div>}
+    {errs>0&&<div className="ag-banner err" role="status"><Warning size={16}/><div><b>{errs} 個錯誤，修正後才能發布</b><ul>{problems.filter(p=>p.level==='error').slice(0,5).map((p,i)=><li key={i}><button type="button" onClick={()=>p.step_id&&setSel(p.step_id)}>{p.message}</button></li>)}</ul></div></div>}
+    <div className={'ag-node agentnode'+(sel==='agent'?' on':'')} onClick={()=>setSel('agent')}>
+      <span className="grip off"/><Tile tone="agent"><span className="em">{agent.icon||'✦'}</span></Tile>
+      <div className="bd"><h4>Agent 設定</h4><p className="pr">{(agent.instructions||'').slice(0,90)||'尚未填寫角色指令'}</p>
+        <div className="chips">{cap.web_search&&<span className="ag-chip">網路搜尋</span>}{cap.connectors.length>0&&<span className="ag-chip">{cap.connectors.length} 個連接器</span>}{cap.spaces.length>0&&<span className="ag-chip">{cap.spaces.length} 個知識空間</span>}<span className="ag-chip">{PREF[cap.model_pref]}</span></div></div>
+    </div>
+    {steps.map((s,i)=>{const m=STEP_TYPES[s.type]||STEP_TYPES.llm_generate,I=m.icon,e=errFor(s.id);return <React.Fragment key={s.id}>
+      <div className={'ag-gap'+(over===i?' over':'')} onDragOver={ev=>{if(drag!=null){ev.preventDefault();setOver(i)}}} onDrop={()=>{move(drag,i);setDrag(null);setOver(null)}}>
+        {canEdit&&<span className="ag-gapbtn"><button type="button" aria-label="在這裡新增步驟" onClick={()=>setAdd(add===i?null:i)}><Plus size={14}/></button>{add===i&&<AddMenu onPick={t=>put(i,t)} onClose={()=>setAdd(null)}/>}</span>}</div>
+      <div className={'ag-node'+(s.id===sel?' on':'')+(s.enabled?'':' off')+(drag===i?' drag':'')} draggable={canEdit} onDragStart={()=>setDrag(i)} onDragEnd={()=>{setDrag(null);setOver(null)}} onClick={()=>setSel(s.id)}>
+        <span className="grip">{canEdit&&<DotsSixVertical size={18}/>}</span><Tile tone={m.cat}><I size={22}/></Tile>
+        <div className="bd"><h4>{s.title}{!s.enabled&&<span className="ag-chip">已停用</span>}{e.some(x=>x.level==='error')?<WarningCircle size={18} weight="fill" className="bad"/>:e.length?<Warning size={18} weight="fill" className="warn"/>:null}</h4>
+          <CardBody st={s} steps={steps.slice(0,i)} connectors={connectors} pref={agent.capabilities.model_pref}/></div>
+      </div></React.Fragment>})}
+    {canEdit&&<div className="ag-addrow"><button type="button" className="ag-addpill" onClick={()=>setAdd(add==='end'?null:'end')}><Plus size={17}/>新增步驟</button>{add==='end'&&<AddMenu onPick={t=>put(steps.length,t)} onClose={()=>setAdd(null)}/>}</div>}
+    {!steps.length&&<p className="ag-muted center">沒有步驟時，這就是一個純對話 Agent。需要固定流程（輸入 → 查資料 → 產出 → 寄送）時，新增步驟。</p>}
+  </div>;
+}
+
+/** The left card: edit the selected step (delete / duplicate at the bottom). */
+export function StepEditPanel({steps,setSteps,sel,setSel,connectors,canEdit}){
+  const idx=steps.findIndex(s=>s.id===sel),st=steps[idx];
+  if(!st)return null;
+  const m=STEP_TYPES[st.type]||{},I=m.icon;
   const patch=p=>setSteps(steps.map(s=>s.id===sel?{...s,...p}:s));
   const dup=()=>{const s={...st,id:'s'+uid(),title:st.title+' (複本)',config:JSON.parse(JSON.stringify(st.config||{}))};const n=[...steps];n.splice(idx+1,0,s);setSteps(n);setSel(s.id)};
   const del=()=>{
     const users=steps.filter(s=>s.id!==st.id&&refsOf(s).includes(st.id));
-    if(!window.confirm(users.length?`刪除「${st.title}」後，下列 Step 對它的 @ 引用會一併移除：\n${users.map(u=>'・'+u.title).join('\n')}\n\n確定刪除？`:`刪除「${st.title}」？`))return;
-    const strip=v=>typeof v==='string'?v.replace(REF,m=>m.includes(st.id)?'':m):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,strip(x)])):v;
-    setSteps(steps.filter(s=>s.id!==st.id).map(s=>({...s,config:strip(s.config)})));
+    if(!window.confirm(users.length?`刪除「${st.title}」後，下列步驟對它的 @ 引用會一併移除：\n${users.map(u=>'・'+u.title).join('\n')}\n\n確定刪除？`:`刪除「${st.title}」？`))return;
+    const strip=v=>typeof v==='string'?v.replace(REF,x=>x.includes(st.id)?'':x):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,y])=>[k,strip(y)])):v;
+    setSteps(steps.filter(s=>s.id!==st.id).map(s=>({...s,config:strip(s.config)})));setSel('agent');
   };
-  const move=(from,to)=>{if(from===to||from+1===to)return;const n=[...steps],[m]=n.splice(from,1);n.splice(to>from?to-1:to,0,m);setSteps(n)};
-  const errFor=id=>problems.filter(p=>p.step_id===id);
-  const errs=problems.filter(p=>p.level==='error').length,warns=problems.filter(p=>p.level==='warning').length;
-  return <div className="ag-steps">
-    {problems.length>0&&<div className={'ag-banner '+(errs?'err':'warn')} role="status"><Warning size={16}/><div><b>{errs?`${errs} 個錯誤，修正後才能發布`:`${warns} 個提醒`}</b>
-      <ul>{problems.slice(0,6).map((p,i)=><li key={i}><button type="button" onClick={()=>p.step_id&&setSel(p.step_id)}>{p.message}</button></li>)}</ul></div></div>}
-    <div className="ag-steps-grid">
-      <div className="ag-steplist">
-        {steps.map((s,i)=>{const m=STEP_TYPES[s.type]||STEP_TYPES.llm_generate,I=m.icon,e=errFor(s.id);return <React.Fragment key={s.id}>
-          <div className={'ag-insert'+(over===i?' over':'')} onDragOver={ev=>{if(drag!=null){ev.preventDefault();setOver(i)}}} onDrop={()=>{move(drag,i);setDrag(null);setOver(null)}}>
-            {canEdit&&<button type="button" aria-label="在這裡新增 Step" onClick={()=>setAdd(add===i?null:i)}><Plus size={13}/></button>}{add===i&&<AddMenu onPick={t=>put(i,t)} onClose={()=>setAdd(null)}/>}</div>
-          <div className={'ag-step'+(s.id===sel?' on':'')+(s.enabled?'':' off')+(drag===i?' drag':'')} draggable={canEdit} onDragStart={()=>setDrag(i)} onDragEnd={()=>{setDrag(null);setOver(null)}} onClick={()=>setSel(s.id)}>
-            {canEdit&&<DotsSixVertical size={16} className="grip"/>}<span className="ic"><I size={18}/></span>
-            <div className="tx"><b>{i+1}. {s.title}</b><small>{summary(s,connectors)}</small></div>
-            {e.some(x=>x.level==='error')?<WarningCircle size={17} weight="fill" className="bad"/>:e.length?<Warning size={17} weight="fill" className="warn"/>:null}{!s.enabled&&<EyeSlash size={15}/>}
-          </div></React.Fragment>})}
-        <div className={'ag-insert last'+(over===steps.length?' over':'')} onDragOver={ev=>{if(drag!=null){ev.preventDefault();setOver(steps.length)}}} onDrop={()=>{move(drag,steps.length);setDrag(null);setOver(null)}}>
-          {canEdit&&<button type="button" className="ag-add wide" onClick={()=>setAdd(add===steps.length?null:steps.length)}><Plus size={14}/>新增 Step</button>}{add===steps.length&&<AddMenu onPick={t=>put(steps.length,t)} onClose={()=>setAdd(null)}/>}</div>
-        {!steps.length&&<p className="ag-muted center">沒有步驟時，這就是一個純對話 Agent。需要固定流程（輸入 → 查資料 → 產出 → 寄送）時，新增 Step。</p>}
-      </div>
-      <div className="ag-stepcfg">
-        {st?<><div className="ag-cfg-head"><b>{(STEP_TYPES[st.type]||{}).label}</b>
-            <span><button className="ag-icon" title={st.enabled?'停用這個 Step':'啟用這個 Step'} aria-label="啟用或停用" onClick={()=>patch({enabled:!st.enabled})}>{st.enabled?<Eye size={16}/>:<EyeSlash size={16}/>}</button>
-              {canEdit&&<><button className="ag-icon" title="複製" aria-label="複製" onClick={dup}><Copy size={16}/></button><button className="ag-icon danger" title="刪除" aria-label="刪除" onClick={del}><Trash size={16}/></button></>}</span></div>
-          {!st.enabled&&<p className="ag-muted">這個 Step 已停用，執行時會略過。</p>}
-          <Config st={st} idx={idx} steps={steps} set={patch} connectors={connectors} canEdit={canEdit}/></>
-          :<p className="ag-muted center">選擇左邊的 Step 來設定，或新增一個。</p>}
-      </div>
-    </div>
+  return <div className="ag-editcard">
+    <h3><Tile tone={m.cat} size={40}><I size={20}/></Tile>編輯{m.label}</h3>
+    <label className="ag-inline top"><Switch on={st.enabled} label="啟用" onChange={v=>patch({enabled:v})}/>啟用這個步驟（關閉後執行時略過）</label>
+    <Config st={st} idx={idx} steps={steps} set={patch} connectors={connectors} canEdit={canEdit}/>
+    {canEdit&&<div className="ag-editfoot"><button className="ag-btn dangerline" onClick={del}><Trash size={15}/>刪除</button><button className="ag-btn greenline" onClick={dup}><Copy size={15}/>複製</button></div>}
   </div>;
 }

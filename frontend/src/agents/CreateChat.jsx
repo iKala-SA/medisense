@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft,PaperPlaneRight,CircleNotch,Sparkle,ListChecks,Globe,Plugs,BookOpen,Warning} from '@phosphor-icons/react';
 import {api} from '../api';
 import {errText} from '../live/kit';
-import {STEP_TYPES,blankAgent} from './stepkit';
+import {STEP_TYPES,TONE,blankAgent} from './stepkit';
 
 const IDEAS=['每週一自動彙整急診科的客訴信，分類後寄給護理長','幫藥劑部做一個查詢院內藥品規範的助理，只能查院內文件','上傳合約後比對內部規範，標出風險條款'];
 
@@ -46,7 +46,7 @@ export default function CreateChat({notify,onBack,onCreated}){
             {draft.capabilities.connectors.map((c,i)=><span key={i} className="ag-chip big"><Plugs size={13}/>{c.action}</span>)}{draft.capabilities.spaces.map(s=><span key={s} className="ag-chip big"><BookOpen size={13}/>知識空間</span>)}
             {!draft.capabilities.web_search&&!draft.capabilities.connectors.length&&!draft.capabilities.spaces.length&&<span className="ag-muted">純對話，沒有額外能力</span>}</div>
           <h5>步驟流程 {draft.steps.length?`（${draft.steps.length}）`:''}</h5>
-          {draft.steps.length?<ol className="ag-pv-steps">{draft.steps.map(s=>{const I=(STEP_TYPES[s.type]||{}).icon||ListChecks;return <li key={s.id}><I size={15}/><b>{s.title}</b><small>{(STEP_TYPES[s.type]||{}).label}</small></li>})}</ol>:<p className="ag-muted">沒有固定流程，這是一個對話型 Agent。</p>}
+          {draft.steps.length?<ol className="ag-pv-steps">{draft.steps.map(s=>{const m=STEP_TYPES[s.type]||{cat:'ai'},I=m.icon||ListChecks;return <li key={s.id}><span className="ag-tile" style={{width:34,height:34,background:TONE[m.cat][0],color:TONE[m.cat][1]}}><I size={17}/></span><b>{s.title}</b><small>{(STEP_TYPES[s.type]||{}).label}</small></li>})}</ol>:<p className="ag-muted">沒有固定流程，這是一個對話型 Agent。</p>}
           {errs.length>0&&<div className="ag-banner warn"><Warning size={15}/><div>草稿還有 {errs.length} 個地方需要在編輯器補上：<ul>{errs.slice(0,4).map((p,i)=><li key={i}>{p.message}</li>)}</ul></div></div>}
           <button className="ag-btn primary wide" disabled={saving} onClick={create}>{saving?<CircleNotch className="spin" size={15}/>:null}建立草稿並繼續編輯</button></>}
       </section>
