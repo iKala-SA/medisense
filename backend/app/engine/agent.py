@@ -163,8 +163,12 @@ def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bo
             "search_knowledge", "knowledge",
             _fn("search_knowledge", "搜尋院內知識庫（指引、辦法、醫學文件）。只在問題需要院內資料時使用；一次一個主題，關鍵字要具體。",
                 {"query": {"type": "string", "description": "搜尋關鍵字或完整問句"}}, ["query"]), "檢索院內文件")
-    for n in agent.flow.nodes:
+    listed = [FlowNode(id=f"cap{i}", type="tool", data={"connector_id": c.connector_id, "action": c.action, "require_approval": c.require_approval})
+              for i, c in enumerate(agent.capabilities.connectors)]  # PRD §4.3: connectors chosen in the agent's capabilities
+    for n in [*agent.flow.nodes, *listed]:
         if n.type == "tool" and (t := _connector_tool(n, user_message)):
+            if n.data.get("require_approval") is False:
+                t.write = False  # the creator turned approval off for this action
             tools[t.name] = t
         elif n.type == "his_emr" and "query_his" not in tools:
             tools["query_his"] = Tool("query_his", "his_emr", _fn("query_his", "查詢 HIS/EMR（尚未串接）。",

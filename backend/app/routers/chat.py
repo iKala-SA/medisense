@@ -96,8 +96,9 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     agent = agent.model_copy(update={"model_group": body.model_group})
 
     doc_ids = []
-    if chosen:  # a picked agent does exactly what it was built to do: its own knowledge, its own connectors, no web, no wider scope
-        pass
+    if chosen:  # a picked agent does exactly what it was built to do: its own knowledge (and spaces, by YOUR rights), its connectors, no wider scope
+        from ..engine.capabilities import rag_files_for
+        rag_files = rag_files_for(agent, user, rag_files)
     elif body.knowledge_scope == "general":  # model only: no retrieval, whatever the agent has attached
         rag_files = []
     elif body.knowledge_scope == "all" and settings().rag_enabled:
@@ -125,10 +126,10 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         extra["project_id"] = body.project_id
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
                 audit_action="chat.run",
-                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": body.web_search and not chosen, "knowledge_docs": len(doc_ids),
+                audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing), session_extra=extra,
-                pin_model=body.model, web_search=body.web_search and not chosen, images=images or None)
+                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
 
 
 @router.get("/agents/{agent_id}")
