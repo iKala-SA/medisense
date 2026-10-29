@@ -81,8 +81,8 @@ done
 LITELLM_SA_EMAIL="${LITELLM_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 BACKEND_SA_EMAIL="${BACKEND_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
-# LiteLLM: call Vertex AI, read its secrets. Nothing else.
-for ROLE in roles/aiplatform.user roles/secretmanager.secretAccessor roles/logging.logWriter; do
+# LiteLLM: call Vertex AI, read its secrets, screen prompts with Model Armor (sanitizeUserPrompt). Nothing else.
+for ROLE in roles/aiplatform.user roles/secretmanager.secretAccessor roles/logging.logWriter roles/modelarmor.user; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${LITELLM_SA_EMAIL}" --role="$ROLE" --condition=None >/dev/null
 done
 

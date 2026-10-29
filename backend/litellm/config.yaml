@@ -7,7 +7,7 @@
 # 3.1 Pro are preview IDs on the `global` endpoint only; Gemini 2.5 is on global + US regions.
 # => VERTEX_LOCATION=global. Cloud models only ever see de-identified text (option B), so this is
 #    acceptable, but it must be stated to TCVGH: Gemini inference is not Taiwan-resident today.
-# Commented: on-prem vLLM (needs VPN), Azure OpenAI GPT-5.4 Data Zone, Bedrock cross-region.
+# Live: Bedrock nova-2-lite (keyless OIDC). Commented: on-prem vLLM (needs VPN), Azure OpenAI GPT-5.4 Data Zone, other Bedrock.
 
 model_list:
   # ---------- Vertex AI, asia-east1 (in-region) ----------
@@ -64,9 +64,19 @@ model_list:
   # - model_name: claude-haiku-4.5
   #   litellm_params: { model: bedrock/apac.anthropic.claude-haiku-4-5, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
   #   model_info: { region: aws-cross-region, capability_tier: budget }
-  # - model_name: nova-2-lite
-  #   litellm_params: { model: bedrock/apac.amazon.nova-2-lite-v1:0, aws_region_name: ap-northeast-1, aws_access_key_id: os.environ/BEDROCK_AWS_ACCESS_KEY, aws_secret_access_key: os.environ/BEDROCK_AWS_SECRET_KEY }
-  #   model_info: { region: aws-cross-region, capability_tier: budget }
+  # Live 2026-10-27. Standalone model_name (not in any group), so TCVGH agents never route to it.
+  # No `apac.` profile exists for Nova 2 Lite; `jp.` keeps inference in Japan (`global.` would not).
+  # Keyless auth: on Cloud Run the two env vars are set and LiteLLM swaps the service account's Google
+  # ID token for temporary AWS credentials (STS AssumeRoleWithWebIdentity). Locally they are unset and
+  # LiteLLM falls back to AWS_PROFILE_NAME (an `aws login` profile).
+  - model_name: nova-2-lite
+    litellm_params:
+      model: bedrock/jp.amazon.nova-2-lite-v1:0
+      aws_region_name: ap-northeast-1
+      aws_role_name: os.environ/BEDROCK_ROLE_ARN                     # arn:aws:iam::<acct>:role/tcvgh-litellm-bedrock
+      aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN  # oidc/google/<audience>
+      aws_session_name: tcvgh-litellm
+    model_info: { region: aws-jp, capability_tier: budget }
 
   # ---------- GROUP ALIASES: what agents actually select ----------
   # A group is just several entries sharing one model_name; the router load-balances across
@@ -78,6 +88,37 @@ model_list:
     litellm_params: { model: vertex_ai/gemini-3.1-pro-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
   - model_name: budget
     litellm_params: { model: vertex_ai/gemini-3-flash-preview, vertex_project: os.environ/VERTEX_PROJECT, vertex_location: os.environ/VERTEX_LOCATION }
+  # AUTO-ROUTING: one model name that picks a tier per request from a local, rule-based complexity score
+  # (no extra API call, <1ms). Every tier value must be a model_name defined above. Claude tiers (haiku/sonnet/opus)
+  # need the Bedrock entries enabled first; until then the tiers use the Vertex Gemini models that are live.
+  - model_name: smart-router
+    litellm_params:
+      model: auto_router/complexity_router
+      complexity_router_config:
+        tiers:
+          SIMPLE:    gemini-2.5-flash
+          MEDIUM:    gemini-3-flash
+          COMPLEX:   gemini-3.1-pro
+          REASONING: gemini-3.1-pro
+        classifier_type: heuristic
+        # The built-in keyword lists are English-only, so Chinese prompts all scored SIMPLE (verified 2026-10-28).
+        # These dimensions add to the built-in score; weights tuned on a handful of prompts, retune on real TCVGH traffic.
+        custom_dimensions:
+          - name: zhReasoning
+            weight: 0.3
+            scoring_mode: match_count
+            keywords: [一步一步, 逐步, 分析, 推理, 評估, 比較, 取捨, 權衡, 為什麼, 機轉, 判斷, 鑑別診斷]
+          - name: zhClinicalComplex
+            weight: 0.25
+            scoring_mode: match_count
+            keywords: [交互作用, 併用, 劑量調整, 治療計畫, 共病, 禁忌, 副作用, 檢驗數值, INR, eGFR]
+          - name: zhMultiStep
+            weight: 0.1
+            patterns: ['先.{0,64}(再|然後)', '第一.{0,64}第二']
+          - name: zhTask
+            weight: 0.3
+            keywords: [摘要, 整理, 衛教, 撰寫, 寫成, 翻譯, 改寫]
+      complexity_router_default_model: gemini-3-flash
   # sovereign has NO cloud member on purpose; until on-prem is connected it returns an error (fail closed).
   # - model_name: sovereign
   #   litellm_params: { model: openai/gpt-oss-120b, api_base: http://10.x.x.x:8001/v1, api_key: os.environ/ONPREM_VLLM_API_KEY }
@@ -101,7 +142,25 @@ litellm_settings:
   set_verbose: false
   request_timeout: 120
   # success_callback: ["gcs_bucket"]        # phase 2: ship spend logs to GCS -> BigQuery
-  # callbacks: ["model_armor"]             # phase 2: Model Armor guardrail hook
+
+# MODEL ARMOR: screens a request BEFORE routing (pre_call runs in the proxy, ahead of the router), so it covers the
+# groups, smart-router and direct model names alike. A match returns HTTP 400 "Content blocked by Model Armor" and no
+# model is called. default_on: false = opt-in per request: the platform backend sends `guardrails: ["model-armor"]`
+# while the admin 路由 page's Model Armor switch is on (instant, no redeploy). Other callers of this gateway are NOT
+# screened unless they send it too. fail_on_error: true = if Model Armor itself is down, screened requests fail closed.
+# The template is env-driven (03-deploy-litellm.sh): sandbox = esther-modelArmor in us-central1, so screened prompts
+# leave Taiwan for that check. The LiteLLM SA needs roles/modelarmor.user.
+guardrails:
+  - guardrail_name: model-armor
+    litellm_params:
+      guardrail: model_armor
+      mode: pre_call
+      default_on: false
+      template_id: os.environ/MODEL_ARMOR_TEMPLATE_ID
+      project_id: os.environ/MODEL_ARMOR_PROJECT
+      location: os.environ/MODEL_ARMOR_LOCATION
+      mask_request_content: false
+      fail_on_error: true
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
