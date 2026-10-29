@@ -16,6 +16,14 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 `my_role` on skills/schedules/spaces = caller's effective access: `owner | admin | edit | use`.
 `PUT .../share` takes a bare `Share` body and returns the full updated object. Group members must exist (422 otherwise).
 
+## Roles (admin-only, read-only so far)
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/api/roles?search=&type=all\|system\|custom` | admin | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
+
+Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "suspended", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. Create, update and delete, and the per-resource matrix, are not implemented yet.
+
 ## Sharing
 
 | Method | Path | Role | Notes |

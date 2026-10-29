@@ -6,12 +6,12 @@ import {DEPARTMENTS,ROLES,ROLE_LABEL,STATUSES,fmtDateTime,errText} from './const
 import {Loading,Notice} from './shared';
 import './admin.css';
 
-const TABS=['全部','管理員','建置者','一般使用者','已停用','待註冊'];
-const inTab=(u,t)=>t==='全部'||(t==='管理員'&&u.role==='admin')||(t==='建置者'&&u.role==='builder')||(t==='一般使用者'&&u.role==='user')||(t==='已停用'&&u.status==='suspended')||(t==='待註冊'&&!u.uid);
+const TABS=['全部','啟用','停用'];
+const inTab=(u,t)=>t==='全部'||(t==='啟用'&&u.status!=='suspended')||(t==='停用'&&u.status==='suspended');
 const PAGE=30;
 
 const RoleBadge=({role})=><span className={'lv-pill '+(role==='admin'?'brand':role==='builder'?'soft':'')}>{ROLE_LABEL[role]||role}</span>;
-const StatusBadge=({u})=>u.status==='suspended'?<span className="lv-pill err"><i/>已停用</span>:!u.uid?<span className="lv-pill warn"><i/>待註冊</span>:<span className="lv-pill ok"><i/>啟用中</span>;
+const StatusBadge=({u})=>u.status==='suspended'?<span className="lv-pill err"><i/>停用</span>:<span className="lv-pill ok"><i/>啟用</span>;
 const Avatar=({u})=><span className={'lv-avatar '+(u.status==='suspended'?'off':'')}>{(u.name||u.email||'?').slice(0,1).toUpperCase()}</span>;
 
 export default function UsersPage({me,notify,goAudit}){
@@ -23,17 +23,27 @@ export default function UsersPage({me,notify,goAudit}){
   const [editing,setEditing]=useState(null);
   const [exporting,setExporting]=useState(false);
   const [busy,setBusy]=useState(false);
+  const [group,setGroup]=useState('');
+  const [role,setRole]=useState('');
+  const [groups,setGroups]=useState([]);
+  const [statsOpen,setStatsOpen]=useState(true);
 
   const load=useCallback(()=>{
     setBusy(true);
     return api.listUsers().then(setDir).catch(e=>{notify?.('載入使用者失敗：'+errText(e));setDir(d=>d||{users:[]})}).finally(()=>setBusy(false));
   },[notify]);
-  useEffect(()=>{load()},[load]);
-  useEffect(()=>setPage(1),[tab,search]);
+  const loadGroups=useCallback(()=>api.listGroups().then(r=>setGroups(Array.isArray(r)?r:r.groups||[])).catch(e=>notify?.('無法載入群組：'+errText(e))),[notify]);
+  // mount only: `notify` changes identity on every App render, so depending on it would re-call the API after a failure
+  useEffect(()=>{load();loadGroups()},[]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>setPage(1),[tab,search,group,role]);
 
   const users=dir?.users||[];
+  // stat cards show totals across all users, not the current filter
+  const suspendedCount=users.filter(u=>u.status==='suspended').length;
   const needle=search.trim().toLowerCase();
-  const shown=useMemoList(users,tab,needle);
+  // group filter: member_emails of the selected group, compared case-insensitively; null means 全部
+  const groupSet=useMemo(()=>{const g=groups.find(x=>x.id===group);return g?new Set((g.member_emails||[]).map(e=>e.toLowerCase())):null},[groups,group]);
+  const shown=useMemoList(users,tab,needle,role,groupSet);
   const pages=Math.max(1,Math.ceil(shown.length/PAGE));
   if(me&&me.role!=='admin')return <div className="card-page lv-page"><Empty text="此頁面僅限系統管理員。"/></div>;
 
@@ -59,13 +69,17 @@ export default function UsersPage({me,notify,goAudit}){
       <button className="btn" onClick={exportCsv} disabled={exporting||!dir}><DownloadSimple/>匯出 CSV</button>
       <button className="btn primary" onClick={()=>setAdding(true)}><UserPlus/>預先註冊</button>
     </div></div>
-    <p className="subtitle">管理同仁的平台角色、所屬科別與帳號狀態。角色與狀態變更需填寫原因，並寫入稽核記錄。</p>
-    <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋姓名、電子郵件或科別" tabs={TABS} tab={tab} onTab={setTab}/>
+    <p className="subtitle">管理同仁的平台角色、所屬群組與帳號狀態。角色與狀態變更需填寫原因，並寫入稽核記錄。</p>
+    <div className="lv-stats-toggle"><button className="lv-stats-btn" aria-label={statsOpen?'收合統計':'展開統計'} aria-expanded={statsOpen} onClick={()=>setStatsOpen(o=>!o)}>+</button></div>
+    {statsOpen&&<div className="lv-stats">{[['使用者人數',users.length],['啟用人數',users.length-suspendedCount],['停用人數',suspendedCount]].map(([label,n])=><div className="lv-card lv-stat" key={label}><span className="muted small">{label}</span><b>{n}</b></div>)}</div>}
+    <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋姓名或電子郵件" tabs={TABS} tab={tab} onTab={setTab} filters={<>
+      <select className="lv-select" aria-label="群組" value={group} onChange={e=>setGroup(e.target.value)}><option value="">全部群組</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select>
+      <select className="lv-select" aria-label="角色" value={role} onChange={e=>setRole(e.target.value)}><option value="">全部角色</option>{ROLES.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select>
+    </>}/>
     {dir===null?<Loading/>:<div className="lt">
-      <div className="lt-head" style={{'--cols':'1.6fr 1.4fr 1fr 1fr .9fr 1fr 24px'}}><span>姓名</span><span>電子郵件</span><span>科別</span><span>角色</span><span>狀態</span><span>最近登入</span><span/></div>
-      {rows.map(u=><div key={u.email} className="lt-row" style={{'--cols':'1.6fr 1.4fr 1fr 1fr .9fr 1fr 24px',cursor:'pointer'}} onClick={()=>setEditing(u.email)}>
-        <span className="lv-name"><Avatar u={u}/><span><b>{u.name||'（尚未登入）'}</b>{u.bootstrap_admin&&<small>固定管理員</small>}</span></span>
-        <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{u.email}</span>
+      <div className="lt-head" style={{'--cols':'1.6fr 1fr 1fr .9fr 1fr 24px'}}><span>姓名</span><span>群組</span><span>角色</span><span>狀態</span><span>最近登入</span><span/></div>
+      {rows.map(u=><div key={u.email} className="lt-row" style={{'--cols':'1.6fr 1fr 1fr .9fr 1fr 24px',cursor:'pointer'}} onClick={()=>setEditing(u.email)}>
+        <span className="lv-name"><Avatar u={u}/><span><b>{u.name||'（尚未登入）'}</b><small style={{display:'block',overflow:'hidden',textOverflow:'ellipsis'}}>{u.email}</small></span></span>
         <span>{u.department||'—'}</span>
         <span><RoleBadge role={u.role}/></span>
         <span><StatusBadge u={u}/></span>
@@ -75,17 +89,17 @@ export default function UsersPage({me,notify,goAudit}){
       {rows.length===0&&<Empty text={users.length===0?'目前沒有使用者資料。':'沒有符合條件的使用者。'}/>}
     </div>}
     {shown.length>PAGE&&<div className="lv-pager"><span>共 {shown.length} 人，第 {page} / {pages} 頁</span><span className="lv-actions"><button className="btn" disabled={page===1} onClick={()=>setPage(p=>p-1)}>上一頁</button><button className="btn" disabled={page===pages} onClick={()=>setPage(p=>p+1)}>下一頁</button></span></div>}
-    {adding&&<AddModal title="預先註冊使用者" hint="同仁首次以院內 Google 帳號登入時，會套用此角色與科別。" submitLabel="預先註冊" onClose={()=>setAdding(false)} onSubmit={preregister}>
+    {adding&&<AddModal title="預先註冊使用者" hint="同仁首次以院內 Google 帳號登入時，會套用此角色與群組。" submitLabel="預先註冊" onClose={()=>setAdding(false)} onSubmit={preregister}>
       <Field label="電子郵件"><input name="email" type="email" required placeholder="name@example.org" autoFocus/></Field>
       <Field label="角色"><select name="role" defaultValue="user">{ROLES.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></Field>
-      <Field label="科別"><select name="department" defaultValue=""><option value="">未設定</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></Field>
+      <Field label="群組"><select name="department" defaultValue=""><option value="">未設定</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></Field>
     </AddModal>}
   </div>;
 }
 
 // plain helper (not a hook name) to keep hook order stable across the admin guard above
-function useMemoList(users,tab,needle){
-  return useMemo(()=>users.filter(u=>inTab(u,tab)&&(!needle||[u.name,u.email,u.department].some(s=>(s||'').toLowerCase().includes(needle)))),[users,tab,needle]);
+function useMemoList(users,tab,needle,role,groupSet){
+  return useMemo(()=>users.filter(u=>inTab(u,tab)&&(!role||u.role===role)&&(!groupSet||groupSet.has(u.email.toLowerCase()))&&(!needle||[u.name,u.email].some(s=>(s||'').toLowerCase().includes(needle)))),[users,tab,needle,role,groupSet]);
 }
 
 function UserEdit({email,me,notify,goAudit,onBack}){
@@ -127,26 +141,26 @@ function UserEdit({email,me,notify,goAudit,onBack}){
     catch(e){notify?.('取消失敗：'+errText(e))}
   }
 
-  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),viewChanged&&(origView?'授予原始檔檢視':'撤銷原始檔檢視'),department!==(u.department||'')&&`科別 → ${department||'未設定'}`].filter(Boolean).join('、');
+  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),viewChanged&&(origView?'授予原始檔檢視':'撤銷原始檔檢視'),department!==(u.department||'')&&`群組 → ${department||'未設定'}`].filter(Boolean).join('、');
 
   return <div className="card-page lv-page">
     <button className="lv-back" onClick={onBack}><ArrowLeft/>返回使用者列表</button>
     <div className="page-heading"><h1>編輯使用者</h1>{goAudit&&<button className="btn" onClick={()=>goAudit(u.email)}><ClockCounterClockwise/>檢視個人稽核記錄</button>}</div>
-    <p className="subtitle">調整同仁的角色、所屬科別，或停用其存取。</p>
+    <p className="subtitle">調整同仁的角色、所屬群組，或停用其存取。</p>
 
     <div className="lv-card"><div className="lv-profile">
       <Avatar u={u}/>
       <div style={{flex:1,minWidth:240}}>
         <h2>{u.name||'（尚未登入）'}<RoleBadge role={u.role}/><StatusBadge u={u}/>{u.bootstrap_admin&&<span className="lv-chip">固定管理員（部署設定）</span>}{self&&<span className="lv-chip">這是您自己的帳號</span>}</h2>
         <p className="muted small" style={{margin:'4px 0 12px'}}>{u.email}</p>
-        <div className="lv-actions"><span className="small muted">所屬科別</span>
+        <div className="lv-actions"><span className="small muted">所屬群組</span>
           <select className="lv-select" value={department} onChange={e=>setDepartment(e.target.value)}><option value="">未設定</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></div>
         <div className="lv-actions" style={{marginTop:12}}><span className="lv-chip">{owned.agents} 個 Agent（{owned.published_agents} 個已發布）</span><span className="lv-chip">{owned.connectors} 個連接器</span><span className="lv-chip">{owned.documents} 份知識文件</span></div>
       </div>
       <dl className="lv-dl"><dt>帳號建立</dt><dd>{fmtDateTime(u.created_at)}{u.created_by&&`（${u.created_by==='migrate_users'?'既有建置者移轉':u.created_by+' 預先註冊'}）`}</dd><dt>首次登入</dt><dd>{u.first_login_at?fmtDateTime(u.first_login_at):'尚未登入'}</dd><dt>最後活動</dt><dd>{fmtDateTime(u.last_seen_at)}</dd></dl>
     </div></div>
 
-    {locked&&<Notice icon={<Lock size={16}/>}>{self?'不能變更自己的角色與狀態，請由另一位管理員操作。':'此帳號列在部署設定 ADMIN_EMAILS，永遠是管理員且不能停用，避免平台被鎖住。需變更請由資訊室重新部署。'}所屬科別仍可修改。</Notice>}
+    {locked&&<Notice icon={<Lock size={16}/>}>{self?'不能變更自己的角色與狀態，請由另一位管理員操作。':'此帳號列在部署設定 ADMIN_EMAILS，永遠是管理員且不能停用，避免平台被鎖住。需變更請由資訊室重新部署。'}所屬群組仍可修改。</Notice>}
 
     <div className="lv-card"><h2>帳號狀態</h2><p className="lv-sub">{u.status_changed_at?`上次由 ${u.status_changed_by} 於 ${fmtDateTime(u.status_changed_at)} 設為${u.status==='suspended'?'停用':'啟用'}${u.status_reason?'：'+u.status_reason:''}`:'停用會立即阻擋平台存取；恢復後依原角色繼續使用。'}</p>
       {STATUSES.map(s=><button key={s.id} type="button" disabled={locked} className={'lv-opt '+(status===s.id?'on ':'')+(s.id==='suspended'?'bad':'')} onClick={()=>setStatus(s.id)}><span className="dot"/><span><b>{s.label}</b><p>{s.desc}</p></span></button>)}
@@ -157,9 +171,9 @@ function UserEdit({email,me,notify,goAudit,onBack}){
       {demoting&&<div style={{marginTop:12}}><Notice tone="warn" icon={<Warning size={16}/>}>此人擁有 {owned.agents} 個 Agent、{owned.connectors} 個連接器與 {owned.documents} 份知識文件。改為一般使用者後這些項目仍歸此人所有，但此人無法再編輯；已發布的 Agent 照常上線，管理員仍可編輯。</Notice></div>}
     </div>
 
-    <div className="lv-card"><h2>原始檔檢視</h2><p className="lv-sub">知識庫文件預設只顯示去識別化內容。含個資的原始檔，只有被授權的人可以開啟，且每次必須填寫用途；每次開啟都會寫入稽核記錄。{u.original_view_changed_at&&` 上次由 ${u.original_view_changed_by} 於 ${fmtDateTime(u.original_view_changed_at)} 變更。`}</p>
+    <div className="lv-card"><h2>原始檔檢視</h2><p className="lv-sub">知識庫文件預設只顯示去識別化內容；含個資的原始檔僅授權人員可開啟，且每次必須填寫用途，每次開啟寫入稽核記錄。{u.original_view_changed_at&&` 上次由 ${u.original_view_changed_by} 於 ${fmtDateTime(u.original_view_changed_at)} 變更。`}</p>
       {self&&<div style={{marginBottom:10}}><Notice icon={<Lock size={16}/>}>不能變更自己的原始檔檢視權限，請由另一位管理員操作。</Notice></div>}
-      {[[false,'不可檢視含個資的原始檔','只能看去識別化版本；未偵測到個資的文件仍可開啟原始檔。'],[true,'可檢視含個資的原始檔（需填用途）','適用於需要核對原文、表格或頁面的臨床同仁。']].map(([v,t,d])=><button key={String(v)} type="button" disabled={self} className={'lv-opt '+(origView===v?'on':'')} onClick={()=>setOrigView(v)}><span className="dot"/><span><b>{t}</b><p>{d}</p></span></button>)}
+      {[[false,'不可檢視含個資的原始檔（預設）','未偵測到個資的文件仍可開啟原始檔。'],[true,'可檢視含個資的原始檔（需填用途）','適用於需要核對原文、表格或頁面的臨床同仁。']].map(([v,t,d])=><button key={String(v)} type="button" disabled={self} className={'lv-opt '+(origView===v?'on':'')} onClick={()=>setOrigView(v)}><span className="dot"/><span><b>{t}</b><p>{d}</p></span></button>)}
     </div>
 
     {accessChanged&&<div className="lv-card"><h2>變更原因 <span style={{color:'#b3261e'}}>*</span></h2><p className="lv-sub">原因會連同變更前後的角色、狀態或原始檔檢視權限寫入稽核記錄。</p>

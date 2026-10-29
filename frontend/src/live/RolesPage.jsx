@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {BookOpen,CheckSquare,DotsThree,IdentificationBadge,Info,Key,PencilSimple,Plus,Prohibit,Shield,Trash,Wrench,User} from '@phosphor-icons/react';
 import {api} from '../api';
-import {ROLES,errText} from './constants';
+import {errText} from './constants';
 import {Loading,Notice} from './shared';
 import {Empty,ListToolbar} from '../ListKit';
 import RolePermissionsPage from './RolePermissionsPage';
@@ -9,19 +9,13 @@ import './admin.css';
 import './roles.css';
 
 const TABS=['全部','系統預設','自訂'];
-const ICON={admin:Shield,builder:Wrench,user:User};
+// 圖示由前端依角色 id 對應（後端不回傳圖示）；未知的角色使用通用圖示
+const ICON={admin:Shield,builder:Wrench,user:User,'ai-reviewer':CheckSquare,trainer:BookOpen};
 const COLS='2.4fr 1fr .8fr .8fr .8fr .6fr';
 
-// 設計稿中的自訂角色（尚無後端支援，僅供顯示，且皆為停用狀態，不可指派）
-const CUSTOM_ROLES=[
-  {id:'ai-reviewer',label:'AI 審核員',desc:'審核 Agent 上架與版本發佈',icon:CheckSquare,custom:true,suspended:true,can:[]},
-  {id:'trainer',label:'教育訓練講師',desc:'建立教育訓練課程與管理參加名單',icon:BookOpen,custom:true,suspended:true,can:[]},
-];
-const ALL_ROLES=[...ROLES.map(r=>({...r,custom:false})),...CUSTOM_ROLES];
-
-// 角色定義寫死在程式碼中（backend 只有 admin / builder / user 三種），此頁僅供檢視，不提供編輯。
+// 角色資料由 GET /api/roles 提供（目前為後端假資料）。此頁僅供檢視，不提供編輯。
 export default function RolesPage({me,notify}){
-  const [users,setUsers]=useState(null);
+  const [data,setData]=useState(null);
   const [tab,setTab]=useState('全部');
   const [search,setSearch]=useState('');
   const [menuFor,setMenuFor]=useState(null);
@@ -30,7 +24,7 @@ export default function RolesPage({me,notify}){
 
   useEffect(()=>{
     if(!admin)return;
-    api.listUsers().then(d=>setUsers(d.users||[])).catch(e=>{notify?.('載入使用者失敗：'+errText(e));setUsers([])});
+    api.listRoles().then(setData).catch(e=>{notify?.('載入角色失敗：'+errText(e));setData({roles:[],stats:null})});
   },[admin]);// eslint-disable-line react-hooks/exhaustive-deps
 
   // 點擊其他地方或按 Esc 關閉操作選單
@@ -43,38 +37,37 @@ export default function RolesPage({me,notify}){
     return()=>{document.removeEventListener('click',close);document.removeEventListener('keydown',esc)};
   },[menuFor]);
 
-  const countOf=role=>users?users.filter(u=>u.role===role).length:null;
+  const roles=data?.roles;
+  const stats=data?.stats;
   const needle=search.trim().toLowerCase();
-  const shown=useMemo(()=>ALL_ROLES.filter(r=>(tab==='全部'||(tab==='自訂')===r.custom)&&(!needle||[r.label,r.en,r.desc].some(s=>(s||'').toLowerCase().includes(needle)))),[tab,needle]);
+  const shown=useMemo(()=>(roles||[]).filter(r=>(tab==='全部'||(tab==='自訂')===r.custom)&&(!needle||[r.name,r.en,r.desc].some(s=>(s||'').toLowerCase().includes(needle)))),[roles,tab,needle]);
 
   if(!admin)return <div className="card-page lv-page"><Empty text="此頁面僅限系統管理員。"/></div>;
   if(permRole)return <RolePermissionsPage role={permRole} onBack={()=>setPermRole(null)}/>;
-
-  const assigned=users?users.filter(u=>ROLES.some(r=>r.id===u.role)).length:null;
 
   return <div className="card-page lv-page rl-page">
     <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn primary" disabled title="尚未開放線上新增"><Plus/>新增角色</button></div></div>
     <p className="subtitle">檢視平台角色的權限範圍與目前指派人數。角色變更請至「使用者管理」進行。</p>
 
     <div className="rl-stats">
-      <div className="rl-stat"><div className="rl-stat-label">角色總數</div><div className="rl-stat-value">{ALL_ROLES.length}<small>個</small></div></div>
-      <div className="rl-stat"><div className="rl-stat-label">系統預設角色</div><div className="rl-stat-value">{ROLES.length}<small>個</small></div></div>
-      <div className="rl-stat"><div className="rl-stat-label">自訂角色</div><div className="rl-stat-value">{CUSTOM_ROLES.length}<small>個</small></div></div>
-      <div className="rl-stat"><div className="rl-stat-label">已指派使用者</div><div className="rl-stat-value">{assigned??'—'}<small>人</small></div></div>
+      <div className="rl-stat"><div className="rl-stat-label">角色總數</div><div className="rl-stat-value">{stats?.total_roles??'—'}<small>個</small></div></div>
+      <div className="rl-stat"><div className="rl-stat-label">系統預設角色</div><div className="rl-stat-value">{stats?.system_roles??'—'}<small>個</small></div></div>
+      <div className="rl-stat"><div className="rl-stat-label">自訂角色</div><div className="rl-stat-value">{stats?.custom_roles??'—'}<small>個</small></div></div>
+      <div className="rl-stat"><div className="rl-stat-label">已指派使用者</div><div className="rl-stat-value">{stats?.assigned_users??'—'}<small>人</small></div></div>
     </div>
 
     <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋角色名稱" tabs={TABS} tab={tab} onTab={setTab}/>
 
-    {users===null?<Loading/>:<div className="lt rl-table">
+    {data===null?<Loading/>:<div className="lt rl-table">
       <div className="lt-head" style={{'--cols':COLS}}><span>角色</span><span>類型</span><span>狀態</span><span>成員數</span><span>權限數</span><span style={{textAlign:'right'}}>操作</span></div>
-      {shown.map(r=>{const Icon=ICON[r.id]||r.icon;return <div key={r.id} className="lt-row" style={{'--cols':COLS}}>
-        <span className="rl-role"><span className={'rl-icon'+(r.custom?' custom':'')}><Icon size={16}/></span><span><b>{r.label}</b><small>{r.desc}</small></span></span>
+      {shown.map(r=>{const Icon=ICON[r.id]||IdentificationBadge;return <div key={r.id} className="lt-row" style={{'--cols':COLS}}>
+        <span className="rl-role"><span className={'rl-icon'+(r.custom?' custom':'')}><Icon size={16}/></span><span><b>{r.name}</b><small>{r.desc}</small></span></span>
         <span><span className={'rl-tag'+(r.custom?' custom':'')}>{r.custom?'自訂':'系統預設'}</span></span>
         <span>{r.suspended?<span className="lv-pill"><i/>停用</span>:<span className="lv-pill ok"><i/>啟用</span>}</span>
-        <span className="muted">{countOf(r.id)} 人</span>
-        <span className="muted">{r.can.length}</span>
+        <span className="muted">{r.member_count} 人</span>
+        <span className="muted">{r.permission_count}</span>
         <span className="rl-actions"><span className="rl-menu">
-          <button className="rl-icon-btn" aria-label={'更多 '+r.label} aria-haspopup="menu" aria-expanded={menuFor===r.id} onClick={e=>{e.stopPropagation();setMenuFor(menuFor===r.id?null:r.id)}}><DotsThree size={16} weight="bold"/></button>
+          <button className="rl-icon-btn" aria-label={'更多 '+r.name} aria-haspopup="menu" aria-expanded={menuFor===r.id} onClick={e=>{e.stopPropagation();setMenuFor(menuFor===r.id?null:r.id)}}><DotsThree size={16} weight="bold"/></button>
           {menuFor===r.id&&<div className="rl-dropdown" role="menu">
             <button className="rl-dropdown-item" role="menuitem" disabled={r.id==='admin'} title={r.id==='admin'?'管理員不可編輯':undefined} onClick={()=>{setMenuFor(null);notify?.('編輯角色尚未接入後端，未實際變更')}}><PencilSimple size={15}/>編輯</button>
             <button className="rl-dropdown-item" role="menuitem" onClick={()=>{setMenuFor(null);setPermRole(r)}}><Key size={15}/>權限設定</button>
