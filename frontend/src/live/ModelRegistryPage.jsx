@@ -130,14 +130,14 @@ function SmartRouterCard({items,smart,onSaved,notify}){
 export default function ModelRegistryPage({me,notify}){
   const admin=me?.role==='admin';
   const [groups,setGroups]=useState(null),[gfail,setGfail]=useState(false);
-  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false);
+  const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false),[smart,setSmart]=useState(null);
   const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
   async function loadCat(){try{setCat(await api.modelCatalog())}catch(e){setCat([]);notify('無法載入可選模型：'+errText(e))}}
   async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 Medisense Model Gateway`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}
-    if(admin){load();loadCat();api.litellmDeploy().then(setDeploy).catch(()=>{})}
+    if(admin){load();loadCat();api.litellmDeploy().then(setDeploy).catch(()=>{});api.getSmartRouter().then(setSmart).catch(()=>{})}
   });
   // Follow the GitHub Actions run until it finishes.
   useEffect(()=>{
