@@ -39,7 +39,7 @@ model_list:
     provider: vertex_ai
 - model_name: nova-2-lite
   litellm_params:
-    model: bedrock/nova-2-lite
+    model: bedrock/jp.amazon.nova-2-lite-v1:0
     aws_region_name: os.environ/BEDROCK_REGION
     aws_role_name: os.environ/BEDROCK_ROLE_ARN
     aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
@@ -50,8 +50,8 @@ model_list:
     provider: bedrock
 - model_name: gemma-4-12b
   litellm_params:
-    model: ollama/gemma-4-12b
-    api_base: http://10.140.0.31:11434
+    model: ollama_chat/gemma4:12b
+    api_base: os.environ/OLLAMA_API_BASE
   model_info:
     deploy: onprem
     group: sovereign
@@ -73,8 +73,8 @@ model_list:
     vertex_location: os.environ/VERTEX_LOCATION
 - model_name: sovereign
   litellm_params:
-    model: ollama/gemma-4-12b
-    api_base: http://10.140.0.31:11434
+    model: ollama_chat/gemma4:12b
+    api_base: os.environ/OLLAMA_API_BASE
 - model_name: smart-router
   litellm_params:
     model: auto_router/complexity_router
