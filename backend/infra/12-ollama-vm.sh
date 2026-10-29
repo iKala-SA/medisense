@@ -15,7 +15,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 VM="${OLLAMA_VM:-tcvgh-onprem-gemma}"
 ZONE="${OLLAMA_ZONE:-asia-east1-a}"
-MODELS="${OLLAMA_MODELS:-gemma3:12b,gemma3:4b}"   # first one is warmed at boot and is the `sovereign` primary
+MODELS="${OLLAMA_MODELS:-gemma4:12b}"   # gemma3 has NO tool template in Ollama (agents with knowledge/tools fail); gemma4 does   # first one is warmed at boot and is the `sovereign` primary
 PROVISIONING="${OLLAMA_PROVISIONING:-SPOT}"        # SPOT | STANDARD
 
 if ! gcloud compute firewall-rules describe allow-ollama-internal --format='value(name)' >/dev/null 2>&1; then

@@ -9,7 +9,7 @@ exec > >(tee -a /var/log/ollama-startup.log) 2>&1
 echo "=== $(date -Is) ollama startup ==="
 
 MODELS="$(curl -sf -H 'Metadata-Flavor: Google' \
-  'http://metadata.google.internal/computeMetadata/v1/instance/attributes/ollama-models' || echo 'gemma3:12b')"
+  'http://metadata.google.internal/computeMetadata/v1/instance/attributes/ollama-models' || echo 'gemma4:12b')"
 
 # Wait up to 15 min for the GPU driver (first boot installs it); fall back to CPU if it never shows up.
 for i in $(seq 1 90); do
