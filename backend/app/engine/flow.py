@@ -37,7 +37,7 @@ COST_TIER = {"budget": 0, "fast": 1, "reasoning": 2, routing.SMART_ROUTER: 2}
 def pick_group(agent: AgentIn, node: FlowNode, user_text: str) -> tuple[str, str]:
     """Model group for one llm / structured_output / condition step, plus a note for the trace.
 
-    1. sovereign_only (the hospital-wide 僅院內模型 switch in config/routing, or the agent's own): every step
+    1. sovereign_only (the hospital-wide 僅本地模型 switch in config/routing, or the agent's own): every step
        on-prem, nothing overrides it, and there is no cloud fallback.
     2. the node's own group, else
     3. (agent/node group "auto" = smart-router when the gateway serves it, else fast; see engine/routing.py)

@@ -6,9 +6,12 @@
 # Google ID token for temporary AWS credentials; leave them unset to deploy without Bedrock.
 # Model Armor (config.yaml `guardrails`) screens requests before routing; MODEL_ARMOR_* (env.sh) pick the template;
 # the SA's roles/modelarmor.user is granted in 02-foundation.sh.
+# On-prem models (group `sovereign`, Ollama on the tcvgh-onprem-gemma VM, infra/12-ollama-vm.sh) are reached over
+# Direct VPC egress (private ranges only, so Vertex/Bedrock traffic still leaves via Google's edge) at OLLAMA_API_BASE.
 set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
 : "${MODEL_ARMOR_TEMPLATE_ID:?set MODEL_ARMOR_* in infra/env.sh}"
+: "${OLLAMA_API_BASE:?set OLLAMA_API_BASE in infra/env.sh (internal IP of the Ollama VM)}"
 cd "$(dirname "$0")/../litellm"
 
 # Set IMAGE=<existing tag> to redeploy without rebuilding.
@@ -45,7 +48,8 @@ gcloud run deploy "$LITELLM_SERVICE" \
   --no-allow-unauthenticated \
   --port 4000 \
   --cpu 1 --memory 1Gi --min-instances 1 --max-instances 3 --concurrency 40 \
-  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO,LITELLM_LOCAL_MODEL_COST_MAP=True,MODEL_ARMOR_PROJECT=${MODEL_ARMOR_PROJECT},MODEL_ARMOR_LOCATION=${MODEL_ARMOR_LOCATION},MODEL_ARMOR_TEMPLATE_ID=${MODEL_ARMOR_TEMPLATE_ID}${BEDROCK_ROLE_ARN:+,BEDROCK_ROLE_ARN=$BEDROCK_ROLE_ARN,BEDROCK_WEB_IDENTITY_TOKEN=$BEDROCK_WEB_IDENTITY_TOKEN}" \
+  --network default --subnet default --vpc-egress private-ranges-only \
+  --set-env-vars "VERTEX_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},LITELLM_LOG=INFO,LITELLM_LOCAL_MODEL_COST_MAP=True,MODEL_ARMOR_PROJECT=${MODEL_ARMOR_PROJECT},MODEL_ARMOR_LOCATION=${MODEL_ARMOR_LOCATION},MODEL_ARMOR_TEMPLATE_ID=${MODEL_ARMOR_TEMPLATE_ID},OLLAMA_API_BASE=${OLLAMA_API_BASE}${BEDROCK_ROLE_ARN:+,BEDROCK_REGION=${BEDROCK_REGION:-ap-northeast-1},BEDROCK_ROLE_ARN=$BEDROCK_ROLE_ARN,BEDROCK_WEB_IDENTITY_TOKEN=$BEDROCK_WEB_IDENTITY_TOKEN}" \
   --set-secrets "LITELLM_MASTER_KEY=litellm-master-key:latest${EXTRA_SECRETS:+,$EXTRA_SECRETS}" \
   --args="--config,/app/config.yaml,--port,4000"
 

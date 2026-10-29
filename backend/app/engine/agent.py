@@ -16,7 +16,7 @@ The canvas no longer sequences anything; it declares what the agent MAY do:
   input / output / condition / pii_mask / llm prompts -> no longer used; instructions + the model do that work
 
 Governance is unchanged: messages, retrieved passages and connector results are de-identified before the model sees
-them, routing is picked by flow.pick_group (僅院內模型 wins over everything), a pinned model is ignored under it, and
+them, routing is picked by flow.pick_group (僅本地模型 wins over everything), a pinned model is ignored under it, and
 every model call goes to the usage ledger. A model that cannot call tools (e.g. on-prem) simply answers directly.
 """
 from __future__ import annotations
@@ -197,7 +197,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     sovereign = agent.routing.sovereign_only or routing.sovereign_only()  # nothing may leave the hospital
     web_blocked = ""
     if web_search and sovereign:
-        web_blocked = "僅院內模型已啟用，網路搜尋已停用"
+        web_blocked = "僅本地模型已啟用，網路搜尋已停用"
     elif web_search and not features.web_search_enabled():
         web_blocked = "管理員尚未開放網路搜尋"
     web_on = web_search and not web_blocked
