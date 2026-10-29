@@ -71,9 +71,9 @@ useEffect(()=>{
   api.listAgents().then(list=>setAgents(list.map(a=>({id:a.id,name:a.name,desc:a.description,status:agentStatus(a),version:String(a.version),model:a.model_group,dept:a.department,share:a.share,mine:a.owner_uid===me?.uid,owner:a.owner_email})))).catch(e=>notify(e.message));
 
 },[logged,me?.uid]);
-/* In chat only agents the user can really run: published ones (their own and everyone's published, or shared with them). */
-const chatAgents=agents.filter(a=>a.id&&a.status==='已發布');
-useEffect(()=>{if(!MOCK&&activeAgent!=='Medisense'&&agents.length&&!chatAgents.some(a=>a.name===activeAgent))setActiveAgentRaw('Medisense')},[agents]);// eslint-disable-line react-hooks/exhaustive-deps
+/* Chat and the Agent page share one list (GET /api/agents: own agents, shared with me, published hospital-wide). */
+const chatAgents=agents.filter(a=>a.id); // the very same list the Agent page shows; unpublished ones are listed but cannot be picked
+useEffect(()=>{if(!MOCK&&activeAgent!=='Medisense'&&agents.length&&!chatAgents.some(a=>a.name===activeAgent&&a.status==='已發布'))setActiveAgentRaw('Medisense')},[agents]);// eslint-disable-line react-hooks/exhaustive-deps
 const recents=useRecents({MOCK,chats:recentChats,setChats:setRecentChats,projects,setProjects,notify,onDeleted:id=>{if(id===liveSession||id===threadId)go('新對話')},onProjectDeleted:id=>{if(projectId===id){setProjectId(null);if(page==='專案')go('新對話')}}});
 useEffect(()=>{
   if(MOCK||(!logged&&!PREVIEW))return;
