@@ -26,13 +26,13 @@ export function LiveGroupTable({groups,failed}){
   </div>;
 }
 
-/* 可選模型: models that can be registered with one click. Registering adds it to the registry; 套用到 LiteLLM makes it usable. */
+/* 可選模型: models that can be registered with one click. Registering adds it to the registry; 套用到 Medisense Model Gateway makes it usable. */
 function CatalogView({items,onRegister,pending,onApply,busy}){
   const [ask,setAsk]=useState(null),[base,setBase]=useState(''),[err,setErr]=useState('');
   if(items===null)return <div className="lv-o-loading">載入中…</div>;
   const reg=async(m,api_base)=>{setErr('');try{await onRegister(m,api_base);setAsk(null);setBase('')}catch(e){setErr(errText(e))}};
   return <>
-    {pending&&<div className="lv-o-banner"><Info size={16}/><div>已註冊的模型<b>尚未套用到 LiteLLM</b>，套用後才能在對話中選用。</div><button className="btn primary" disabled={!!busy} onClick={onApply} style={{marginLeft:'auto'}}><UploadSimple/>套用到 LiteLLM</button></div>}
+    {pending&&<div className="lv-o-banner"><Info size={16}/><div>已註冊的模型<b>尚未套用到 Medisense Model Gateway</b>，套用後才能在對話中選用。</div><button className="btn primary" disabled={!!busy} onClick={onApply} style={{marginLeft:'auto'}}><UploadSimple/>套用到 Medisense Model Gateway</button></div>}
     <div className="mc-grid">{items.map(m=><div className={'mc-card'+(m.registered?' on':'')} key={m.key}>
       <span className="mc-ico">{m.deploy==='onprem'?<Cpu size={20}/>:<Sparkle size={20} weight="fill" color="#4285f4"/>}</span>
       <div className="mc-txt"><b>{m.name}</b><small>{m.description}</small>
@@ -133,7 +133,7 @@ export default function ModelRegistryPage({me,notify}){
   const [items,setItems]=useState(null),[search,setSearch]=useState(''),[tab,setTab]=useState('全部'),[view,setView]=useState('catalog'),[cat,setCat]=useState(null),[pending,setPending]=useState(false);
   const [editing,setEditing]=useState(null),[del,setDel]=useState(null),[deploy,setDeploy]=useState(null),[confirmApply,setConfirmApply]=useState(false),[last,setLast]=useState(undefined),[busy,setBusy]=useState('');
   async function loadCat(){try{setCat(await api.modelCatalog())}catch(e){setCat([]);notify('無法載入可選模型：'+errText(e))}}
-  async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 LiteLLM`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
+  async function register(m,api_base){await api.registerCatalogModel(m.key,api_base);notify(`已註冊 ${m.name}，尚未套用到 Medisense Model Gateway`);setPending(true);setLast(undefined);await Promise.all([loadCat(),load()])}
   async function load(){try{const r=await api.listModelRegistry();setItems(Array.isArray(r)?r:(r.models||r.items||[]))}catch(e){setItems([]);notify('無法載入模型清單：'+errText(e))}}
   useOnce(async()=>{
     try{const r=await api.modelGroups();setGroups(r.groups||[])}catch(e){setGroups([]);setGfail(true);notify('無法載入模型路由表：'+errText(e))}
@@ -169,10 +169,9 @@ export default function ModelRegistryPage({me,notify}){
   }
   const price=m=>`${m.input_price_per_m??0} / ${m.output_price_per_m??0}`;
   return <div className="lv-o">{heading}
-    <p className="subtitle">管理 Medisense Model Gateway 可用的模型登錄（雲端或地端／自架開源模型）。儲存後會更新 Medisense Model Gateway 設定檔；按「套用到 Medisense Model Gateway」才會重新部署。</p>
-    <div className="lv-o-viewtabs"><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>模型登錄</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
-    {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:<>
-      <ProviderApproval notify={notify} models={items}/>
+    <p className="subtitle">從「可選模型」挑選並註冊，再按「套用到 Medisense Model Gateway」就能在對話中使用。目錄沒有的模型，可到「已註冊」手動新增。</p>
+    <div className="lv-o-viewtabs"><button className={view==='catalog'?'selected':''} onClick={()=>setView('catalog')}>可選模型</button><button className={view==='registry'?'selected':''} onClick={()=>setView('registry')}>已註冊</button><button className={view==='groups'?'selected':''} onClick={()=>setView('groups')}>即時群組</button></div>
+    {view==='groups'?<LiveGroupTable groups={groups} failed={gfail}/>:view==='catalog'?<CatalogView items={cat} onRegister={register} pending={pending} onApply={()=>setConfirmApply(true)} busy={busy}/>:<>
       <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋名稱、供應商、模型" tabs={['全部','雲端','地端']} tab={tab} onTab={setTab}/>
       {items===null?<div className="lv-o-loading">載入中…</div>:<div className="lt" style={{'--cols':'minmax(130px,1.3fr) minmax(90px,.8fr) minmax(160px,1.5fr) 100px 70px 60px 110px 84px'}}>
         <div className="lt-head"><span>名稱</span><span>供應商</span><span>Medisense Model Gateway 模型</span><span>群組</span><span>部署</span><span>啟用</span><span>價格 輸入/輸出</span><span/></div>
