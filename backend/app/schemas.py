@@ -705,27 +705,21 @@ class ModelEntryIn(BaseModel):
         return self
 
 
-class ProvidersIn(BaseModel):
-    """Cloud model providers the security review has approved (the prefix of litellm_model, e.g. vertex_ai, azure, bedrock).
-    On-prem models never need approval: they run inside the hospital."""
-    approved: list[str] = Field(default_factory=list, max_length=30)
-
-    @field_validator("approved", mode="after")
-    @classmethod
-    def _clean(cls, v: list[str]) -> list[str]:
-        out = []
-        for p in v:
-            p = p.strip().lower()
-            if p and not re.fullmatch(r"[a-z0-9_-]{2,40}", p):
-                raise ValueError(f"invalid provider name: {p}")
-            if p and p not in out:
-                out.append(p)
-        return out
+class CatalogItemOut(BaseModel):
+    key: str
+    name: str
+    provider: str
+    litellm_model: str
+    group: str
+    deploy: Literal["cloud", "onprem"]
+    description: str = ""
+    needs_api_base: bool = False
+    registered: bool = False
+    registered_id: str = ""
 
 
-class ProvidersOut(ProvidersIn):
-    updated_by: str = ""
-    updated_at: Any = None
+class CatalogRegisterIn(BaseModel):
+    api_base: str = Field(default="", max_length=300)  # on-prem entries: the address of the hospital's server
 
 
 class SmartRouterIn(BaseModel):
@@ -868,7 +862,8 @@ class AttachmentOut(BaseModel):
     attachment_id: str
     name: str
     chars: int
-    snippet: str  # first 500 chars of the DE-IDENTIFIED text
+    snippet: str  # first 500 chars of the DE-IDENTIFIED text ("" for an image)
+    kind: Literal["text", "image"] = "text"
 
 
 class CalendarStatus(BaseModel):

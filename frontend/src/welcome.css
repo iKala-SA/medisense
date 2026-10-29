@@ -1,5 +1,5 @@
-/* New-conversation opening: jellyfish peeks, blinks twice, brows hop twice, swims to the middle and smiles; then the greeting
-   blurs in letter by letter (Qwen-like). The composer is there from the first frame. Total ~3.4s. */
+/* New-conversation opening: jellyfish peeks, blinks twice, brows hop twice, swims to the middle and smiles; while the greeting
+   blurs in letter by letter (Qwen-like), starting on the same frame as the jellyfish. The composer is there from the first frame. Total ~3.4s. */
 .ji{position:relative;display:inline-block;border-radius:50%;background:#f4f4f4;overflow:hidden;flex-shrink:0}
 .ji-fig{position:absolute;inset:8%;display:block;animation:ji-swim 4s cubic-bezier(.4,0,.2,1) both}
 .ji-float{position:absolute;inset:0;display:block;animation:ji-bob 3.2s ease-in-out 4.1s infinite}
@@ -15,7 +15,7 @@
 @keyframes ji-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3.5%)}}
 
 .wl-title{display:flex;justify-content:center;flex-wrap:wrap}
-.wl-char{display:inline-block;white-space:pre;opacity:0;animation:wl-char .8s cubic-bezier(.2,.7,.2,1) calc(2.5s + var(--i)*70ms) both}
+.wl-char{display:inline-block;white-space:pre;opacity:0;animation:wl-char .8s cubic-bezier(.2,.7,.2,1) calc(var(--i)*150ms) both}
 @keyframes wl-char{from{opacity:0;transform:translateY(16px);filter:blur(8px)}to{opacity:1;transform:none;filter:blur(0)}}
 @media(prefers-reduced-motion:reduce){
   .ji-fig,.ji-float,.ji-lid,.ji-brows,.wl-char{animation:none}

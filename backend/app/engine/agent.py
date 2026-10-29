@@ -178,7 +178,8 @@ def _clip(s: str) -> str:
 
 def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str, history: list[dict],
               rag_files: list[str] | None = None, resume: dict | None = None, skill_prefix: str = "",
-              extra_context: str = "", pin_model: str | None = None, emit=None, web_search: bool = False) -> RunResult:
+              extra_context: str = "", pin_model: str | None = None, emit=None, web_search: bool = False,
+              images: list[dict] | None = None) -> RunResult:
     """One conversation turn. `resume` = the `pending` dict a previous run returned at an approval: the paused
     tool call is executed (approved) and the loop continues. `emit(event)` feeds the chat stream:
     step_start, step_skip, step_done, delta, citations."""
@@ -324,7 +325,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         approved_id = resume["call"]["id"]
         res.trace.append(StepTrace(node_id=resume.get("node_id", "approval"), type="approval", summary="已由 Agent 負責人核准，繼續執行"))
     else:
-        messages = [*history, {"role": "user", "content": user_message}]
+        content = [{"type": "text", "text": user_message}, *images] if images else user_message  # images: redacted copies only
+        messages = [*history, {"role": "user", "content": content}]
         queue, approved_id = [], ""
         res.trace.append(StepTrace(node_id="input", type="input", summary="收到使用者輸入（已去識別化）"))
         if web_blocked:

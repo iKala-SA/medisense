@@ -63,21 +63,6 @@ def required_secrets(models: list[dict]) -> list[dict[str, str]]:
     return [{"secret": k, "env": v} for k, v in sorted(seen.items())]
 
 
-DEFAULT_APPROVED = ("vertex_ai",)  # what the platform was built and reviewed with; an admin extends the list
-
-
-def provider_of(m: dict) -> str:
-    """'vertex_ai/gemini-3-flash' -> 'vertex_ai'. A model without a prefix is its own provider name."""
-    return str(m.get("litellm_model", "")).split("/", 1)[0].strip().lower()
-
-
-def unapproved(models: list[dict], approved) -> list[dict]:
-    """Enabled CLOUD models whose provider is not on the approved list (on-prem models stay inside the hospital)."""
-    ok = {str(a).lower() for a in approved}
-    return [m for m in models if m.get("enabled", True) and m.get("litellm_model") and m.get("deploy", "cloud") == "cloud"
-            and provider_of(m) not in ok]
-
-
 def missing_groups(models: list[dict]) -> list[str]:
     """Groups agents rely on that have no enabled member. Deploying with any of these missing would leave
     agents that pick the group without a model, so apply refuses (sovereign is optional: it fails closed)."""

@@ -4,7 +4,7 @@ import './admin-home.css';
 
 /* Admin home: one page, no tabs. Every admin area as a card, grouped like the sidebar. */
 const DESC={
-  'Model':'可用模型、供應商與核准的雲端供應商。',
+  'Model':'瀏覽可用模型、一鍵註冊並套用到 Medisense Model Gateway。',
   'Model Routing':'模型群組、規則優先順序與敏感資料處置政策。',
   'Security Control':'網路搜尋、語音輸入等功能總開關與資料保護設定。',
   '稽核記錄':'模型呼叫、路由決策與資料分級的查詢與匯出。',

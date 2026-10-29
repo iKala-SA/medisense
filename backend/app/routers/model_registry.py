@@ -14,8 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import db
 from ..auth import User, require_admin
-from ..engine import github_actions, litellm_config, llm
-from ..schemas import LitellmRenderOut, ModelEntryIn, ModelEntryOut, ProvidersIn, ProvidersOut, SmartRouterIn, SmartRouterOut
+
+from ..engine import github_actions, litellm_config, llm, model_catalog
+from ..schemas import CatalogItemOut, CatalogRegisterIn, LitellmRenderOut, ModelEntryIn, ModelEntryOut, SmartRouterIn, SmartRouterOut
+
 
 router = APIRouter(prefix="/api/model-registry", tags=["model-registry"], dependencies=[Depends(require_admin)])
 
@@ -66,20 +68,6 @@ def _render(user: User) -> dict:
     return data
 
 
-def _approved() -> list[str]:
-    snap = db.client().collection("config").document("model_providers").get()
-    row = (snap.to_dict() if snap.exists else None) or {}
-    return list(row.get("approved") if row.get("approved") is not None else litellm_config.DEFAULT_APPROVED)
-
-
-def _require_approved(body: ModelEntryIn) -> None:
-    if body.enabled and body.deploy == "cloud":
-        bad = litellm_config.unapproved([body.model_dump()], _approved())
-        if bad:
-            raise HTTPException(409, f"provider '{litellm_config.provider_of(bad[0])}' has not been approved by the security review; "
-                                     "an admin must approve it under 已核准的雲端供應商 first (or save the model disabled)")
-
-
 def _changed(user: User) -> None:
     llm.reset_registry_cache()
     _render(user)
@@ -107,22 +95,6 @@ def _refresh(data: dict) -> dict:
     return {**data, **patch}
 
 
-@router.get("/providers", response_model=ProvidersOut)
-def get_providers():
-    snap = db.client().collection("config").document("model_providers").get()
-    row = (snap.to_dict() if snap.exists else None) or {}
-    return ProvidersOut(approved=_approved(), updated_by=row.get("updated_by", ""), updated_at=row.get("updated_at"))
-
-
-@router.put("/providers", response_model=ProvidersOut)
-def put_providers(body: ProvidersIn, user: User = Depends(require_admin)):
-    old = _approved()
-    data = {"approved": body.approved, "updated_by": user.email, "updated_at": db.now()}
-    db.client().collection("config").document("model_providers").set(data)
-    db.audit(user.uid, "model.providers", user.email, old=old, new=body.approved)
-    return ProvidersOut(**data)
-
-
 @router.get("", response_model=list[ModelEntryOut])
 def list_models():
     return sorted((_out(d) for d in _col().stream()), key=lambda m: (m.group, m.name.lower()))
@@ -130,12 +102,40 @@ def list_models():
 
 @router.post("", response_model=ModelEntryOut, status_code=201)
 def create_model(body: ModelEntryIn, user: User = Depends(require_admin)):
-    _require_approved(body)
     ref = _col().document()
     data = {**body.model_dump(), "created_by": user.email, "created_at": db.now(), "updated_at": db.now()}
     ref.set(data)
     _changed(user)
     db.audit(user.uid, "model.create", user.email, model_id=ref.id, name=body.name, group=body.group, deploy=body.deploy)
+    return ModelEntryOut(id=ref.id, **data)
+
+
+@router.get("/catalog", response_model=list[CatalogItemOut])
+def catalog():
+    """Models that can be registered with one click, each marked with whether it already is."""
+    have = {r.get("litellm_model"): r["id"] for r in _rows()}
+    return [CatalogItemOut(**m, registered=m["litellm_model"] in have, registered_id=have.get(m["litellm_model"], ""))
+            for m in model_catalog.CATALOG]
+
+
+@router.post("/catalog/{key}/register", response_model=ModelEntryOut, status_code=201)
+def register_from_catalog(key: str, body: CatalogRegisterIn, user: User = Depends(require_admin)):
+    item = model_catalog.BY_KEY.get(key)
+    if not item:
+        raise HTTPException(404, "model is not in the catalog")
+    if any(r.get("litellm_model") == item["litellm_model"] for r in _rows()):
+        raise HTTPException(409, "this model is already registered")
+    api_base = body.api_base.strip()
+    if item.get("needs_api_base") and not api_base:
+        raise HTTPException(422, "api_base is required for an on-prem model")
+    entry = ModelEntryIn(name=item["name"], provider=item["provider"], litellm_model=item["litellm_model"], group=item["group"],
+                         deploy=item["deploy"], enabled=True, api_base=api_base if item.get("needs_api_base") else "",
+                         notes=item["description"])
+    ref = _col().document()
+    data = {**entry.model_dump(), "created_by": user.email, "created_at": db.now(), "updated_at": db.now()}
+    ref.set(data)
+    _changed(user)
+    db.audit(user.uid, "model.register", user.email, model_id=ref.id, key=key, litellm_model=item["litellm_model"])
     return ModelEntryOut(id=ref.id, **data)
 
 
@@ -157,10 +157,6 @@ def get_deploy():
 def apply_registry(user: User = Depends(require_admin)):
     """Render the registry and deploy it to LiteLLM via the GitHub Actions workflow (infra/09)."""
     rows = _rows()
-    bad = litellm_config.unapproved(rows, _approved())
-    if bad:
-        raise HTTPException(409, "cannot deploy: provider(s) not approved by the security review: "
-                                 + ", ".join(sorted({litellm_config.provider_of(m) for m in bad})))
     missing = litellm_config.missing_groups(rows)
     if missing:
         raise HTTPException(409, f"cannot deploy: no enabled model in group(s) {', '.join(missing)}")
@@ -216,7 +212,6 @@ def get_model(mid: str):
 @router.put("/{mid}", response_model=ModelEntryOut)
 def update_model(mid: str, body: ModelEntryIn, user: User = Depends(require_admin)):
     snap = _load(mid)
-    _require_approved(body)
     snap.reference.update({**body.model_dump(), "updated_at": db.now()})
     _changed(user)
     db.audit(user.uid, "model.update", user.email, model_id=mid, name=body.name, group=body.group, deploy=body.deploy)

@@ -63,7 +63,7 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     d = snap.to_dict() or {}
     return SessionDetail(**_summary(snap.id, d).model_dump(),
                          messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta")) for m in d.get("messages") or []],
-                         attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0)}
+                         attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],
                          feedback={str(k): v for k, v in (d.get("feedback") or {}).items()})
 
@@ -100,5 +100,7 @@ def delete_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     if (snap.to_dict() or {}).get("locked"):
         raise HTTPException(409, "conversation is locked")
+    from ..engine import chat_images
+    chat_images.delete([a["blob"] for a in (snap.to_dict() or {}).get("attachments") or [] if a.get("blob")])
     snap.reference.delete()
     db.audit(user.uid, "session.delete", user.email, session_id=session_id)
