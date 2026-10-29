@@ -18,5 +18,13 @@ CATALOG: list[dict] = [
      "group": "sovereign", "deploy": "onprem", "needs_api_base": True, "description": "院內 vLLM 伺服器上的開源模型，資料不出院。需填伺服器位址。"},
     {"key": "gpt-oss-20b", "name": "gpt-oss 20B（院內）", "provider": "自架開源", "litellm_model": "openai/gpt-oss-20b",
      "group": "sovereign", "deploy": "onprem", "needs_api_base": True, "description": "較小的院內開源模型，資源需求較低。需填伺服器位址。"},
+    # Ollama ids are "<family><version>:<size>" (ollama.com/library); LiteLLM's ollama_chat/ prefix uses Ollama's chat API,
+    # which is what carries tool calls (gemma3 has no tool template in Ollama; gemma4 does, so agents with knowledge work).
+    {"key": "gemma-4-12b", "name": "Gemma 4 12B（院內）", "provider": "ollama", "litellm_model": "ollama_chat/gemma4:12b",
+     "group": "sovereign", "deploy": "onprem", "needs_api_base": True,
+     "description": "院內 Ollama 伺服器上的 Google 開放權重模型，支援工具呼叫與視覺，資料不出院。需填伺服器位址（例如 http://10.140.0.31:11434 或 os.environ/OLLAMA_API_BASE）。"},
+    # Bedrock keyless: the renderer adds aws_role_name / aws_web_identity_token / aws_region_name (BEDROCK_* env, infra/env.sh).
+    {"key": "nova-2-lite", "name": "Amazon Nova 2 Lite", "provider": "bedrock", "litellm_model": "bedrock/jp.amazon.nova-2-lite-v1:0",
+     "group": "budget", "deploy": "cloud", "description": "AWS Bedrock（東京）上的低成本模型，透過平台服務帳戶免金鑰呼叫。"},
 ]
 BY_KEY = {m["key"]: m for m in CATALOG}
