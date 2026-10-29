@@ -34,6 +34,10 @@ done
 gcloud storage buckets add-iam-policy-binding "gs://${PROJECT_ID}_cloudbuild" \
   --member="serviceAccount:${SA}" --role=roles/storage.admin --quiet >/dev/null
 echo "   granted roles/storage.admin on gs://${PROJECT_ID}_cloudbuild"
+# `gcloud run deploy --image` checks the deployer can pull the image Cloud Build pushed (only this repo).
+gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --location "$REGION" --project "$PROJECT_ID" \
+  --member="serviceAccount:${SA}" --role=roles/artifactregistry.reader --quiet >/dev/null
+echo "   granted roles/artifactregistry.reader on ${AR_REPO}"
 # Deploy LiteLLM *as* its runtime SA (actAs on that one SA only).
 gcloud iam service-accounts add-iam-policy-binding "${LITELLM_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
   --member="serviceAccount:${SA}" --role=roles/iam.serviceAccountUser --project "$PROJECT_ID" --quiet >/dev/null
