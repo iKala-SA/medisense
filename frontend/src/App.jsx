@@ -13,6 +13,7 @@ import {api} from './api';
 import {Recents,ProjectPage,useRecents} from './Recents';
 import {SideResizer,loadSideWidth} from './SideResizer';
 import AdminHome from './AdminHome';
+import {isMine} from './live/kit';
 const ChatRunForm=lazy(()=>import('./agents/ChatRunForm'));
 import {isImage,prepareImage} from './imageKit';
 const BkApp=lazy(()=>import('./bk/BkApp')),AgentsApp=lazy(()=>import('./agents/AgentsApp')),AgentsPage=lazy(()=>import('./live/AgentsPage')),ConnectorsPage=lazy(()=>import('./live/ConnectorsPage')),LiveCalendar=lazy(()=>import('./live/LiveCalendar')),ModelsPage=lazy(()=>import('./live/ModelsPage')),ModelRegistryPage=lazy(()=>import('./live/ModelRegistryPage')),RouterPage=lazy(()=>import('./live/RoutingRulesPage')),SkillsPage=lazy(()=>import('./live/SkillsPage')),SchedulesPage=lazy(()=>import('./live/SchedulesPage')),SpacesPage=lazy(()=>import('./live/SpacesPage')),GroupsPage=lazy(()=>import('./live/GroupsPage')),SecurityLive=lazy(()=>import('./live/SecurityPage')),UsersPage=lazy(()=>import('./live/UsersPage')),RolesPage=lazy(()=>import('./live/RolesPage')),MonitoringPage=lazy(()=>import('./live/MonitoringPage')),AuditLive=lazy(()=>import('./live/AuditPage'));
@@ -67,7 +68,7 @@ useEffect(()=>{
   api.features().then(setFeatures).catch(()=>setFeatures({web_search:false}));
   api.modelGroups().then(r=>setModelOpts(buildOptions(r.groups,r.models))).catch(()=>setModelOpts(buildOptions([])));
 },[logged]);
-const loadAgents=()=>api.listAgents().then(list=>setAgents(list.map(a=>({id:a.id,name:a.name,desc:a.description,status:agentStatus(a),version:String(a.version),model:a.model_group,dept:a.department,share:a.share,mine:a.owner_uid===me?.uid,owner:a.owner_email})))).catch(e=>notify(e.message));
+const loadAgents=()=>api.listAgents().then(list=>setAgents(list.map(a=>({id:a.id,name:a.name,desc:a.description,status:agentStatus(a),version:String(a.version),model:a.model_group,dept:a.department,share:a.share,mine:isMine(a,me),owner:a.owner_email})))).catch(e=>notify(e.message));
 useEffect(()=>{
   if(MOCK||(!logged&&!PREVIEW))return;
   loadAgents();

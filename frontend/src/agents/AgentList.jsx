@@ -2,34 +2,32 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube} from '@phosphor-icons/react';
 import {api} from '../api';
 import {ShareDialog} from '../live/ShareLive';
-import {canEditAgent,errText} from '../live/kit';
+import {canEditAgent,errText,isMine} from '../live/kit';
 import {agentToIn,blankAgent} from './stepkit';
 
 const TABS=[['all','全部'],['mine','我的'],['published','已發布']];
 const ago=t=>{if(!t)return '';const d=new Date(t);if(isNaN(d))return '';const m=(Date.now()-d)/60000;return m<1?'剛剛':m<60?`${Math.round(m)} 分鐘前`:m<1440?`${Math.round(m/60)} 小時前`:`${Math.round(m/1440)} 天前`};
 const download=(name,obj)=>{const u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)};
 
-function Card({a,me,onOpen,onChat,onDup,onShare,onDelete}){
-  const [menu,setMenu]=useState(false),edit=canEditAgent(a,me),mine=a.owner_uid===me.uid,pub=a.status==='published';
+function Row({a,me,onOpen,onChat,onDup,onShare,onDelete}){
+  const [menu,setMenu]=useState(false),edit=canEditAgent(a,me),mine=isMine(a,me),pub=a.status==='published';
   const st=a.review?.state==='pending'?['待審核','warn']:a.review?.state==='rejected'?['已退回','bad']:pub?[`已發布 v${a.version}`,'ok']:['草稿',''];
-  return <article className="ag-card">
-    <header><span className="ag-icon-tile">{a.icon||<Cube size={20}/>}</span><div className="tt"><h3 title={a.name}>{a.name}</h3><small>{mine?'我':(a.owner_email||'').split('@')[0]} · {ago(a.updated_at)}</small></div>
-      <div className="ag-menuwrap"><button className="ag-icon" aria-label={`「${a.name}」的更多選項`} aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={20} weight="bold"/></button>
+  return <div className="ag-row2" role="row">
+    <button className="nm" onClick={edit?onOpen:pub?onChat:undefined}><span className="ag-icon-tile">{a.icon||<Cube size={20}/>}</span>
+      <span className="tx"><b title={a.name}>{a.name}</b><small>{a.description||'（尚無說明）'}</small>
+        {(a.steps?.length>0||a.capabilities?.web_search||a.capabilities?.connectors?.length>0)&&<span className="tags">{a.steps?.length>0&&<span className="ag-chip"><ListChecks size={12}/>{a.steps.length} 步流程</span>}{a.capabilities?.web_search&&<span className="ag-chip">網路搜尋</span>}{a.capabilities?.connectors?.length>0&&<span className="ag-chip">{a.capabilities.connectors.length} 個連接器</span>}</span>}</span></button>
+    <span className="st"><span className={'ag-badge '+st[1]}>{st[0]}</span></span>
+    <span className="own">{mine?'我':(a.owner_email||'').split('@')[0]}</span><span className="when">{ago(a.updated_at)}</span>
+    <span className="act">{pub&&<button className="ag-btn primary" onClick={onChat}><Chat size={15}/>對話</button>}{edit&&<button className="ag-btn" onClick={onOpen}>編輯</button>}
+      <span className="ag-menuwrap"><button className="ag-icon" aria-label={`「${a.name}」的更多選項`} aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={20} weight="bold"/></button>
         {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
           {edit&&<button role="menuitem" onClick={onOpen}><PencilSimple size={16}/>編輯</button>}
           {pub&&<button role="menuitem" onClick={onChat}><Chat size={16}/>開始對話</button>}
           <button role="menuitem" onClick={onDup}><Copy size={16}/>複製為新草稿</button>
           <button role="menuitem" onClick={()=>download(a.name+'.json',agentToIn(a))}><DownloadSimple size={16}/>匯出 JSON</button>
           {edit&&<button role="menuitem" onClick={onShare}><Export size={16}/>分享</button>}
-          {edit&&<><hr/><button role="menuitem" className="danger" onClick={onDelete}><Trash size={16}/>刪除</button></>}</div></>}</div></header>
-    <p className="ds">{a.description||'（尚無說明）'}</p>
-    <div className="meta"><span className={'ag-badge '+st[1]}>{st[0]}</span>
-      {a.steps?.length>0&&<span className="ag-chip"><ListChecks size={12}/>{a.steps.length} 步流程</span>}
-      {a.capabilities?.web_search&&<span className="ag-chip">網路搜尋</span>}
-      {(a.capabilities?.connectors?.length>0)&&<span className="ag-chip">{a.capabilities.connectors.length} 個連接器</span>}</div>
-    <footer>{pub?<button className="ag-btn primary" onClick={onChat}><Chat size={15}/>對話</button>:<span className="ag-muted small">發布後才能對話</span>}
-      {edit?<button className="ag-btn" onClick={onOpen}>編輯</button>:null}</footer>
-  </article>;
+          {edit&&<><hr/><button role="menuitem" className="danger" onClick={onDelete}><Trash size={16}/>刪除</button></>}</div></>}</span></span>
+  </div>;
 }
 
 export default function AgentList({me,notify,onOpen,onCreateChat,onChat,refreshKey}){
@@ -38,7 +36,7 @@ export default function AgentList({me,notify,onOpen,onCreateChat,onChat,refreshK
   const file=useRef(null);
   const load=()=>api.listAgents().then(l=>{setAgents(builder?l:l.filter(a=>a.status==='published'));setErr('')}).catch(e=>{setAgents([]);setErr(errText(e))});
   useEffect(()=>{load()},[refreshKey]);// eslint-disable-line
-  const shown=useMemo(()=>{const n=q.trim().toLowerCase();return (agents||[]).filter(a=>tab==='all'||(tab==='mine'?a.owner_uid===me.uid:a.status==='published'))
+  const shown=useMemo(()=>{const n=q.trim().toLowerCase();return (agents||[]).filter(a=>tab==='all'||(tab==='mine'?isMine(a,me):a.status==='published'))
     .filter(a=>!n||[a.name,a.description,a.owner_email].some(t=>(t||'').toLowerCase().includes(n)))},[agents,tab,q,me.uid]);
   const blank=async()=>{setBusy(true);try{const a=await api.createAgent(blankAgent());onOpen(a.id)}catch(e){notify(errText(e));setBusy(false)}};
   const importJson=async f=>{
@@ -62,7 +60,7 @@ export default function AgentList({me,notify,onOpen,onCreateChat,onChat,refreshK
     {agents===null?<p className="ag-muted center">載入中…</p>
       :err&&!agents.length?<p className="ag-muted center">無法載入 Agent：{err}<br/><button className="ag-link" onClick={()=>{setAgents(null);load()}}>重試</button></p>
       :!shown.length?<p className="ag-muted center">{agents.length?'沒有符合的 Agent':builder?'還沒有 Agent。按「建立 Agent」開始。':'目前沒有已發布的 Agent。'}</p>
-      :<div className="ag-grid">{shown.map(a=><Card key={a.id} a={a} me={me} onOpen={()=>onOpen(a.id)} onChat={()=>onChat(a)} onDup={()=>dup(a)} onShare={()=>setSharing(a.id)} onDelete={()=>del(a)}/>)}</div>}
+      :<div className="ag-rows" role="table"><div className="ag-rowh" role="row"><span>名稱</span><span>狀態</span><span>負責人</span><span>更新</span><span/></div>{shown.map(a=><Row key={a.id} a={a} me={me} onOpen={()=>onOpen(a.id)} onChat={()=>onChat(a)} onDup={()=>dup(a)} onShare={()=>setSharing(a.id)} onDelete={()=>del(a)}/>)}</div>}
     {sharingAgent&&<ShareDialog title={sharingAgent.name} value={sharingAgent.share} owner={sharingAgent.owner_email} onClose={()=>setSharing(null)} onDone={async v=>{try{const r=await api.shareAgent(sharingAgent.id,v);setAgents(l=>l.map(x=>x.id===sharingAgent.id?{...x,share:r?.share||v}:x));notify('已更新分享設定');setSharing(null)}catch(e){notify(errText(e))}}}/>}
   </div>;
 }

@@ -45,3 +45,6 @@ export function statusBadges(a){
   else if(a.review?.state==='rejected')out.push('已退回');
   return out;
 }
+
+/* the person who created the agent: by user id, or by e-mail (the id can differ between sign-in methods) */
+export const isMine=(a,me)=>!!a&&!!me&&(a.owner_uid===me.uid||(!!a.owner_email&&a.owner_email===me.email));

@@ -25,7 +25,6 @@ export function Config({st,idx,steps,set,connectors,canEdit}){
   const prompt=<div className="ag-field"><label>提示詞 <small>輸入 @ 引用前面 Step 的輸出</small></label>
     <MentionEditor value={c.prompt||''} steps={before.filter(s=>s.enabled||true)} placeholder="描述要做什麼…" onChange={v=>setC({prompt:v})}/></div>;
   return <div className="ag-cfg" aria-disabled={!canEdit}>
-    <div className="ag-field"><label>標題 <small>流程內不可重複；其他 Step 用 @標題 引用</small></label><input aria-label="Step 標題" value={st.title} maxLength={60} onChange={e=>set({title:e.target.value})}/></div>
     <div className="ag-field"><label>描述</label><input value={st.description||''} maxLength={300} placeholder="（選填）" onChange={e=>set({description:e.target.value})}/></div>
     {st.type==='text_input'&&<>
       <div className="ag-field"><label>提示文字</label><input value={c.placeholder||''} placeholder="欄位為空時顯示" onChange={e=>setC({placeholder:e.target.value})}/></div>
@@ -108,7 +107,8 @@ export function StepEditPanel({steps,setSteps,sel,setSel,connectors,canEdit}){
     setSteps(steps.filter(s=>s.id!==st.id).map(s=>({...s,config:strip(s.config)})));setSel('agent');
   };
   return <div className="ag-editcard">
-    <h3><Tile tone={m.cat} size={40}><I size={20}/></Tile>編輯{m.label}</h3>
+    <h3><Tile tone={m.cat} size={40}><I size={20}/></Tile><span className="ttl"><span className="t" title={st.title}>{st.title||'（未命名步驟）'}</span><small>{m.label}</small></span></h3>
+    <div className="ag-field"><label htmlFor="step-name">步驟名稱 <small>流程內不可重複；其他步驟用 @名稱 引用</small></label><input id="step-name" aria-label="步驟名稱" value={st.title} maxLength={60} disabled={!canEdit} onChange={e=>patch({title:e.target.value})}/></div>
     <label className="ag-inline top"><Switch on={st.enabled} label="啟用" onChange={v=>patch({enabled:v})}/>啟用這個步驟（關閉後執行時略過）</label>
     <Config st={st} idx={idx} steps={steps} set={patch} connectors={connectors} canEdit={canEdit}/>
     {canEdit&&<div className="ag-editfoot"><button className="ag-btn dangerline" onClick={del}><Trash size={15}/>刪除</button><button className="ag-btn greenline" onClick={dup}><Copy size={15}/>複製</button></div>}
