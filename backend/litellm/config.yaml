@@ -37,33 +37,6 @@ model_list:
     deploy: cloud
     group: budget
     provider: vertex_ai
-- model_name: nova-2-lite
-  litellm_params:
-    model: bedrock/jp.amazon.nova-2-lite-v1:0
-    aws_region_name: os.environ/BEDROCK_REGION
-    aws_role_name: os.environ/BEDROCK_ROLE_ARN
-    aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
-    aws_session_name: tcvgh-litellm
-  model_info:
-    deploy: cloud
-    group: budget
-    provider: bedrock
-- model_name: gemma-3-12b
-  litellm_params:
-    model: ollama_chat/gemma3:12b
-    api_base: os.environ/OLLAMA_API_BASE
-  model_info:
-    deploy: onprem
-    group: sovereign
-    provider: ollama
-- model_name: gemma-3-4b
-  litellm_params:
-    model: ollama_chat/gemma3:4b
-    api_base: os.environ/OLLAMA_API_BASE
-  model_info:
-    deploy: onprem
-    group: sovereign
-    provider: ollama
 - model_name: fast
   litellm_params:
     model: vertex_ai/gemini-2.5-flash
@@ -79,10 +52,6 @@ model_list:
     model: vertex_ai/gemini-3-flash-preview
     vertex_project: os.environ/VERTEX_PROJECT
     vertex_location: os.environ/VERTEX_LOCATION
-- model_name: sovereign
-  litellm_params:
-    model: ollama_chat/gemma3:12b
-    api_base: os.environ/OLLAMA_API_BASE
 - model_name: smart-router
   litellm_params:
     model: auto_router/complexity_router
@@ -106,10 +75,7 @@ router_settings:
   - reasoning:
     - fast
   - budget:
-    - nova-2-lite
     - fast
-  - sovereign:
-    - gemma-3-4b
   context_window_fallbacks:
   - fast:
     - reasoning
