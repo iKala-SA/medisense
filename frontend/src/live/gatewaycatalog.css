@@ -1,12 +1,12 @@
 .lv-gc-switch{display:inline-flex;background:#eef5f1;border-radius:9px;padding:3px;gap:2px;margin:0 0 16px;max-width:100%}
 .lv-gc-switch button{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:500;color:#4b6157;white-space:nowrap}
-.lv-gc-switch button.on{background:#fff;color:#1f8656;box-shadow:0 1px 3px #0f2a1c18}
+.lv-gc-switch button.on{background:#fff;color:#239660;box-shadow:0 1px 3px #0f2a1c18}
 .lv-gc-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .lv-gc-bar .search{flex:1;min-width:220px;max-width:420px}
 .lv-gc-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;user-select:none}
 .lv-gc-chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .lv-gc-chip{border:1px solid #dce5e1;background:#fff;border-radius:20px;padding:5px 12px;font-size:12px;color:#44594f;white-space:nowrap}
-.lv-gc-chip.on{background:#e8faf2;border-color:#4bd595;color:#1f8656;font-weight:600}
+.lv-gc-chip.on{background:#e8faf2;border-color:#4bd595;color:#239660;font-weight:600}
 .lv-gc-chip em{font-style:normal;color:#8aa196;margin-left:4px;font-size:11px}
 .lv-gc-chips select{font-size:12px;padding:5px 10px;border-radius:20px;max-width:200px}
 .lv-gc-count{font-size:13px;color:#4b6157;margin:4px 0 14px}

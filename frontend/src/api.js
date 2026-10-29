@@ -174,6 +174,7 @@ export const api={
     if(!result)throw new Error('連線中斷，未收到完整回覆');
     return result;
   },
+  chatAgent:id=>call(`/api/chat/agents/${id}`),
   chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
