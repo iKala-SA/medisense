@@ -123,19 +123,27 @@ def register_from_catalog(key: str, body: CatalogRegisterIn, user: User = Depend
     item = model_catalog.BY_KEY.get(key)
     if not item:
         raise HTTPException(404, "model is not in the catalog")
-    if any(r.get("litellm_model") == item["litellm_model"] for r in _rows()):
+    lm = item["litellm_model"]
+    if item.get("needs_deployment"):
+        if not body.deployment.strip():
+            raise HTTPException(422, "deployment name is required")
+        lm = lm.replace("{deployment}", body.deployment.strip())
+    if any(r.get("litellm_model") == lm for r in _rows()):
         raise HTTPException(409, "this model is already registered")
     api_base = body.api_base.strip()
     if item.get("needs_api_base") and not api_base:
-        raise HTTPException(422, "api_base is required for an on-prem model")
-    entry = ModelEntryIn(name=item["name"], provider=item["provider"], litellm_model=item["litellm_model"], group=item["group"],
+        raise HTTPException(422, "api_base is required for this model")
+    if item.get("needs_secret") and not body.secret_name.strip():
+        raise HTTPException(422, "secret_name is required for this model")
+    name = item["name"] if not item.get("needs_deployment") else f"{item['name'].split('（')[0]}（{body.deployment.strip()}）"
+    entry = ModelEntryIn(name=name, provider=item["provider"], litellm_model=lm, group=item["group"],
                          deploy=item["deploy"], enabled=True, api_base=api_base if item.get("needs_api_base") else "",
-                         notes=item["description"])
+                         secret_name=body.secret_name.strip() if item.get("needs_secret") else "", notes=item["description"])
     ref = _col().document()
     data = {**entry.model_dump(), "created_by": user.email, "created_at": db.now(), "updated_at": db.now()}
     ref.set(data)
     _changed(user)
-    db.audit(user.uid, "model.register", user.email, model_id=ref.id, key=key, litellm_model=item["litellm_model"])
+    db.audit(user.uid, "model.register", user.email, model_id=ref.id, key=key, litellm_model=lm)
     return ModelEntryOut(id=ref.id, **data)
 
 

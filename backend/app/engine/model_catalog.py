@@ -14,9 +14,26 @@ CATALOG: list[dict] = [
      "group": "reasoning", "deploy": "cloud", "description": "穩定版的進階推理模型。"},
     {"key": "gemini-2-5-flash-lite", "name": "Gemini 2.5 Flash-Lite", "provider": "Google", "litellm_model": "vertex_ai/gemini-2.5-flash-lite",
      "group": "budget", "deploy": "cloud", "description": "最省成本，適合簡單分類與摘要。"},
+    {"key": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Anthropic", "litellm_model": "vertex_ai/claude-sonnet-5-5",
+     "group": "reasoning", "deploy": "cloud", "description": "Anthropic 的主力模型，經 Vertex AI 提供，不需另外建立金鑰。"},
+    {"key": "claude-opus-5-5", "name": "Claude Opus 5.5", "provider": "Anthropic", "litellm_model": "vertex_ai/claude-opus-5-5",
+     "group": "reasoning", "deploy": "cloud", "description": "最強推理與長文件分析，經 Vertex AI 提供，成本較高。"},
+    {"key": "claude-haiku-5-5", "name": "Claude Haiku 5.5", "provider": "Anthropic", "litellm_model": "vertex_ai/claude-haiku-5-5",
+     "group": "budget", "deploy": "cloud", "description": "快速低成本，適合簡單問答與分類，經 Vertex AI 提供。"},
+    {"key": "azure-openai", "name": "Azure OpenAI（自訂部署）", "provider": "Azure", "litellm_model": "azure/{deployment}",
+     "group": "reasoning", "deploy": "cloud", "needs_deployment": True, "needs_api_base": True, "needs_secret": True,
+     "description": "貴院 Azure OpenAI 資源上的部署。需填部署名稱、資源位址，以及 Secret Manager 中金鑰的名稱（不是金鑰內容）。"},
     {"key": "gpt-oss-120b", "name": "gpt-oss 120B（院內）", "provider": "自架開源", "litellm_model": "openai/gpt-oss-120b",
      "group": "sovereign", "deploy": "onprem", "needs_api_base": True, "description": "院內 vLLM 伺服器上的開源模型，資料不出院。需填伺服器位址。"},
     {"key": "gpt-oss-20b", "name": "gpt-oss 20B（院內）", "provider": "自架開源", "litellm_model": "openai/gpt-oss-20b",
      "group": "sovereign", "deploy": "onprem", "needs_api_base": True, "description": "較小的院內開源模型，資源需求較低。需填伺服器位址。"},
+    # Ollama ids are "<family><version>:<size>" (ollama.com/library); LiteLLM's ollama_chat/ prefix uses Ollama's chat API,
+    # which is what carries tool calls (gemma3 has no tool template in Ollama; gemma4 does, so agents with knowledge work).
+    {"key": "gemma-4-12b", "name": "Gemma 4 12B（院內）", "provider": "ollama", "litellm_model": "ollama_chat/gemma4:12b",
+     "group": "sovereign", "deploy": "onprem", "needs_api_base": True,
+     "description": "院內 Ollama 伺服器上的 Google 開放權重模型，支援工具呼叫與視覺，資料不出院。需填伺服器位址（例如 http://10.140.0.31:11434 或 os.environ/OLLAMA_API_BASE）。"},
+    # Bedrock keyless: the renderer adds aws_role_name / aws_web_identity_token / aws_region_name (BEDROCK_* env, infra/env.sh).
+    {"key": "nova-2-lite", "name": "Amazon Nova 2 Lite", "provider": "bedrock", "litellm_model": "bedrock/jp.amazon.nova-2-lite-v1:0",
+     "group": "budget", "deploy": "cloud", "description": "AWS Bedrock（東京）上的低成本模型，透過平台服務帳戶免金鑰呼叫。"},
 ]
 BY_KEY = {m["key"]: m for m in CATALOG}

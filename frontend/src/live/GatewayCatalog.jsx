@@ -24,7 +24,7 @@ function Detail({service,admin,onClose,onSetup,onEnable,onEdit}){
   return <div className="lv-gc-side" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="lv-gc-panel" role="dialog" aria-modal="true" aria-label={service.name}>
     <button type="button" className="icon-btn modal-close" aria-label="關閉" onClick={onClose}><X/></button>
     <div className="lv-gc-head"><SvcIcon svc={service.service} name={service.name} url={service.icon_url} homepage={info.homepage||service.homepage}/><div><h2>{info.name||service.name}</h2><span className="lv-p-meta">{service.service}</span></div></div>
-    {info.homepage&&<a href={info.homepage} target="_blank" rel="noreferrer" style={{color:'#1f8656',fontSize:13,display:'inline-flex',gap:5,alignItems:'center',overflowWrap:'anywhere'}}><ArrowSquareOut size={14}/>{info.homepage}</a>}
+    {info.homepage&&<a href={info.homepage} target="_blank" rel="noreferrer" style={{color:'#239660',fontSize:13,display:'inline-flex',gap:5,alignItems:'center',overflowWrap:'anywhere'}}><ArrowSquareOut size={14}/>{info.homepage}</a>}
     <div className="lv-gc-tags">{(info.categories||[]).map(c=><span key={c} className="lv-gc-tag">{catLabel(c)}</span>)}<AuthBadges types={info.auth_types}/></div>
     {err?<Banner icon={<Warning size={16}/>}>無法載入服務詳情：{err}</Banner>:!d?<Loading/>:<>
       <div className="lv-gc-nums"><span className="badge">動作 {d.action_count}（可執行 {d.executable_count}）</span><span className="badge">觸發器 {d.trigger_count}</span></div>

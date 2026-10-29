@@ -8,7 +8,7 @@ import {Loading,Kpi,Delta} from './shared';
 import './admin.css';
 
 const RANGES=[['today','今日'],['7d','近 7 天'],['month','本月'],['custom','自訂區間']];
-const SERIES=['#23945f','#6bdca7','#2a8f9c','#c27c1e','#d15f8b','#8d8799'];
+const SERIES=['#239660','#6bdca7','#2a8f9c','#c27c1e','#d15f8b','#8d8799'];
 const PAGE=10;
 const shift=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const rangeDates=r=>{

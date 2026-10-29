@@ -47,7 +47,7 @@
 
 /* React Flow (Clinical Jade -> Medisense purple) */
 .bk .react-flow__node { font-family: inherit; }
-.bk .react-flow__handle { width: 10px; height: 10px; background: #23945f; border: 2px solid #fff; }
+.bk .react-flow__handle { width: 10px; height: 10px; background: #239660; border: 2px solid #fff; }
 .bk .react-flow__edge-path { stroke: #5cd99f; stroke-width: 1.5; }
 .bk .react-flow__controls { box-shadow: 0px 4px 16px rgba(35, 148, 95, 0.08); border: 1px solid #eaf0ed; border-radius: 6px; overflow: hidden; }
 .bk .react-flow__controls-button { border-bottom: 1px solid #eaf0ed; }

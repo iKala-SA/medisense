@@ -309,9 +309,26 @@ def model_catalog() -> list[dict]:
         name = str(m.get("model_name") or "")
         if name and name not in SELECTABLE_GROUPS and name != routing.SMART_ROUTER:
             seen.setdefault(name, str((m.get("litellm_params") or {}).get("model") or name))
-    out = [{"id": k, "model": v} for k, v in sorted(seen.items())]
+    out = [{"id": k, "model": v, **_registry_card(k, v)} for k, v in sorted(seen.items())]
     _catalog_cache = (time.monotonic(), out)
     return out
+
+
+def _registry_card(model_name: str, litellm_model: str) -> dict:
+    """What the admin 模型 page shows for this served model (name, provider, deploy, group), so the chat box can
+    list it with the same words. Matched the way the renderer names entries (slug of the row's name) or by the
+    LiteLLM model id; {} for a hand-written config entry that is not in the registry."""
+    from .litellm_config import _slug  # pure module, no I/O
+
+    rows = _registry()
+    # Two rows may share one LiteLLM model (e.g. "Gemini 3 Flash" in fast and "Gemini 3 Flash (budget)"), so the slug
+    # of the row's name, which is what the renderer uses as model_name, wins over a model-id match.
+    hit = (next((r for r in rows if _slug(str(r.get("name", ""))) == model_name), None)
+           or next((r for r in rows if str(r.get("litellm_model")) == litellm_model), None))
+    if hit is None:
+        return {}
+    return {"name": str(hit.get("name") or model_name), "provider": str(hit.get("provider") or ""),
+            "deploy": str(hit.get("deploy") or "cloud"), "group": str(hit.get("group") or "")}
 
 
 def _gateway() -> tuple[list[dict], list[dict]]:

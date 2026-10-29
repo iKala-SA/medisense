@@ -1,5 +1,5 @@
 .lv-w-role{font-size:11px;color:#7c6e89;background:#edf9f3;border-radius:10px;padding:2px 8px;white-space:nowrap}
-.lv-w-ok{color:#1d7a43}.lv-w-bad{color:#a02323}
+.lv-w-ok{color:#239660}.lv-w-bad{color:#a02323}
 .lv-w-note{font-size:12px;color:var(--muted);margin:8px 0 0}
 .lv-w-form{max-width:760px;background:#fff;border:1px solid #ebf0ee;border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:14px}
 .lv-w-form .field input,.lv-w-form .field select,.lv-w-form .field textarea{width:100%}

@@ -51,6 +51,15 @@ export const api={
   deleteAgent:id=>call(`/api/agents/${id}`,{method:'DELETE'}),
   run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',body:body({message,session_id,use_published,version})}),
   approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',body:body({session_id,approve})}),
+  draftAgent:(message,current,history,kind='flow')=>call('/api/agents/draft',{method:'POST',body:body({message,current,history,kind})}),
+  improveInstructions:b=>call('/api/agents/improve',{method:'POST',body:body(b)}),
+  validateSteps:steps=>call('/api/agents/validate-steps',{method:'POST',body:body({steps})}),
+  startStepRun:(id,inputs,use_published=false,version)=>call(`/api/agents/${id}/step-runs`,{method:'POST',body:body({inputs,use_published,version})}),
+  listStepRuns:id=>call(`/api/agents/${id}/step-runs`),
+  getStepRun:id=>call(`/api/step-runs/${id}`),
+  runToChat:(id,session_id)=>call(`/api/step-runs/${id}/to-chat`,{method:'POST',body:body({session_id})}),
+  approveStepRun:(id,approve)=>call(`/api/step-runs/${id}/approve`,{method:'POST',body:body({approve})}),
+  uploadRunFile:(agentId,file)=>{const fd=new FormData();fd.append('file',file);return call(`/api/agents/${agentId}/run-files`,{method:'POST',body:fd},false)},
   // knowledge
   listDocs:()=>call('/api/knowledge'),
   uploadDoc:(file,category,department)=>{const fd=new FormData();fd.append('file',file);fd.append('category',category);fd.append('department',department);return call('/api/knowledge',{method:'POST',body:fd},false)},
@@ -127,7 +136,7 @@ export const api={
   testRouting:text=>call('/api/routing/test',{method:'POST',body:body({text})}),
   // model registry (admin)
   modelCatalog:()=>call('/api/model-registry/catalog'),
-  registerCatalogModel:(key,api_base='')=>call(`/api/model-registry/catalog/${key}/register`,{method:'POST',body:body({api_base})}),
+  registerCatalogModel:(key,b={})=>call(`/api/model-registry/catalog/${key}/register`,{method:'POST',body:body(b)}),
   listModelRegistry:()=>call('/api/model-registry'),
   createModelEntry:m=>call('/api/model-registry',{method:'POST',body:body(m)}),
   updateModelEntry:(id,m)=>call(`/api/model-registry/${id}`,{method:'PUT',body:body(m)}),
@@ -174,6 +183,7 @@ export const api={
     if(!result)throw new Error('連線中斷，未收到完整回覆');
     return result;
   },
+  chatAgent:id=>call(`/api/chat/agents/${id}`),
   chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),

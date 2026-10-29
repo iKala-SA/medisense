@@ -98,6 +98,75 @@ class TestCase(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
 
 
+StepType = Literal["text_input", "file_upload", "llm_generate", "web_search", "research", "agent_call", "browser_agent",
+                   "image_generate", "knowledge_query", "data_insight", "action", "reasoning_group"]
+OnError = Literal["stop", "retry", "skip"]
+
+
+class Step(BaseModel):
+    """One unit of an agent's step flow (PRD §5). Prompts reference earlier steps as {{step_id}} / {{step_id.field}}; the
+    editor shows them as @title tokens, so renaming a step never breaks a reference."""
+
+    id: str = Field(min_length=1, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
+    type: StepType
+    title: str = Field(min_length=1, max_length=60)
+    description: str = Field(default="", max_length=300)
+    enabled: bool = True
+    on_error: OnError = "stop"
+    config: dict[str, Any] = Field(default_factory=dict)
+    children: list["Step"] = Field(default_factory=list)  # reasoning_group only
+
+
+Step.model_rebuild()
+
+
+class CapConnector(BaseModel):
+    connector_id: str = Field(min_length=1, max_length=80)
+    action: str = Field(min_length=1, max_length=80)
+    require_approval: bool = True  # write actions default to asking the user first
+
+
+class Capabilities(BaseModel):
+    """What the agent may use besides its instructions (PRD §4.3). Nothing is on unless listed here."""
+
+    web_search: bool = False
+    spaces: list[str] = Field(default_factory=list, max_length=50)  # knowledge spaces; empty = no internal knowledge
+    connectors: list[CapConnector] = Field(default_factory=list, max_length=30)
+    model_pref: Literal["fast", "balanced", "quality"] = "balanced"
+    thinking: Literal["off", "low", "medium", "high"] = "low"
+
+
+class StepsIn(BaseModel):
+    steps: list[Step] = Field(default_factory=list, max_length=60)
+
+
+class ImproveIn(BaseModel):
+    name: str = Field(default="", max_length=80)
+    description: str = Field(default="", max_length=300)
+    instructions: str = Field(min_length=1, max_length=8000)
+
+
+class AgentDraftIn(BaseModel):
+    kind: Literal["agent", "flow"] = "flow"
+    message: str = Field(min_length=1, max_length=50000)
+    current: dict[str, Any] | None = None  # the draft being edited (name, instructions, capabilities, steps, ...)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
+
+
+class StepRunIn(BaseModel):
+    inputs: dict[str, str] = Field(default_factory=dict)  # input step id -> the typed value, or the uploaded file's id
+    use_published: bool = True  # False = test the draft (owner / editors only)
+    version: int | None = None
+
+
+class StepRunToChatIn(BaseModel):
+    session_id: str | None = None
+
+
+class StepRunApproveIn(BaseModel):
+    approve: bool
+
+
 class AgentIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = ""
@@ -119,6 +188,18 @@ class AgentIn(BaseModel):
     skill_ids: list[str] = Field(default_factory=list, max_length=50)
     # Who besides the owner may view / edit this agent (published agents stay hospital-wide regardless).
     share: Share = Field(default_factory=Share)
+    icon: str = Field(default="", max_length=300)  # an emoji, or an image URL
+    opening_questions: list[str] = Field(default_factory=list, max_length=4)  # shown on the start screen of a chat
+    capabilities: Capabilities = Field(default_factory=Capabilities)
+    steps: list[Step] = Field(default_factory=list, max_length=60)  # empty = a pure chat agent
+    original_prompt: str = Field(default="", max_length=4000)  # what the creator typed when building it by conversation
+    kind: Literal["agent", "flow"] = "agent"  # agent = a chat persona; flow = a fixed sequence of steps (PRD "流程")
+
+    @field_validator("opening_questions", mode="after")
+    @classmethod
+    def _clean_questions(cls, v: list[str]) -> list[str]:
+        out = [" ".join(q.split())[:120] for q in v]
+        return [q for q in out if q]
 
     @field_validator("department", mode="before")
     @classmethod
@@ -739,12 +820,16 @@ class CatalogItemOut(BaseModel):
     deploy: Literal["cloud", "onprem"]
     description: str = ""
     needs_api_base: bool = False
+    needs_secret: bool = False
+    needs_deployment: bool = False
     registered: bool = False
     registered_id: str = ""
 
 
 class CatalogRegisterIn(BaseModel):
-    api_base: str = Field(default="", max_length=300)  # on-prem entries: the address of the hospital's server
+    api_base: str = Field(default="", max_length=300)  # on-prem / Azure: the address of the server or resource
+    secret_name: str = Field(default="", max_length=255, pattern=r"^[A-Za-z0-9_-]*$")  # Azure: Secret Manager NAME, never a key
+    deployment: str = Field(default="", max_length=120, pattern=r"^[A-Za-z0-9._-]*$")  # Azure: the deployment name
 
 
 class SmartRouterIn(BaseModel):

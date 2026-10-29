@@ -7,7 +7,7 @@ set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
 : "${FIRESTORE_DATABASE:?run: source infra/env.sh}"
 
-for COLLECTION in sessions feedback; do
+for COLLECTION in sessions feedback step_runs run_files; do
   gcloud firestore fields ttls update expire_at --collection-group="$COLLECTION" --enable-ttl \
     --database="$FIRESTORE_DATABASE" --project "$PROJECT_ID" --async
   echo "TTL on ${COLLECTION}.expire_at enabled (database ${FIRESTORE_DATABASE})"
