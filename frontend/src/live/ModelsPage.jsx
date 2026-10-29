@@ -8,7 +8,7 @@ import './pages.css';
 const GROUPS=[['fast','fast · 快速','一般問答與多數流程步驟的預設選擇。'],['reasoning','reasoning · 深度推理','需要較深推理時使用；成本最高。'],['budget','budget · 低成本','成本最低的雲端群組。'],['sovereign','sovereign · 院內模型','僅在院內部署執行，不回退雲端。']];
 const chainText=f=>f.models?.length&&f.models.join()!==f.name?`${f.name}（${f.models.join('、')}）`:f.name;
 
-/* Shared loader: live LiteLLM routing table from /api/models. */
+/* Shared loader: live Medisense Model Gateway routing table from /api/models. */
 function useGroups(notify){
   const [groups,setGroups]=useState(null),[failed,setFailed]=useState(false);
   useOnce(async()=>{
@@ -19,14 +19,14 @@ function useGroups(notify){
   return {groups,failed,get:id=>byId[id]};
 }
 const Chain=({g})=>!g?.configured?null:g.fallbacks?.length?<div className="lv-p-chain"><span className="lv-p-meta">備援順序</span>{g.fallbacks.map((f,i)=><React.Fragment key={i}><ArrowRight size={12}/><span className="badge">{chainText(f)}</span></React.Fragment>)}</div>:<span className="lv-p-meta">無備援</span>;
-const Unconfigured=({id})=><Banner icon={<Warning size={14}/>}>{id==='sovereign'?'尚未設定院內模型：使用此群組的執行會失敗（刻意不回退雲端）。':'LiteLLM 尚未設定此群組：使用此群組的執行會失敗。'}</Banner>;
+const Unconfigured=({id})=><Banner icon={<Warning size={14}/>}>{id==='sovereign'?'尚未設定院內模型：使用此群組的執行會失敗（刻意不回退雲端）。':'Medisense Model Gateway 尚未設定此群組：使用此群組的執行會失敗。'}</Banner>;
 
 export function ModelsPage({me,notify}){
   const {groups,failed,get}=useGroups(notify);
   if(groups===null)return <div className="lv-p"><Loading/></div>;
   return <div className="lv-p">
     <div className="page-heading"><h1><Cpu/>模型</h1></div>
-    <p className="subtitle">平台以「模型群組」對外提供模型；各群組實際使用的模型與備援順序來自後端 LiteLLM 的即時路由表（唯讀）。</p>
+    <p className="subtitle">平台以「模型群組」對外提供模型；各群組實際使用的模型與備援順序來自後端 Medisense Model Gateway 的即時路由表（唯讀）。</p>
     {failed&&<Banner icon={<Warning size={16}/>}>無法取得路由表，以下僅列出群組名稱。</Banner>}
     <div className="lv-p-cards" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{GROUPS.map(([id,label,desc])=>{const g=get(id);return <section key={id} className="lv-p-card">
       <div className="lv-p-card-head"><span className="connector-icon"><Cpu size={22}/></span><div><h3>{label}</h3><span className="lv-p-meta">{desc}</span></div></div>
@@ -34,7 +34,7 @@ export function ModelsPage({me,notify}){
       <div className="lv-p-card-foot"><span className={'lv-p-status '+(failed?'':g?.configured?'ok':'warn')}><i/>{failed?'未取得':g?.configured?'已設定':'尚未設定'}</span><span className="lv-p-meta">資料來源：/api/models</span></div>
     </section>})}</div>
     {!groups.length&&!failed&&<div className="lt" style={{marginTop:16}}><Empty text="後端未回傳任何模型群組"/></div>}
-    <div className="notice"><Info/>此頁為唯讀。「已設定」僅表示 LiteLLM 路由表中存在該群組，並不代表模型端點已通過健康檢查。</div>
+    <div className="notice"><Info/>此頁為唯讀。「已設定」僅表示 Medisense Model Gateway 路由表中存在該群組，並不代表模型端點已通過健康檢查。</div>
   </div>;
 }
 
@@ -63,7 +63,7 @@ export function RouterPage({me,notify}){
         <span>{failed||!g?.configured?'—':g.fallbacks?.length?g.fallbacks.map(chainText).join(' → '):'無備援'}</span>
         <span><span className={'lv-p-status '+(failed?'':g?.configured?'ok':'warn')}><i/>{failed?'未取得':g?.configured?'已設定':'未設定'}</span></span></div>})}
     </div>
-    <div className="notice"><Info/>sovereign 若尚未設定院內模型，執行會直接失敗，刻意不回退至雲端群組。路由規則由後端執行，此頁不提供修改。</div>
+    <div className="notice"><Info/>sovereign 若尚未設定院內模型，執行會直接失敗，刻意不回退至雲端群組。auto 由 smart-router 選擇模型，全院開關在「路由」頁。</div>
   </div>;
 }
 

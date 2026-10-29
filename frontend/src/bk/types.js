@@ -60,7 +60,7 @@ const toAgentIn = (a) => ({
   category: a.category,
   department: a.department,
   code: a.code,
-  model_group: "auto",  // the admin routing rules pick the group (路由 page); agents no longer choose one
+  model_group: "auto",  // the gateway smart-router picks the model; agents no longer choose one
   temperature: a.temperature,
   routing: a.routing,
   connectors: a.connectors,
