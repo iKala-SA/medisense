@@ -39,7 +39,7 @@ model_list:
     provider: vertex_ai
 - model_name: nova-2-lite
   litellm_params:
-    model: bedrock/jp.amazon.nova-2-lite-v1:0
+    model: bedrock/nova-2-lite
     aws_region_name: os.environ/BEDROCK_REGION
     aws_role_name: os.environ/BEDROCK_ROLE_ARN
     aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
@@ -82,7 +82,7 @@ model_list:
       tiers:
         SIMPLE: gemini-3-flash
         MEDIUM: gemini-2.5-flash
-        COMPLEX: gemini-3-flash
+        COMPLEX: gemini-2.5-flash
         REASONING: gemini-3-flash
       classifier_type: heuristic
     complexity_router_default_model: gemini-2.5-flash
