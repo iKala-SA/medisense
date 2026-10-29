@@ -105,3 +105,18 @@ def test_images_black_out_all_text_by_default():
     from app.config import settings
 
     assert settings().image_redact_all_text is True
+
+
+def test_image_redaction_uses_the_image_location_not_the_taiwan_region(monkeypatch):
+    """Sensitive Data Protection does not inspect images in asia-east1; the call must go to IMAGE_DLP_LOCATION."""
+    seen = {}
+
+    class C:
+        def redact_image(self, request):
+            seen.update(request)
+            return type("R", (), {"redacted_image": b"out"})()
+
+    monkeypatch.setattr(deid, "_client", lambda: C())
+    assert deid.redact_image(PNG, "image/png") == b"out"
+    assert seen["parent"].endswith("/locations/global") and "asia-east1" not in seen["parent"]
+    assert seen["image_redaction_configs"] == [{"redact_all_text": True}]
