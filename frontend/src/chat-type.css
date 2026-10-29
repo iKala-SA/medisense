@@ -77,3 +77,7 @@
 @keyframes wl-intro{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.wl-intro{animation:none;opacity:1}}
 .agent-choice>button:disabled{opacity:.5;cursor:default}
+
+/* opening questions of a picked agent */
+.crf-ideas{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:760px;margin:0 auto 14px}
+.crf-ideas button{padding:8px 14px;border:1px solid #e6e8eb;border-radius:999px;background:#fff;font-size:13px;color:#35383e;cursor:pointer}.crf-ideas button:hover{background:#f3fcf8;border-color:#bfe3d0}

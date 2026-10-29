@@ -99,3 +99,19 @@ def test_actions_ask_before_writing_and_can_be_rejected(fs, as_user, monkeypatch
     rej = c.post(f"/api/step-runs/{run2['id']}/approve", json={"approve": False}).json()
     assert rej["status"] == "cancelled" and len(sent) == 1
     assert {"step_run.approve", "step_run.reject"} <= {a["action"] for a in audit_log()}
+
+
+def test_inputs_are_deidentified_before_storage_and_a_run_can_continue_in_chat(fs, as_user, monkeypatch):
+    fake_llm(monkeypatch, lambda kw: "報告內容")
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t.replace("王小明", "[PERSON_NAME]"))
+    c = as_user(BUILDER)
+    aid = make(c, [S("s1", "text_input", "病人"), S("s2", "llm_generate", "摘要", prompt="摘要 {{s1}}")])
+    run = c.post(f"/api/agents/{aid}/step-runs", json={"inputs": {"s1": "王小明 血壓高"}, "use_published": False}).json()
+    stored = fs.store[f"step_runs/{run['id']}"]
+    assert "王小明" not in json.dumps(stored, ensure_ascii=False, default=str) and run["status"] == "succeeded"
+    out = c.post(f"/api/step-runs/{run['id']}/to-chat", json={}).json()
+    sess = fs.store[f"sessions/{out['session_id']}"]
+    assert [m["role"] for m in sess["messages"]] == ["user", "assistant"] and sess["messages"][1]["content"] == "報告內容" and "王小明" not in sess["messages"][0]["content"]
+    assert as_user(BUILDER2).post(f"/api/step-runs/{run['id']}/to-chat", json={}).status_code == 404
+    waiting = c.post(f"/api/agents/{make(c, [S('s1', 'action', 'x', connector_id='c', action='a', prompt='p')])}/step-runs", json={"use_published": False})
+    assert waiting.status_code in (200, 422)

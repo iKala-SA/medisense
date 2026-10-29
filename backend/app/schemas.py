@@ -152,6 +152,10 @@ class StepRunIn(BaseModel):
     version: int | None = None
 
 
+class StepRunToChatIn(BaseModel):
+    session_id: str | None = None
+
+
 class StepRunApproveIn(BaseModel):
     approve: bool
 

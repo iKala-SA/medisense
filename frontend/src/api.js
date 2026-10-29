@@ -56,6 +56,7 @@ export const api={
   startStepRun:(id,inputs,use_published=false,version)=>call(`/api/agents/${id}/step-runs`,{method:'POST',body:body({inputs,use_published,version})}),
   listStepRuns:id=>call(`/api/agents/${id}/step-runs`),
   getStepRun:id=>call(`/api/step-runs/${id}`),
+  runToChat:(id,session_id)=>call(`/api/step-runs/${id}/to-chat`,{method:'POST',body:body({session_id})}),
   approveStepRun:(id,approve)=>call(`/api/step-runs/${id}/approve`,{method:'POST',body:body({approve})}),
   uploadRunFile:(agentId,file)=>{const fd=new FormData();fd.append('file',file);return call(`/api/agents/${agentId}/run-files`,{method:'POST',body:fd},false)},
   // knowledge

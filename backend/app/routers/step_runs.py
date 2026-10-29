@@ -11,7 +11,7 @@ from ..config import settings
 from ..engine import steps as step_engine
 from ..engine.capabilities import rag_files_for
 from ..engine.extract import NoTextError, extract_text
-from ..schemas import StepRunApproveIn, StepRunIn
+from ..schemas import StepRunApproveIn, StepRunIn, StepRunToChatIn
 from .knowledge import _read_upload
 from .runs import _agent_def
 
@@ -53,7 +53,11 @@ def start_run(agent_id: str, body: StepRunIn, user: User = Depends(current_user)
     ref = _col().document(uuid.uuid4().hex)
     base = {"uid": user.uid, "agent_id": agent_id, "agent_name": agent.name, "trigger": "manual", "triggered_by": user.email,
             "draft": not body.use_published, "started_at": step_engine.now_iso(), "expire_at": db.expiry(settings().session_retention_days)}
-    run = {"status": "running", "inputs": body.inputs, "steps": []}
+    from ..engine import deid
+    types = {s.id: s.type for s in step_engine.flatten(agent.steps)}
+    # what the user typed is de-identified before it is stored anywhere (file inputs are ids of already de-identified uploads)
+    safe_inputs = {k: (deid.deidentify(v) if types.get(k) == "text_input" and v else v) for k, v in body.inputs.items()}
+    run = {"status": "running", "inputs": safe_inputs, "steps": []}
     save = _saver(ref, base)
     save(run)
     db.audit(user.uid, "step_run.start", user.email, agent_id=agent_id, run_id=ref.id, draft=base["draft"])
@@ -119,3 +123,27 @@ async def upload_run_file(agent_id: str, file: UploadFile = File(...), user: Use
                                                            "at": db.now(), "expire_at": db.expiry(settings().session_retention_days)})
     db.audit(user.uid, "step_run.file", user.email, agent_id=agent_id, file=filename, chars=len(text))
     return {"id": fid, "name": filename, "chars": len(text)}
+
+
+@router.post("/api/step-runs/{run_id}/to-chat")
+def run_to_chat(run_id: str, body: StepRunToChatIn, user: User = Depends(current_user)):
+    """Put a finished run into a conversation (new, or `session_id`) so the user can ask follow-ups about it in chat (PRD §3.2)."""
+    snap = _own(run_id, user)
+    d = snap.to_dict() or {}
+    if d.get("status") != "succeeded":
+        raise HTTPException(409, "只有執行完成的流程可以帶進對話")
+    sid = body.session_id or uuid.uuid4().hex
+    ref = db.client().collection("sessions").document(sid)
+    sess = ref.get().to_dict() or {"agent_id": d["agent_id"], "uid": user.uid, "messages": [], "created_at": db.now(), "kind": "chat"}
+    if sess.get("uid") != user.uid:
+        raise HTTPException(403, "not your session")
+    typed = [f"{r['title']}：{v}" for r in d.get("steps", []) if r["type"] == "text_input" and (v := (d.get("inputs") or {}).get(r["step_id"]))]
+    ask = f"執行「{d.get('agent_name', '')}」流程" + ("\n" + "\n".join(typed) if typed else "")
+    meta = {"trace": [{"node_id": r["step_id"], "type": "tool", "summary": f"{r['title']}（{r['status']}）"} for r in d["steps"]], "citations": []}
+    sess["messages"] = [*sess.get("messages", []), {"role": "user", "content": ask}, {"role": "assistant", "content": d.get("result") or "（流程沒有產出文字結果）", "meta": meta}]
+    sess["title"] = sess.get("title") or ask[:30]
+    sess["updated_at"] = db.now()
+    sess["expire_at"] = db.expiry(settings().session_retention_days)
+    ref.set(sess)
+    db.audit(user.uid, "step_run.to_chat", user.email, run_id=run_id, session_id=sid)
+    return {"session_id": sid, "message_index": len(sess["messages"]) - 1, "reply": d.get("result") or "", "user": ask}
