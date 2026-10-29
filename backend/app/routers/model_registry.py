@@ -16,7 +16,7 @@ from .. import db
 from ..auth import User, require_admin
 
 from ..engine import github_actions, litellm_config, llm, model_catalog
-from ..schemas import CatalogItemOut, CatalogRegisterIn, LitellmRenderOut, ModelEntryIn, ModelEntryOut ProvidersIn, ProvidersOut, SmartRouterIn, SmartRouterOut
+from ..schemas import CatalogItemOut, CatalogRegisterIn, LitellmRenderOut, ModelEntryIn, ModelEntryOut, SmartRouterIn, SmartRouterOut
 
 
 router = APIRouter(prefix="/api/model-registry", tags=["model-registry"], dependencies=[Depends(require_admin)])
