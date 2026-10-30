@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {ArrowClockwise,ArrowLeft,CaretRight,Lock,Plus,Trash,UsersThree,UserPlus,X} from '@phosphor-icons/react';
 import {api} from '../api';
-import {ListToolbar,Empty} from '../ListKit';
+import {ListToolbar,Empty,Toggle} from '../ListKit';
 import {errText,useOnce} from './pkit';
 import './ops.css';
 
@@ -126,8 +126,8 @@ function MembersTab({group,notify,onCountChange}){
   </div>;
 }
 
-function InfoTab({group,notify,onDirtyChange,onSaved,onDeleted}){
-  const [name,setName]=useState(group.name||''),[desc,setDesc]=useState(group.description||''),[err,setErr]=useState(''),[busy,setBusy]=useState(false),[confirmDel,setConfirmDel]=useState(false);
+function InfoTab({group,notify,onDirtyChange,onSaved}){
+  const [name,setName]=useState(group.name||''),[desc,setDesc]=useState(group.description||''),[err,setErr]=useState(''),[busy,setBusy]=useState(false);
   const dirty=name.trim()!==(group.name||'')||desc.trim()!==(group.description||'');
   useEffect(()=>{onDirtyChange(dirty)},[dirty]);// eslint-disable-line react-hooks/exhaustive-deps
 
@@ -142,42 +142,44 @@ function InfoTab({group,notify,onDirtyChange,onSaved,onDeleted}){
       notify('已更新群組');onSaved(g);
     }catch(x){setErr(friendly(x))}finally{setBusy(false)}
   }
-  async function remove(){
-    setBusy(true);
-    try{await api.deleteGroup(group.id);notify('已刪除群組');onDeleted()}
-    catch(e){notify(friendly(e))}finally{setBusy(false)}  // keep the dialog open on failure (FE-GROUP-SPEC §5.3.1)
-  }
 
   return <form onSubmit={save} style={{maxWidth:560,display:'grid',gap:12}}>
     <div className="field"><label>群組名稱</label><input maxLength={80} value={name} onChange={e=>{setName(e.target.value);setErr('')}}/></div>
     <div className="field"><label>說明</label><textarea rows={3} maxLength={500} value={desc} onChange={e=>setDesc(e.target.value)}/></div>
     {err&&<p className="lv-o-err" role="alert">{err}</p>}
     <div className="lv-actions"><button className="btn primary" disabled={busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>
-    <div style={{marginTop:24,borderTop:'1px solid #ebf4f0',paddingTop:16}}>
-      <button type="button" className="btn" style={{color:'#b91c1c'}} onClick={()=>setConfirmDel(true)}><Trash/>刪除群組</button>
-    </div>
-    {confirmDel&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setConfirmDel(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
-      <h2>刪除群組</h2><p>確定要刪除「{group.name}」？群組的 {group.member_count??group.member_emails?.length??0} 位成員名單將一併刪除。</p>
-      <div className="modal-actions"><button type="button" className="btn" disabled={busy} onClick={()=>setConfirmDel(false)}>取消</button><button type="button" className="btn primary" disabled={busy} onClick={remove}>{busy?'刪除中…':'刪除'}</button></div>
-    </div></div>}
   </form>;
 }
 
 function GroupDetail({group:initial,notify,onBack,onChanged}){
-  const [group,setGroup]=useState(initial),[tab,setTab]=useState('members'),[dirty,setDirty]=useState(false);
+  const [group,setGroup]=useState(initial),[dirty,setDirty]=useState(false),[delOpen,setDelOpen]=useState(false),[delBusy,setDelBusy]=useState(false),[infoOpen,setInfoOpen]=useState(true),[membersOpen,setMembersOpen]=useState(true);
   const [memberCount,setMemberCount]=useState(initial.member_count??initial.member_emails?.length??0);
-  const switchTab=t=>{if(t===tab)return;if(dirty&&!window.confirm('放棄未儲存的變更？'))return;setDirty(false);setTab(t)};
+  async function remove(){
+    setDelBusy(true);
+    try{await api.deleteGroup(group.id);notify('已刪除群組');onChanged();onBack()}
+    catch(e){notify(friendly(e))}finally{setDelBusy(false)}  // keep the dialog open on failure (FE-GROUP-SPEC §5.3.1)
+  }
   const back=()=>{if(dirty&&!window.confirm('放棄未儲存的變更？'))return;onBack()};
   return <div className="lv-o">
-    <div className="page-heading"><h1><button className="icon-btn" aria-label="返回群組列表" onClick={back}><ArrowLeft/></button>{group.name}</h1></div>
+    <div className="page-heading"><h1><button className="icon-btn" aria-label="返回群組列表" onClick={back}><ArrowLeft/></button>{group.name}</h1><div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} onClick={()=>setDelOpen(true)}><Trash/>刪除群組</button></div></div>
     <p className="subtitle">成員 {memberCount} 人。群組目前不影響使用者的存取權限。</p>
-    <div className="lv-actions" style={{marginBottom:16}}>
-      <button className={'btn'+(tab==='members'?' primary':'')} onClick={()=>switchTab('members')}>成員</button>
-      <button className={'btn'+(tab==='info'?' primary':'')} onClick={()=>switchTab('info')}>基本資料</button>
-    </div>
-    {tab==='members'
-      ?<MembersTab group={group} notify={notify} onCountChange={setMemberCount}/>
-      :<InfoTab group={group} notify={notify} onDirtyChange={setDirty} onSaved={g=>{setGroup({...group,...g});setDirty(false);onChanged()}} onDeleted={()=>{onChanged();onBack()}}/>}
+    {/* Sections stay mounted when collapsed (display only) so unsaved edits and loaded members are kept. */}
+    <section style={{marginBottom:28}}>
+      <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:12}}>
+        <h2 style={{fontSize:16,margin:0}}>基本資料</h2><Toggle on={infoOpen} onChange={setInfoOpen} label="展開或收合基本資料"/>
+      </div>
+      <div style={{display:infoOpen?undefined:'none'}}><InfoTab group={group} notify={notify} onDirtyChange={setDirty} onSaved={g=>{setGroup({...group,...g});setDirty(false);onChanged()}}/></div>
+    </section>
+    <section>
+      <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:12}}>
+        <h2 style={{fontSize:16,margin:0}}>成員（{memberCount}）</h2><Toggle on={membersOpen} onChange={setMembersOpen} label="展開或收合成員名單"/>
+      </div>
+      <div style={{display:membersOpen?undefined:'none'}}><MembersTab group={group} notify={notify} onCountChange={setMemberCount}/></div>
+    </section>
+    {delOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
+      <h2>刪除群組</h2><p>確定要刪除「{group.name}」？群組的 {memberCount} 位成員名單將一併刪除。</p>
+      <div className="modal-actions"><button type="button" className="btn" disabled={delBusy} onClick={()=>setDelOpen(false)}>取消</button><button type="button" className="btn primary" disabled={delBusy} onClick={remove}>{delBusy?'刪除中…':'刪除'}</button></div>
+    </div></div>}
   </div>;
 }
 
