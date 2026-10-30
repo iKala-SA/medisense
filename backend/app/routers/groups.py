@@ -108,13 +108,16 @@ def delete_group(group_id: str, user: User = Depends(require_admin)):
 def list_members(group_id: str):
     emails = _members(_load(group_id))
     refs = [db.client().collection("users").document(e) for e in emails]
-    snaps = db.client().get_all(refs) if refs else []
+    # get_all does not return snapshots in request order, so match them by document id (the e-mail).
+    by_id = {snap.id: snap for snap in db.client().get_all(refs)} if refs else {}
     out: list[GroupMemberOut] = []
-    for email, snap in zip(emails, snaps):
-        data = (snap.to_dict() or {}) if snap.exists else {}
+    for email in emails:
+        snap = by_id.get(email)
+        exists = snap is not None and snap.exists
+        data = (snap.to_dict() or {}) if exists else {}
         out.append(GroupMemberOut(email=email, name=data.get("name", ""), department=data.get("department", ""),
                                   status="suspended" if data.get("status") == "suspended" else "active",
-                                  has_account=snap.exists))
+                                  has_account=exists))
     return sorted(out, key=lambda m: (m.name or m.email).lower())
 
 

@@ -127,3 +127,15 @@ def test_create_sets_updated_by(fs, as_user):
     r = as_user(ADMIN).post("/api/groups", json={"name": "新群組", "description": "", "member_emails": []})
     assert r.status_code == 201
     assert r.json()["updated_by"] == ADMIN.email
+
+
+def test_member_rows_keep_their_own_name_when_snapshots_come_back_unordered(fs, as_user, monkeypatch):
+    """Firestore get_all makes no ordering promise; each row must still carry its own name and e-mail."""
+    seed_group(fs, members=["aaa@example.test", "bbb@example.test", "ccc@example.test"])
+    seed_user(fs, "aaa@example.test", "甲")
+    seed_user(fs, "bbb@example.test", "乙")
+    seed_user(fs, "ccc@example.test", "丙")
+    real_get_all = fs.get_all
+    monkeypatch.setattr(fs, "get_all", lambda refs: list(reversed(real_get_all(refs))))
+    rows = {m["email"]: m["name"] for m in as_user(ADMIN).get("/api/groups/g1/members").json()}
+    assert rows == {"aaa@example.test": "甲", "bbb@example.test": "乙", "ccc@example.test": "丙"}
