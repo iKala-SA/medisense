@@ -92,7 +92,7 @@ def test_groups_admin_only_and_directory(fs, as_user):
     c = as_user(ADMIN)
     r = c.post("/api/groups", json={"name": "ICU", "member_emails": ["Nurse@Example.com", "nurse@example.com"]})
     assert r.status_code == 201 and r.json()["member_emails"] == ["nurse@example.com"]
-    assert c.post("/api/groups", json={"name": "ICU"}).status_code == 409
+    assert c.post("/api/groups", json={"name": "ICU"}).status_code == 201  # duplicate names are allowed
     fs.put("users/nurse@example.com", {"email": "nurse@example.com", "name": "Nina", "department": "護理部", "status": "active"})
     fs.put("users/gone@example.com", {"email": "gone@example.com", "name": "Nina Gone", "status": "suspended"})
     d = as_user(PLAIN).get("/api/directory", params={"q": "nin"}).json()

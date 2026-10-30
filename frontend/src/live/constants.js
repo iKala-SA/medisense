@@ -21,7 +21,8 @@ export const ACTION_LABEL={
   'connector.create':'新增連接器','connector.update':'更新連接器設定','connector.delete':'刪除連接器','connector.test':'連線測試','connector.invoke':'連接器調用',
   'monitoring.export':'匯出成本報表','audit.export':'匯出稽核報表','users.export':'匯出帳號清冊',
   'user.first_login':'首次登入','user.preregister':'預先登錄帳號','user.preregister_cancel':'取消預先登錄','user.role':'變更角色',
-  'user.suspend':'暫停帳號','user.reactivate':'恢復帳號','user.update':'更新帳號資料'
+  'user.suspend':'暫停帳號','user.reactivate':'恢復帳號','user.update':'更新帳號資料',
+  'group.create':'建立群組','group.update':'更新群組','group.delete':'刪除群組','group.member_add':'加入群組成員','group.member_remove':'移除群組成員'
 };
 export const AUDIT_CATEGORIES={
   inference:{label:'Agent 推論',color:'#239660'},

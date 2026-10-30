@@ -91,3 +91,16 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - `RolesPage` lists the system roles `admin`, `builder`, `user` (plus any `roles/{id}` custom documents). `ai-reviewer` and `trainer` are not in the list.
 - Role type (系統預設 / 自訂) follows the API `custom` field, which comes from the stored `roles/{id}` document (fallback: id is not admin/builder/user).
 - 角色管理 and 群組管理 have a 重新整理 button (admin only), matching 使用者管理. Refresh keeps the current list on failure.
+
+## Group and role scope reduced (2026-10-30)
+- Scope is admin interface plus the `admin` and `user` roles only. Custom roles, the permission matrix and RBAC enforcement are deferred. `builder` stays as it is today and is outside RBAC.
+- Group grants of roles (`role_ids`) are dropped. Groups have no effect on access; they are member lists (shared with sharing for now). Primary group and 科別 merge are deferred.
+- User management keeps the `department` field and its 12 fixed values; the UI label is 群組. The `Group` filter that clashed with the groups-management 群組 has been removed from 使用者管理 (decided 2026-10-30; `FE-USER-SPEC.md` §3.3, `FE-GROUP-SPEC.md` Q2). `UsersPage.jsx` no longer loads `/api/groups` or renders the filter.
+- `RolesPage` stays read-only. Permission settings and custom-role UI are marked 暫緩 in `FE-ROLE-SPEC.md`.
+- Specs: `specifications/FE-GROUP-SPEC.md`, `specifications/BE-GROUP-SPEC.md`, `specifications/FE-ROLE-SPEC.md`, `specifications/BE-ROLE-SPEC.md`.
+
+## Group management implements member CRUD (2026-10-30)
+- `GroupsPage` is a list plus a single edit page: 基本資料 section on top, 成員 section below (the tabs were merged 2026-10-30). Each section header has a `Toggle` to collapse or expand it; collapsed content stays mounted so edits are kept. No role grant section. Members are added and removed one by one through `/api/groups/{id}/members`; the add dialog only accepts existing accounts and reports skipped / rejected e-mails.
+- Basic info saves with `PATCH` so editing a name cannot overwrite the member list. `api.updateGroup` (PUT) is no longer called from the UI; the backend keeps PUT until `BE-GROUP-SPEC.md` Q4 is decided.
+- Member e-mail check matches the backend (contains `@`, no whitespace). Suspended accounts are not suggested but can be typed in.
+- Not yet implemented: Esc to close and unsaved-change prompt in the add dialog. Browser verification was not run.

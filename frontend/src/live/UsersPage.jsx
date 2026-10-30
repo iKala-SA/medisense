@@ -23,27 +23,22 @@ export default function UsersPage({me,notify,goAudit}){
   const [editing,setEditing]=useState(null);
   const [exporting,setExporting]=useState(false);
   const [busy,setBusy]=useState(false);
-  const [group,setGroup]=useState('');
   const [role,setRole]=useState('');
-  const [groups,setGroups]=useState([]);
   const [statsOpen,setStatsOpen]=useState(true);
 
   const load=useCallback(()=>{
     setBusy(true);
     return api.listUsers().then(setDir).catch(e=>{notify?.('載入使用者失敗：'+errText(e));setDir(d=>d||{users:[]})}).finally(()=>setBusy(false));
   },[notify]);
-  const loadGroups=useCallback(()=>api.listGroups().then(r=>setGroups(Array.isArray(r)?r:r.groups||[])).catch(e=>notify?.('無法載入群組：'+errText(e))),[notify]);
   // mount only: `notify` changes identity on every App render, so depending on it would re-call the API after a failure
-  useEffect(()=>{load();loadGroups()},[]);// eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>setPage(1),[tab,search,group,role]);
+  useEffect(()=>{load()},[]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>setPage(1),[tab,search,role]);
 
   const users=dir?.users||[];
   // stat cards show totals across all users, not the current filter
   const suspendedCount=users.filter(u=>u.status==='suspended').length;
   const needle=search.trim().toLowerCase();
-  // group filter: member_emails of the selected group, compared case-insensitively; null means 全部
-  const groupSet=useMemo(()=>{const g=groups.find(x=>x.id===group);return g?new Set((g.member_emails||[]).map(e=>e.toLowerCase())):null},[groups,group]);
-  const shown=useMemoList(users,tab,needle,role,groupSet);
+  const shown=useMemoList(users,tab,needle,role);
   const pages=Math.max(1,Math.ceil(shown.length/PAGE));
   if(me&&me.role!=='admin')return <div className="card-page lv-page"><Empty text="此頁面僅限系統管理員。"/></div>;
 
@@ -73,7 +68,6 @@ export default function UsersPage({me,notify,goAudit}){
     <div className="lv-stats-toggle"><button className="lv-stats-btn" aria-label={statsOpen?'收合統計':'展開統計'} aria-expanded={statsOpen} onClick={()=>setStatsOpen(o=>!o)}>+</button></div>
     {statsOpen&&<div className="lv-stats">{[['使用者人數',users.length],['啟用人數',users.length-suspendedCount],['停用人數',suspendedCount]].map(([label,n])=><div className="lv-card lv-stat" key={label}><span className="muted small">{label}</span><b>{n}</b></div>)}</div>}
     <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋姓名或電子郵件" tabs={TABS} tab={tab} onTab={setTab} filters={<>
-      <select className="lv-select" aria-label="群組" value={group} onChange={e=>setGroup(e.target.value)}><option value="">全部群組</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select>
       <select className="lv-select" aria-label="角色" value={role} onChange={e=>setRole(e.target.value)}><option value="">全部角色</option>{ROLES.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select>
     </>}/>
     {dir===null?<Loading/>:<div className="lt">
@@ -98,8 +92,8 @@ export default function UsersPage({me,notify,goAudit}){
 }
 
 // plain helper (not a hook name) to keep hook order stable across the admin guard above
-function useMemoList(users,tab,needle,role,groupSet){
-  return useMemo(()=>users.filter(u=>inTab(u,tab)&&(!role||u.role===role)&&(!groupSet||groupSet.has(u.email.toLowerCase()))&&(!needle||[u.name,u.email].some(s=>(s||'').toLowerCase().includes(needle)))),[users,tab,needle,role,groupSet]);
+function useMemoList(users,tab,needle,role){
+  return useMemo(()=>users.filter(u=>inTab(u,tab)&&(!role||u.role===role)&&(!needle||[u.name,u.email].some(s=>(s||'').toLowerCase().includes(needle)))),[users,tab,needle,role]);
 }
 
 function UserEdit({email,me,notify,goAudit,onBack}){
