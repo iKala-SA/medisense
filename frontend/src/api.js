@@ -99,8 +99,11 @@ export const api={
   directory:(q='')=>call(`/api/directory?${query({q})}`),
   listGroups:()=>call('/api/groups'),
   createGroup:g=>call('/api/groups',{method:'POST',body:body(g)}),
-  updateGroup:(id,g)=>call(`/api/groups/${id}`,{method:'PUT',body:body(g)}),
+  updateGroupInfo:(id,g)=>call(`/api/groups/${id}`,{method:'PATCH',body:body(g)}),
   deleteGroup:id=>call(`/api/groups/${id}`,{method:'DELETE'}),
+  listGroupMembers:id=>call(`/api/groups/${id}/members`),
+  addGroupMembers:(id,emails)=>call(`/api/groups/${id}/members`,{method:'POST',body:body({emails})}),
+  removeGroupMember:(id,email)=>call(`/api/groups/${id}/members/${encodeURIComponent(email)}`,{method:'DELETE'}),
   shareAgent:(id,share)=>call(`/api/agents/${id}/share`,{method:'PUT',body:body(share)}),
   // skills
   listSkills:()=>call('/api/skills'),

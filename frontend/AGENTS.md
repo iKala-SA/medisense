@@ -98,3 +98,9 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - User management keeps the `department` field and its 12 fixed values; the UI label is 群組. The `Group` filter that clashed with the groups-management 群組 has been removed from 使用者管理 (decided 2026-10-30; `FE-USER-SPEC.md` §3.3, `FE-GROUP-SPEC.md` Q2). `UsersPage.jsx` no longer loads `/api/groups` or renders the filter.
 - `RolesPage` stays read-only. Permission settings and custom-role UI are marked 暫緩 in `FE-ROLE-SPEC.md`.
 - Specs: `specifications/FE-GROUP-SPEC.md`, `specifications/BE-GROUP-SPEC.md`, `specifications/FE-ROLE-SPEC.md`, `specifications/BE-ROLE-SPEC.md`. `RBAC-MIGRATION-PLAN.md` and `RBAC-ROUTE-INVENTORY.md` are superseded.
+
+## Group management implements member CRUD (2026-10-30)
+- `GroupsPage` is a list plus an edit page with 成員 and 基本資料 tabs (no role grant tab). Members are added and removed one by one through `/api/groups/{id}/members`; the add dialog only accepts existing accounts and reports skipped / rejected e-mails.
+- Basic info saves with `PATCH` so editing a name cannot overwrite the member list. `api.updateGroup` (PUT) is no longer called from the UI; the backend keeps PUT until `BE-GROUP-SPEC.md` Q4 is decided.
+- Member e-mail check matches the backend (contains `@`, no whitespace). Suspended accounts are not suggested but can be typed in.
+- Not yet implemented: Esc to close and unsaved-change prompt in the add dialog. Browser verification was not run.
