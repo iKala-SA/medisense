@@ -31,7 +31,7 @@ Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "suspended", "mem
 | GET | `/api/directory?q=` | any signed-in | search box for the share dialog |
 | GET/POST | `/api/groups` | admin | list / create |
 | GET/PUT/DELETE | `/api/groups/{id}` | admin | PUT = full replace (includes `member_emails`), DELETE -> 204 |
-| PATCH | `/api/groups/{id}` | admin | partial update of `name` / `description` only (`{name?, description?}`); members unchanged; duplicate names allowed; see `specifications/BE-GROUP-SPEC.md` §4.3 |
+| PATCH | `/api/groups/{id}` | admin | partial update of `name` / `description` / `role_ids` (`{name?, description?, role_ids?}`); members unchanged; duplicate names allowed; `role_ids` must reference existing roles (422 `unknown role` otherwise; `admin` and `user` are allowed); it is a link only and grants no permissions yet; see `specifications/BE-GROUP-SPEC.md` §4.3 |
 | GET / POST | `/api/groups/{id}/members` | admin | member list (`GroupMemberOut[]`) / batch add `{emails[≤100]}` -> `{added, skipped, rejected[{email, reason: invalid_email \| domain_not_allowed \| not_a_registered_account}]}`; only existing accounts; 422 if the group would exceed 1000; §4.5 |
 | DELETE | `/api/groups/{id}/members/{email}` | admin | remove one member -> 204; 404 if not a member; §4.5 |
 | PUT | `/api/agents/{id}/share` | builder; owner or admin only | audit `agent.share`; returns `AgentOut` |

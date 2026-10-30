@@ -19,6 +19,7 @@ from ..schemas import (
     MemberAddResult,
     MemberRejected,
 )
+from .roles import SYSTEM_ROLES
 
 router = APIRouter(prefix="/api/groups", tags=["groups"], dependencies=[Depends(require_admin)])
 directory_router = APIRouter(prefix="/api/directory", tags=["groups"])
@@ -45,6 +46,17 @@ def _members(snap) -> list[str]:
     return list((snap.to_dict() or {}).get("member_emails") or [])
 
 
+def _check_role_ids(ids: list[str]) -> list[str]:
+    known = set(SYSTEM_ROLES) | {d.id for d in db.client().collection("roles").stream()}
+    out: list[str] = []
+    for rid in (r.strip() for r in ids):
+        if rid not in known:
+            raise HTTPException(422, f"unknown role: {rid}")
+        if rid not in out:
+            out.append(rid)
+    return out
+
+
 def _normalize(email: str) -> str:
     return email.strip().lower()
 
@@ -67,7 +79,7 @@ def list_groups():
 @router.post("", response_model=GroupOut, status_code=201)
 def create_group(body: GroupIn, user: User = Depends(require_admin)):
     ref = _col().document()
-    data = {**body.model_dump(), "created_by": user.email, "created_at": db.now(), "updated_at": db.now(),
+    data = {**body.model_dump(), "role_ids": _check_role_ids(body.role_ids), "created_by": user.email, "created_at": db.now(), "updated_at": db.now(),
             "updated_by": user.email}
     ref.set(data)
     db.audit(user.uid, "group.create", user.email, group_id=ref.id, name=body.name, members=len(body.member_emails))
@@ -83,16 +95,22 @@ def get_group(group_id: str):
 def patch_group(group_id: str, body: GroupPatch, user: User = Depends(require_admin)):
     snap = _load(group_id)
     changes = body.model_dump(exclude_none=True)
+    audit_extra: dict = {}
+    if "role_ids" in changes:
+        old = list((snap.to_dict() or {}).get("role_ids") or [])
+        changes["role_ids"] = _check_role_ids(changes["role_ids"])
+        audit_extra = {"old_role_ids": old, "new_role_ids": changes["role_ids"]}
     if changes:
         snap.reference.update({**changes, "updated_at": db.now(), "updated_by": user.email})
-        db.audit(user.uid, "group.update", user.email, group_id=group_id, fields=sorted(changes))
+        db.audit(user.uid, "group.update", user.email, group_id=group_id, fields=sorted(changes), **audit_extra)
     return _out(snap.reference.get())
 
 
 @router.put("/{group_id}", response_model=GroupOut)
 def update_group(group_id: str, body: GroupIn, user: User = Depends(require_admin)):
     snap = _load(group_id)
-    snap.reference.update({**body.model_dump(), "updated_at": db.now(), "updated_by": user.email})
+    snap.reference.update({**body.model_dump(), "role_ids": _check_role_ids(body.role_ids),
+                           "updated_at": db.now(), "updated_by": user.email})
     db.audit(user.uid, "group.update", user.email, group_id=group_id, name=body.name, members=len(body.member_emails))
     return _out(snap.reference.get())
 
