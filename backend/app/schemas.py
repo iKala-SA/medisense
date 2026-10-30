@@ -598,6 +598,51 @@ class GroupOut(GroupIn):
     created_by: str = ""
     created_at: Any = None
     updated_at: Any = None
+    updated_by: str = ""
+
+
+class GroupPatch(BaseModel):
+    """Partial update of name / description. Members change only through the /members endpoints."""
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    description: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def _strip_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be blank")
+        return v
+
+    @field_validator("description", mode="after")
+    @classmethod
+    def _strip_description(cls, v: str | None) -> str | None:
+        return None if v is None else v.strip()
+
+
+class GroupMemberOut(BaseModel):
+    email: str
+    name: str = ""
+    department: str = ""
+    status: Literal["active", "suspended"] = "active"
+    has_account: bool = False
+
+
+class MemberAddIn(BaseModel):
+    emails: list[str] = Field(min_length=1, max_length=100)
+
+
+class MemberRejected(BaseModel):
+    email: str
+    reason: Literal["invalid_email", "domain_not_allowed", "not_a_registered_account"]
+
+
+class MemberAddResult(BaseModel):
+    added: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+    rejected: list[MemberRejected] = Field(default_factory=list)
 
 
 class DirectoryUser(BaseModel):

@@ -3,6 +3,7 @@ import copy
 import itertools
 
 from google.api_core.exceptions import AlreadyExists
+from google.cloud import firestore
 
 _ids = itertools.count(1)
 
@@ -49,7 +50,12 @@ class DocRef:
             raise KeyError(self.path)
         cur = self.client.store[self.path]
         for k, v in copy.deepcopy(data).items():
-            cur[k] = v
+            if isinstance(v, firestore.ArrayUnion):
+                cur[k] = list(cur.get(k) or []) + [x for x in v.values if x not in (cur.get(k) or [])]
+            elif isinstance(v, firestore.ArrayRemove):
+                cur[k] = [x for x in (cur.get(k) or []) if x not in v.values]
+            else:
+                cur[k] = v
 
     def delete(self):
         self.client.store.pop(self.path, None)
