@@ -100,7 +100,9 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Specs: `specifications/FE-GROUP-SPEC.md`, `specifications/BE-GROUP-SPEC.md`, `specifications/FE-ROLE-SPEC.md`, `specifications/BE-ROLE-SPEC.md`.
 
 ## Group management implements member CRUD (2026-10-30)
-- `GroupsPage` is a list plus a single edit page: 基本資料 section on top, 成員 section below (the tabs were merged 2026-10-30). Each section header has a `Toggle` to collapse or expand it; collapsed content stays mounted so edits are kept. No role grant section. Members are added and removed one by one through `/api/groups/{id}/members`; the add dialog only accepts existing accounts and reports skipped / rejected e-mails.
+- `GroupsPage` is a list plus a single edit page: 基本資料 section on top, 成員 section below (the tabs were merged 2026-10-30). Each section header has a `Toggle` to collapse or expand it; collapsed content stays mounted so edits are kept. No role grant section.
+- Basic info has a 角色 field: group ↔ `roles/{id}` links (compact tags on the same row as a search box over `GET /api/roles`; the candidate list is a focus-only overlay of at most 10 items; admin and user are selectable). Saved with PATCH as `role_ids`. The link has no access effect yet; the UI says so.
+- Members can be selected with checkboxes (per page, selection kept across pages, cleared on search change) and removed in batch. The batch calls the single-member DELETE endpoint for each e-mail; failed items stay selected and the dialog stays open. Members are added and removed one by one through `/api/groups/{id}/members`; the add dialog only accepts existing accounts and reports skipped / rejected e-mails.
 - Basic info saves with `PATCH` so editing a name cannot overwrite the member list. `api.updateGroup` (PUT) is no longer called from the UI; the backend keeps PUT until `BE-GROUP-SPEC.md` Q4 is decided.
 - Member e-mail check matches the backend (contains `@`, no whitespace). Suspended accounts are not suggested but can be typed in.
 - Not yet implemented: Esc to close and unsaved-change prompt in the add dialog. Browser verification was not run.

@@ -139,3 +139,45 @@ def test_member_rows_keep_their_own_name_when_snapshots_come_back_unordered(fs, 
     monkeypatch.setattr(fs, "get_all", lambda refs: list(reversed(real_get_all(refs))))
     rows = {m["email"]: m["name"] for m in as_user(ADMIN).get("/api/groups/g1/members").json()}
     assert rows == {"aaa@example.test": "甲", "bbb@example.test": "乙", "ccc@example.test": "丙"}
+
+
+def test_role_ids_default_empty_and_grant_then_remove(fs, as_user, audit_log):
+    seed_group(fs)  # legacy document without role_ids
+    client = as_user(ADMIN)
+    assert client.get("/api/groups/g1").json()["role_ids"] == []
+    r = client.patch("/api/groups/g1", json={"role_ids": ["builder", "builder"]})
+    assert r.status_code == 200 and r.json()["role_ids"] == ["builder"]
+    assert any(a["action"] == "group.update" and a["new_role_ids"] == ["builder"] and a["old_role_ids"] == []
+               for a in audit_log())
+    r = client.patch("/api/groups/g1", json={"role_ids": []})
+    assert r.json()["role_ids"] == []
+    assert r.json()["member_emails"] == []  # PATCH of role_ids never touches members
+
+
+def test_role_ids_reject_unknown_role_without_writing(fs, as_user):
+    seed_group(fs)
+    client = as_user(ADMIN)
+    assert client.patch("/api/groups/g1", json={"role_ids": ["no-such-role"]}).status_code == 422
+    assert client.post("/api/groups", json={"name": "x", "role_ids": ["no-such-role"]}).status_code == 422
+    assert fs.store["groups/g1"].get("role_ids") is None  # nothing written on rejection
+
+
+def test_role_ids_accept_admin_and_user(fs, as_user):
+    seed_group(fs)
+    r = as_user(ADMIN).patch("/api/groups/g1", json={"role_ids": ["admin", "user", "builder"]})
+    assert r.status_code == 200 and r.json()["role_ids"] == ["admin", "user", "builder"]
+
+
+def test_role_ids_accept_stored_custom_role_document(fs, as_user):
+    fs.put("roles/auditor", {"id": "auditor", "name": "稽核員", "custom": True})
+    seed_group(fs)
+    r = as_user(ADMIN).patch("/api/groups/g1", json={"role_ids": ["auditor"]})
+    assert r.status_code == 200 and r.json()["role_ids"] == ["auditor"]
+
+
+def test_role_ids_survive_member_changes(fs, as_user):
+    seed_group(fs, members=["staff-a@example.test"])
+    client = as_user(ADMIN)
+    client.patch("/api/groups/g1", json={"role_ids": ["builder"]})
+    client.delete("/api/groups/g1/members/staff-a@example.test")
+    assert fs.store["groups/g1"]["role_ids"] == ["builder"]

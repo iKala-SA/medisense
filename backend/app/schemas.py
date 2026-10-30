@@ -3,7 +3,6 @@
 The canvas (React Flow) saves `nodes` and `edges`. Each node has a `type` from NODE_TYPES and a
 `data` dict with the fields the left/right panels edit. The interpreter only trusts these schemas.
 """
-import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -579,6 +578,18 @@ class GroupIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=500)
     member_emails: list[str] = Field(default_factory=list, max_length=1000)
+    # roles/{id} references. Stored only: a granted role's permissions are not enforced yet (2026-10-30).
+    role_ids: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("role_ids", mode="after")
+    @classmethod
+    def _role_ids(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for r in v:
+            r = r.strip()
+            if r and r not in out:
+                out.append(r)
+        return out
 
     @field_validator("member_emails", mode="after")
     @classmethod
@@ -602,9 +613,10 @@ class GroupOut(GroupIn):
 
 
 class GroupPatch(BaseModel):
-    """Partial update of name / description. Members change only through the /members endpoints."""
+    """Partial update of name / description / role_ids. Members change only through the /members endpoints."""
     name: str | None = Field(default=None, min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=500)
+    role_ids: list[str] | None = Field(default=None, max_length=50)
 
     @field_validator("name", mode="after")
     @classmethod
