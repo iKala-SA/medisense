@@ -381,3 +381,18 @@ body,#root{background:transparent!important}
 .quick-composer-wrap .agent-picker{max-height:min(560px,calc(100vh - 140px))!important}
 /* ...starting just right of the agent button (which stays visible), as in Amazon Quick */
 .quick-composer-wrap .agent-anchor .agent-picker{left:calc(var(--agent-w,150px) + 22px);right:0;width:auto}
+
+/* brand mark shown when the sidebar is collapsed */
+.brand-mark{display:block;width:26px;height:26px;user-select:none}
+
+/* login: just the mark, the wordmark and one button */
+.lg-screen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:#fff}
+.lg-center{display:flex;flex-direction:column;align-items:center;gap:44px}
+.lg-brand{display:flex;align-items:center;gap:16px}
+.lg-mark{width:52px;height:52px;display:block}
+.lg-brand b{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;font-size:44px;letter-spacing:-.8px;color:#1c2026;line-height:1}
+.lg-center .btn,.lg-center button{min-width:200px;justify-content:center}
+.lg-note{margin:0;font-size:13px;color:#8a8f98}
+.lg-center .login-error{margin:0;max-width:320px;text-align:center}
+.lg-center .btn,.lg-center button{font-size:17px;font-weight:600;min-height:48px;min-width:220px}
+.lg-center button svg{width:20px;height:20px}
