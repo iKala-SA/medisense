@@ -1,37 +1,18 @@
-/* New-conversation opening: jellyfish peeks, blinks twice, brows hop twice, swims to the middle and smiles; while the greeting
-   blurs in letter by letter (Qwen-like), starting on the same frame as the jellyfish. The composer is there from the first frame. Total ~3.4s. */
-.ji{position:relative;display:inline-block;border-radius:50%;background:#f4f4f4;overflow:hidden;flex-shrink:0}
-.ji-fig{position:absolute;inset:8%;display:block;animation:ji-swim 4s cubic-bezier(.4,0,.2,1) both}
-.ji-float{position:absolute;inset:0;display:block;animation:ji-bob 3.2s ease-in-out 4.1s infinite}
-.ji-float img,.ji-float svg{position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none}
-.ji-float img{object-fit:contain}
-.ji-lid{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0);animation:ji-blink .34s ease-in-out .95s 2 both}
-.ji-brows{animation:ji-hop .38s cubic-bezier(.3,1.6,.5,1) 1.95s 2 both}
-.ji-mouth{stroke-dasharray:1 1;stroke-dashoffset:0;animation:ji-smile .7s cubic-bezier(.5,0,.25,1) 3.5s both}
-@keyframes ji-swim{0%{transform:translateY(85%)}14%{transform:translateY(42%)}58%{transform:translateY(42%)}68%{transform:translateY(46%)}86%{transform:translateY(-5%)}100%{transform:translateY(0)}}
-@keyframes ji-blink{0%,100%{transform:scaleY(0)}45%,60%{transform:scaleY(1.04)}}
-@keyframes ji-hop{0%,100%{transform:translateY(0)}45%{transform:translateY(-9px)}}
-@keyframes ji-smile{from{stroke-dashoffset:0}to{stroke-dashoffset:-1}}
-@keyframes ji-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3.5%)}}
-
+/* New-conversation opening: the character pops in while the greeting blurs in letter by letter (Qwen-like). */
 .wl-title{display:flex;justify-content:center;flex-wrap:wrap}
-.wl-char{display:inline-block;white-space:pre;opacity:0;animation:wl-char .8s cubic-bezier(.2,.7,.2,1) calc(var(--i)*150ms) both}
-@keyframes wl-char{from{opacity:0;transform:translateY(16px);filter:blur(8px)}to{opacity:1;transform:none;filter:blur(0)}}
+.wl-char{display:inline-block;white-space:pre;opacity:0;animation:wl-char .4s cubic-bezier(.2,.7,.2,1) calc(var(--i)*35ms) both}
+@keyframes wl-char{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:none;filter:blur(0)}}
 @media(prefers-reduced-motion:reduce){
-  .ji-fig,.ji-float,.ji-lid,.ji-brows,.wl-char{animation:none}
-  .ji-mouth{stroke-dashoffset:-1;animation:none}.wl-char{opacity:1}
+  .wl-char,.mcw-fig{animation:none}.wl-char{opacity:1}
 }
 
-/* ===== click: the jellyfish becomes a doctor / a nurse and jumps out of the circle (keyframes of the reference page) ===== */
+/* ===== today's character: pops in, bobs, hops when clicked ===== */
 .mcw{--s:clamp(.65px,.048828125vw,1px);--sz:calc(166*var(--s));position:relative;width:var(--sz);height:var(--sz);margin:0 auto;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:50%}
 .mcw:focus-visible{outline:2px solid #239660;outline-offset:6px}
-.mcw>.ji{display:block;position:relative;z-index:1;background:transparent}
-.ji.settled .ji-fig,.ji.settled .ji-lid,.ji.settled .ji-brows{animation:none}.ji.settled .ji-mouth{stroke-dashoffset:-1;animation:none}.ji.settled .ji-float{animation-delay:0s}
-.mcw-circle{position:absolute;inset:0;border-radius:50%;background:#f4f4f4;transition:transform .5s,opacity .5s}
-.mcw[data-out=true] .mcw-circle{transform:scale(.85);opacity:.6}
-.mcw-fig{position:absolute;inset:calc(-8*var(--s));z-index:2;animation:mcw-jump .75s cubic-bezier(.2,.7,.3,1) both,mcw-outfloat 3s .75s ease-in-out infinite}
-.mcw-sprite{display:block;width:100%;height:100%;background-repeat:no-repeat;background-size:contain;background-position:center}
-@keyframes mcw-jump{0%{transform:translate(0,0) scale(1)}25%{transform:translateY(10px) scale(1.08,.88)}65%{transform:translate(22px,-75px) scale(1.25) rotate(-7deg)}100%{transform:translate(32px,-38px) scale(1.23) rotate(3deg)}}
-@keyframes mcw-outfloat{0%,100%{transform:translate(32px,-38px) scale(1.23) rotate(3deg)}50%{transform:translate(32px,-45px) scale(1.23) rotate(-3deg)}}
-@media(prefers-reduced-motion:reduce){.mcw-fig{animation:none;transform:translate(32px,-38px) scale(1.23)}}
+.mcw-fig{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;animation:mcw-pop .9s cubic-bezier(.2,.8,.3,1.2) both,mcw-bob 3.2s ease-in-out .9s infinite}
+.mcw-fig[data-hop=true]{animation:mcw-hop .6s cubic-bezier(.3,1.4,.5,1) both,mcw-bob 3.2s ease-in-out .6s infinite}
+.mcw-fig img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;pointer-events:none;filter:drop-shadow(0 8px 10px rgba(60,80,120,.16))}
+@keyframes mcw-pop{0%{transform:translateY(40%) scale(.5);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}
+@keyframes mcw-hop{0%{transform:none}35%{transform:translateY(-22%) scale(.96,1.06) rotate(-4deg)}70%{transform:translateY(0) scale(1.06,.94)}100%{transform:none}}
+@keyframes mcw-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4%)}}
 .welcome .mcw{margin-bottom:6px}

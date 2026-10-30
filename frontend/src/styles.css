@@ -262,21 +262,20 @@ h1,h2{letter-spacing:-.02em}
 .panel,.card-page .panel{border-color:var(--hair);border-radius:16px;box-shadow:none}
 .login-screen{background:#fbfbfb}.login-box{border-radius:22px;border-color:var(--hair);box-shadow:0 12px 40px #0000000a}
 
-/* The jellyfish: bell and tentacles are two layers split at the rim, so they can move separately */
+/* The Medisense character: a clean cutout, no backdrop */
 .jelly{display:inline-block;position:relative;flex-shrink:0;vertical-align:middle}
-.jelly-circle{border-radius:50%;background:#ececef}
-.jelly-body{position:absolute;inset:8%;display:block}
-.jelly:not(.jelly-circle) .jelly-body{inset:0}
+.jelly-circle{background:none}
+.jelly-body{position:absolute;inset:0;display:block}
 .jelly img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;user-select:none;pointer-events:none}
-.jelly-top{clip-path:inset(0 0 36% 0);transform-origin:50% 50%}
-.jelly-bottom{clip-path:inset(62% 0 0 0);transform-origin:50% 62%}
-.jelly.swim .jelly-body{animation:jelly-drift 2.4s ease-in-out infinite}
-.jelly.swim .jelly-top{animation:jelly-pulse 1.4s cubic-bezier(.45,0,.35,1) infinite}
-.jelly.swim .jelly-bottom{animation:jelly-sway 1.4s ease-in-out infinite}
-@keyframes jelly-drift{0%,100%{transform:translateY(7%) rotate(-5deg)}50%{transform:translateY(-8%) rotate(5deg)}}
-@keyframes jelly-pulse{0%{transform:scale(1,1)}28%{transform:scale(.9,1.1)}62%{transform:scale(1.06,.95)}100%{transform:scale(1,1)}}
-@keyframes jelly-sway{0%{transform:skewX(0) scaleY(1)}28%{transform:skewX(-9deg) scaleY(1.1)}62%{transform:skewX(9deg) scaleY(1.03)}100%{transform:skewX(0) scaleY(1)}}
-@media(prefers-reduced-motion:reduce){.jelly.swim .jelly-body,.jelly.swim .jelly-top,.jelly.swim .jelly-bottom{animation-duration:6s}}
+.jelly-top{transform-origin:50% 100%}
+/* while the model is working: the character hops with a squash on take-off and landing, over a soft shadow */
+.jelly.swim .jelly-body{inset:0 0 9% 0;animation:jelly-hop 1.1s cubic-bezier(.3,0,.4,1) infinite}
+.jelly.swim .jelly-top{animation:jelly-squash 1.1s ease-in-out infinite}
+.jelly.swim::after{content:'';position:absolute;left:22%;right:22%;bottom:0;height:8%;border-radius:50%;background:rgba(60,80,120,.16);animation:jelly-shadow 1.1s cubic-bezier(.3,0,.4,1) infinite}
+@keyframes jelly-hop{0%,100%{transform:translateY(0)}45%{transform:translateY(-16%)}}
+@keyframes jelly-squash{0%{transform:scale(1.07,.9)}18%{transform:scale(.95,1.07)}45%{transform:scale(1,1)}78%{transform:scale(1,1)}92%{transform:scale(1.07,.9)}100%{transform:scale(1.07,.9)}}
+@keyframes jelly-shadow{0%,100%{transform:scaleX(1);opacity:1}45%{transform:scaleX(.65);opacity:.5}}
+@media(prefers-reduced-motion:reduce){.jelly.swim .jelly-body,.jelly.swim .jelly-top,.jelly.swim::after{animation-duration:6s}}
 @media(max-width:800px){.welcome h1{font-size:30px}.welcome{padding-bottom:40px}}
 /* Account-management sidebar: its own header with a way back, separate from the workspace navigation */
 .admin-side-head{display:flex;flex-direction:column;gap:10px;padding:2px 2px 14px;margin-bottom:6px;border-bottom:1px solid #e6e6ea}
