@@ -91,3 +91,10 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - `RolesPage` lists the system roles `admin`, `builder`, `user` (plus any `roles/{id}` custom documents). `ai-reviewer` and `trainer` are not in the list.
 - Role type (系統預設 / 自訂) follows the API `custom` field, which comes from the stored `roles/{id}` document (fallback: id is not admin/builder/user).
 - 角色管理 and 群組管理 have a 重新整理 button (admin only), matching 使用者管理. Refresh keeps the current list on failure.
+
+## Group and role scope reduced (2026-10-30)
+- Scope is admin interface plus the `admin` and `user` roles only. Custom roles, the permission matrix and RBAC enforcement are deferred. `builder` stays as it is today and is outside RBAC.
+- Group grants of roles (`role_ids`) are dropped. Groups have no effect on access; they are member lists (shared with sharing for now). Primary group and 科別 merge are deferred.
+- User management keeps the `department` field and its 12 fixed values; the UI label is 群組. The `Group` filter that clashed with the groups-management 群組 has been removed from 使用者管理 (decided 2026-10-30; `FE-USER-SPEC.md` §3.3, `FE-GROUP-SPEC.md` Q2). `UsersPage.jsx` no longer loads `/api/groups` or renders the filter.
+- `RolesPage` stays read-only. Permission settings and custom-role UI are marked 暫緩 in `FE-ROLE-SPEC.md`.
+- Specs: `specifications/FE-GROUP-SPEC.md`, `specifications/BE-GROUP-SPEC.md`, `specifications/FE-ROLE-SPEC.md`, `specifications/BE-ROLE-SPEC.md`. `RBAC-MIGRATION-PLAN.md` and `RBAC-ROUTE-INVENTORY.md` are superseded.
