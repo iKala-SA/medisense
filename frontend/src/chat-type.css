@@ -84,3 +84,18 @@
 
 /* pages that use the card layout start right under the top bar */
 main.card-page,.card-page{padding-top:0!important}
+.conn-db{width:22px;height:22px;border-radius:6px;background:#e7f4ee;color:#239660;display:grid;place-items:center;flex-shrink:0}
+.conn-lock{color:#a6adb8;flex-shrink:0}
+.tool-submenu.conn-list{min-width:270px}
+.tools-menu .tool-submenu.conn-list{padding-bottom:6px}
+.scope-icon{position:relative}.scope-badge{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;border-radius:8px;background:#239660;color:#fff;font:600 10px/15px Inter,sans-serif;text-align:center;font-style:normal;padding:0 3px}
+.scope-menu .db-caption{margin-top:6px;padding-top:8px;border-top:1px solid #eef1f4}
+.scope-menu .db-opt.static{cursor:default}
+.scope-menu .db-opt b{font-weight:500}
+.quick-composer-wrap .scope-menu>.menu-caption.db-caption{display:block;padding:8px 14px 2px;margin-top:6px;border-top:1px solid #eef1f4;font-size:12px;color:#8a919c}
+.quick-composer-wrap .scope-menu>.menu-caption.db-caption:first-child{border-top:0;margin-top:0}
+.picked-block{margin-top:2px}.picked-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px 2px}
+.picked-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px dashed #b9c4be;border-radius:99px;padding:4px 6px 4px 10px;font-size:12.5px;color:#44524b;background:#fff}
+.picked-chip i{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.picked-chip svg{flex:none;color:#44524b}.picked-chip button{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;color:#7a8a82}.picked-chip button:hover{background:#eef1f4}
+.picked-add{display:flex;align-items:center;gap:6px;padding:8px 14px;color:#239660;font-weight:500;font-size:13.5px;background:none;border:0;cursor:pointer}

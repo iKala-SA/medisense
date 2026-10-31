@@ -15,6 +15,7 @@ import {connectAccount,connectErr} from './connectFlow';
 import GatewayCatalog from './GatewayCatalog';
 import EnableService from './EnableService';
 import ProviderIcon from './ProviderIcon';
+import DatabaseTab,{MyDb} from './DatabaseTab';
 import './pages.css';
 import './gatewaycatalog.css';
 
@@ -186,7 +187,7 @@ export default function ConnectorsPage({me,notify}){
   const [q,setQ]=useState(''),[tab,setTab]=useState('全部');
   const [view,setView]=useState(null); // {typeId, id?}
   const [wizard,setWizard]=useState(null),[summary,setSummary]=useState(null),[mcKey,setMcKey]=useState(0);
-  const [mode,setMode]=useState('mine'),[gwTotal,setGwTotal]=useState(null);
+  const [mode,setMode]=useState('mine'),[gwTotal,setGwTotal]=useState(null),[area,setArea]=useState('saas'),[dbMode,setDbMode]=useState('common'),[dbEditing,setDbEditing]=useState(false);
   const builder=isBuilder(me),admin=isAdmin(me),[sharing,setSharing]=useState(null);
   const catalog=builder;
 
@@ -217,9 +218,11 @@ export default function ConnectorsPage({me,notify}){
   if(types===null)return <div className="lv-p"><Loading/></div>;
 
   const doShare=async share=>{try{const c=await api.shareConnector(sharing.id,share);setConns(a=>a.map(x=>x.id===c.id?c:x));setSharing(null);notify('分享設定已更新')}catch(e){notify('分享失敗：'+errText(e))}};
+  const areaTabs=<div className="lv-cn-area" role="tablist" aria-label="連接器類型"><button role="tab" aria-selected={area==='saas'} className={area==='saas'?'on':''} onClick={()=>setArea('saas')}>SaaS</button><button role="tab" aria-selected={area==='db'} className={area==='db'?'on':''} onClick={()=>setArea('db')}>資料庫</button></div>;
   if(!catalog)return <div className="lv-p"><div className="page-heading"><h1><Plugs/>連接器</h1></div>
     <p className="subtitle">連接您自己的工作帳號，讓 Medisense 在您的授權下協助處理日程等事務。</p>
-    <MyConnections notify={notify}/></div>;
+    {areaTabs}
+    {area==='db'?<><label className="search lv-top-search" style={{margin:'0 0 14px'}}><MagnifyingGlass size={16}/><input aria-label="搜尋資料庫" placeholder="搜尋資料庫" value={q} onChange={e=>setQ(e.target.value)}/></label><MyDb q={q}/></>:<MyConnections notify={notify}/>}</div>;
 
   if(wizard)return <div className="lv-p"><EnableService key={wizard.service+(wizard.id||'')} service={wizard.service} connectorId={wizard.id} me={me} notify={notify} onBack={()=>setWizard(null)}
     onDone={async()=>{setWizard(null);setMode('common');setMcKey(k=>k+1);await load()}}/></div>;
@@ -240,9 +243,14 @@ export default function ConnectorsPage({me,notify}){
   return <div className="lv-p">
     <div className="page-heading"><h1><Plugs/>連接器</h1></div>
     <p className="subtitle">連接 MCP 伺服器、Webhook 與協作工具。連接器為全院共用物件，憑證僅存放於 Secret Manager。</p>
+    {areaTabs}
+    {area==='db'&&!admin?<><label className="search lv-top-search" style={{margin:'0 0 14px'}}><MagnifyingGlass size={16}/><input aria-label="搜尋資料庫" placeholder="搜尋資料庫" value={q} onChange={e=>setQ(e.target.value)}/></label><MyDb q={q}/></>:area==='db'?<>
+      {!dbEditing&&<div className="lv-cn-sub"><div className="lv-gc-switch" role="tablist"><button role="tab" aria-selected={dbMode==='mine'} className={dbMode==='mine'?'on':''} onClick={()=>setDbMode('mine')}>我的連線</button><button role="tab" aria-selected={dbMode==='common'} className={dbMode==='common'?'on':''} onClick={()=>setDbMode('common')}>常用連接器</button><button role="tab" aria-selected={dbMode==='all'} className={dbMode==='all'?'on':''} onClick={()=>setDbMode('all')}>全部連接器</button></div>
+        <label className="search lv-top-search"><MagnifyingGlass size={16}/><input aria-label="搜尋連接器" placeholder="搜尋資料庫" value={q} onChange={e=>setQ(e.target.value)}/></label></div>}
+      <DatabaseTab notify={notify} mode={dbMode} q={q} setEditing={setDbEditing}/></>:<>
     {denied&&<Banner icon={<Warning size={16}/>}>您目前的角色（{me?.role||'未知'}）沒有連接器的存取權限：後端要求建置者（builder）或管理員。如需使用請聯絡管理員調整角色。</Banner>}
-    <div className="lv-gc-switch" role="tablist"><button role="tab" aria-selected={mode==='mine'} className={mode==='mine'?'on':''} onClick={()=>setMode('mine')}>我的連線</button><button role="tab" aria-selected={mode==='common'} className={mode==='common'?'on':''} onClick={()=>setMode('common')}>常用連接器</button><button role="tab" aria-selected={mode==='all'} className={mode==='all'?'on':''} onClick={()=>setMode('all')}>全部連接器{gwTotal!=null?`（${gwTotal.toLocaleString('en-US')}）`:''}</button></div>
-    <label className="search lv-top-search"><MagnifyingGlass size={16}/><input aria-label="搜尋連接器" placeholder="搜尋連接器" value={q} onChange={e=>setQ(e.target.value)}/></label>
+    <div className="lv-cn-sub"><div className="lv-gc-switch" role="tablist"><button role="tab" aria-selected={mode==='mine'} className={mode==='mine'?'on':''} onClick={()=>setMode('mine')}>我的連線</button><button role="tab" aria-selected={mode==='common'} className={mode==='common'?'on':''} onClick={()=>setMode('common')}>常用連接器</button><button role="tab" aria-selected={mode==='all'} className={mode==='all'?'on':''} onClick={()=>setMode('all')}>全部連接器{gwTotal!=null?`（${gwTotal.toLocaleString('en-US')}）`:''}</button></div>
+    <label className="search lv-top-search"><MagnifyingGlass size={16}/><input aria-label="搜尋連接器" placeholder="搜尋連接器" value={q} onChange={e=>setQ(e.target.value)}/></label></div>
     {mode==='mine'?<MyConnections notify={notify} reloadKey={mcKey} query={q}/>:null}
     {mode==='mine'?null:mode==='all'?<GatewayCatalog query={q} admin={admin} onEnable={service=>setWizard({service})} onEdit={(service,id)=>setWizard({service,id})} onSetup={typeId=>{setMode('common');const c=(conns||[]).find(x=>x.type===typeId);setView(c?{typeId,id:c.id}:{typeId})}}/>:<>
     <h2 className="lv-gc-group" style={{marginTop:0}}>自訂</h2>
@@ -268,5 +276,6 @@ export default function ConnectorsPage({me,notify}){
       <p>已開放 {summary.config?.allowed_actions?.length||0} 個動作。只有管理員可以修改此連接器。</p><div className="modal-actions"><button className="btn" onClick={()=>setSummary(null)}>關閉</button></div></section></div>}
     {sharing&&<ShareDialog title={sharing.label} value={sharing.share} owner={sharing.owner_email||'你'} onClose={()=>setSharing(null)} onDone={doShare}/>}
     <div className="notice"><ShieldCheck/>狀態來自後端紀錄與最近一次連線測試；「已連線」僅代表該次測試通過，並非持續監控。</div>
+    </>}
   </div>;
 }

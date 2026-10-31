@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     github_repo: str = ""  # owner/name, e.g. iKala-SA/medisense
     github_ref: str = "main"
     litellm_apply_workflow: str = "litellm-apply.yml"
+    toolbox_url: str = ""  # MCP Toolbox for Databases (Cloud Run, internal); empty = database queries disabled
+    toolbox_apply_workflow: str = "toolbox-apply.yml"  # 套用到 Toolbox (資料庫連接器): infra/13-deploy-toolbox.sh
     github_dispatch_token: str = ""
 
     @property

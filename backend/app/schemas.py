@@ -131,6 +131,7 @@ class Capabilities(BaseModel):
     web_search: bool = False
     spaces: list[str] = Field(default_factory=list, max_length=50)  # knowledge spaces; empty = no internal knowledge
     connectors: list[CapConnector] = Field(default_factory=list, max_length=30)
+    db_connectors: list[str] = Field(default_factory=list, max_length=20)  # 資料庫連接器 ids; what each user may query follows THEIR group rules
     model_pref: Literal["fast", "balanced", "quality"] = "balanced"
     thinking: Literal["off", "low", "medium", "high"] = "low"
 
@@ -1022,6 +1023,8 @@ class ChatRequest(BaseModel):
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
     knowledge_scope: Literal["general", "selected", "all"] = "selected"
+    space_ids: list[str] = Field(default_factory=list, max_length=20)  # no agent picked, 具體資料: knowledge spaces to read (by the caller's own rights)
+    db_connectors: list[str] = Field(default_factory=list, max_length=20)  # no agent picked: databases the user switched on for this chat
 
 
 class AttachmentOut(BaseModel):
@@ -1049,3 +1052,121 @@ class OpenOriginalOut(BaseModel):
     filename: str
     kind: Literal["pdf", "text", "download"]  # how the viewer can show it
     watermark: str  # text the viewer repeats over the page
+
+
+# ---- database connectors (docs/DB-CONNECTORS-DESIGN.md) -------------------------------------------------------------
+DbKind = Literal["postgres", "mysql", "mssql", "cloud_sql_postgres", "cloud_sql_mysql", "cloud_sql_mssql", "bigquery"]
+DB_REQUIRED = {  # connection fields per kind (non-secret)
+    "postgres": ("host", "port", "database"), "mysql": ("host", "port", "database"), "mssql": ("host", "port", "database"),
+    "cloud_sql_postgres": ("project", "region", "instance", "database"), "cloud_sql_mysql": ("project", "region", "instance", "database"),
+    "cloud_sql_mssql": ("project", "region", "instance", "database"), "bigquery": ("project",),
+}
+_SLUG = r"^[a-z][a-z0-9_]{0,39}$"
+
+
+class DbParam(BaseModel):
+    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,39}$")
+    type: Literal["string", "integer", "float", "boolean"] = "string"
+    description: str = Field(default="", max_length=200)
+    required: bool = True
+
+
+class DbQuery(BaseModel):
+    """A: an administrator-written, parameterised, read-only query. The model can only fill the parameters."""
+    id: str = Field(pattern=_SLUG)
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=500)
+    statement: str = Field(min_length=1, max_length=4000)
+    parameters: list[DbParam] = Field(default_factory=list, max_length=12)
+
+
+class DbColumn(BaseModel):
+    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+    type: str = Field(default="", max_length=40)
+    sensitive: bool = False  # never readable by natural-language queries
+
+
+class DbExample(BaseModel):
+    question: str = Field(max_length=300)
+    sql: str = Field(max_length=2000)
+
+
+class DbView(BaseModel):
+    """B: a view (or table) natural-language queries may read, with the columns they may use."""
+    id: str = Field(pattern=_SLUG)
+    name: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z_][A-Za-z0-9_.]*$")  # [dataset.|schema.]view
+    description: str = Field(default="", max_length=500)
+    columns: list[DbColumn] = Field(min_length=1, max_length=200)
+    examples: list[DbExample] = Field(default_factory=list, max_length=10)
+
+
+class DbSourceIn(BaseModel):
+    """One database login = one read-only database role (one Toolbox source). The password is write-only."""
+    id: str = Field(pattern=_SLUG)
+    label: str = Field(min_length=1, max_length=80)
+    user: str = Field(min_length=1, max_length=120)
+    password: str | None = Field(default=None, max_length=500)  # omitted on update = keep the stored one
+
+
+class DbRule(BaseModel):
+    """Members of `group_id` use `source_id` with these queries and views. Rules are tried in order; the first match wins."""
+    group_id: str = Field(min_length=1, max_length=80)
+    source_id: str = Field(default="", max_length=40)  # "" only for BigQuery (the user's own identity)
+    queries: list[str] = Field(default_factory=list, max_length=100)
+    views: list[str] = Field(default_factory=list, max_length=100)
+
+
+class DbConnectorIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    kind: DbKind
+    description: str = Field(default="", max_length=500)
+    connection: dict[str, str] = Field(default_factory=dict)
+    sources: list[DbSourceIn] = Field(default_factory=list, max_length=20)
+    rules: list[DbRule] = Field(default_factory=list, max_length=50)
+    queries: list[DbQuery] = Field(default_factory=list, max_length=100)
+    views: list[DbView] = Field(default_factory=list, max_length=100)
+    max_rows: int = Field(default=100, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "DbConnectorIn":
+        need = DB_REQUIRED[self.kind]
+        miss = [k for k in need if not str(self.connection.get(k, "")).strip()]
+        if miss:
+            raise ValueError(f"connection is missing: {', '.join(miss)}")
+        self.connection = {k: v.strip() for k, v in self.connection.items() if isinstance(v, str)}
+        if self.connection.get("ip_type", "") not in ("", "public", "private", "psc"):
+            raise ValueError("ip_type must be public, private or psc")
+        sids, qids, vids = [x.id for x in self.sources], [x.id for x in self.queries], [x.id for x in self.views]
+        for what, ids in (("source", sids), ("query", qids), ("view", vids)):
+            if len(ids) != len(set(ids)):
+                raise ValueError(f"duplicate {what} id")
+        if self.kind == "bigquery" and self.sources:
+            raise ValueError("BigQuery runs as the signed-in user: it has no database logins")
+        for r in self.rules:
+            if self.kind == "bigquery":
+                if r.source_id:
+                    raise ValueError("BigQuery rules take no source")
+            elif r.source_id not in sids:
+                raise ValueError(f"rule uses unknown source '{r.source_id}'")
+            if bad := [q for q in r.queries if q not in qids]:
+                raise ValueError(f"rule uses unknown query: {', '.join(bad)}")
+            if bad := [v for v in r.views if v not in vids]:
+                raise ValueError(f"rule uses unknown view: {', '.join(bad)}")
+        return self
+
+
+class DbConnectorOut(BaseModel):
+    id: str
+    name: str
+    kind: DbKind
+    description: str = ""
+    connection: dict[str, str] = Field(default_factory=dict)
+    sources: list[dict[str, Any]] = Field(default_factory=list)  # {id, label, user, password_set}
+    rules: list[DbRule] = Field(default_factory=list)
+    queries: list[DbQuery] = Field(default_factory=list)
+    views: list[DbView] = Field(default_factory=list)
+    max_rows: int = 100
+    status: str = "draft"  # draft -> applied (deployed to Toolbox)
+    created_by: str = ""
+    created_at: Any = None
+    updated_at: Any = None
