@@ -173,3 +173,16 @@ def test_specific_data_chat_reads_the_chosen_spaces_by_the_callers_rights(world,
         except RuntimeError:
             pass
     assert seen[0] == [f"{BUILDER.email}:s1", f"{BUILDER.email}:s2"] and seen[1:] == [[], []]  # spaces apply only to 具體資料
+
+
+def test_slash_skills_are_added_for_that_message_and_checked_per_user(world, as_user, fs, monkeypatch):
+    fs.put("skills/k1", {"name": "衛教語氣", "instructions": "用淺白的話", "enabled": True, "owner_uid": "x", "share": {"access": "account", "role": "use", "members": []}})
+    fs.put("skills/k2", {"name": "私人", "instructions": "不該被看到", "enabled": True, "owner_uid": "x", "share_keys": []})
+    seen = []
+    monkeypatch.setattr("app.routers.runs.agent_runtime.run_agent", lambda agent, **kw: seen.append(kw["skill_prefix"]) or (_ for _ in ()).throw(RuntimeError("stop")))
+    for ids in ([], ["k1", "k2", "nope"]):
+        try:
+            as_user(BUILDER).post("/api/chat", json={"message": "hi", "skill_ids": ids, "knowledge_scope": "general"})
+        except RuntimeError:
+            pass
+    assert seen[0] == "" and "淺白" in seen[1] and "不該被看到" not in seen[1]
