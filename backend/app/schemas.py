@@ -1023,6 +1023,7 @@ class ChatRequest(BaseModel):
     knowledge_doc_ids: list[str] = Field(default_factory=list, max_length=50)
     # general = model only; selected = knowledge_doc_ids; all = every indexed document the caller may see
     knowledge_scope: Literal["general", "selected", "all"] = "selected"
+    skill_ids: list[str] = Field(default_factory=list, max_length=10)  # skills the user invoked with / for this message (visibility checked per user)
     space_ids: list[str] = Field(default_factory=list, max_length=20)  # no agent picked, 具體資料: knowledge spaces to read (by the caller's own rights)
     db_connectors: list[str] = Field(default_factory=list, max_length=20)  # no agent picked: databases the user switched on for this chat
 

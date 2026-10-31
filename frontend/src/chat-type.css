@@ -99,3 +99,14 @@ main.card-page,.card-page{padding-top:0!important}
 .picked-chip i{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
 .picked-chip svg{flex:none;color:#44524b}.picked-chip button{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;color:#7a8a82}.picked-chip button:hover{background:#eef1f4}
 .picked-add{display:flex;align-items:center;gap:6px;padding:8px 14px;color:#239660;font-weight:500;font-size:13.5px;background:none;border:0;cursor:pointer}
+.skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px 0}
+.skill-chip{display:inline-flex;align-items:center;gap:5px;border-radius:99px;background:#e7f4ee;color:#1f7a52;font-size:12.5px;padding:3px 6px 3px 9px}
+.skill-chip button{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;color:#1f7a52}.skill-chip button:hover{background:#cfe9da}
+.trig-menu{width:340px;max-width:92vw;max-height:300px;overflow:auto;padding:6px;z-index:70;background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(20,24,40,.16),0 0 0 1px #e8eeea;font-size:14px}
+.trig-menu .menu-caption{padding:6px 10px 2px;font-size:12px;color:#8a919c}
+.trig-item{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:8px}
+.trig-item.on{background:#eef5f1}.trig-item svg{color:#239660;margin-top:2px;flex:none}.trig-item b{display:block;font-weight:500;font-size:13.5px}
+.trig-item small{display:block;color:#8a919c;font-size:12px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+.trig-empty{padding:10px 12px;color:#8a919c;font-size:13px;margin:0}
+.flow-row{width:100%;text-align:left}
+.flow-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:760px;margin:6px auto -2px;font-size:13px;color:#44524b}

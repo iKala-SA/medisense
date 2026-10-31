@@ -95,6 +95,8 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         agent, agent_id = _default_agent(user)
         rag_files = resolve_rag_files(agent.knowledge_doc_ids) if agent_id != BUILTIN_ID else []
     agent = agent.model_copy(update={"model_group": body.model_group})
+    if body.skill_ids:  # skills invoked with / : added to the agent's own; unknown, disabled or non-viewable ones are skipped by skills.build_prefix
+        agent = agent.model_copy(update={"skill_ids": list(dict.fromkeys([*agent.skill_ids, *body.skill_ids]))})
     if not chosen and body.db_connectors:  # what each database returns is still decided by THIS user's group rules at call time
         agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"db_connectors": list(dict.fromkeys(body.db_connectors))})})
 
