@@ -1,0 +1,16 @@
+.pd-dialog{width:min(760px,94vw);padding:22px 26px 20px;text-align:left;display:flex;flex-direction:column;max-height:86vh}
+.pd-dialog header{display:flex;justify-content:space-between;align-items:center}.pd-dialog h2{font-size:18px;margin:0}
+.pd-sub{font-size:12.5px;color:#6b7680;margin:6px 0 12px}
+.pd-search{max-width:320px;margin:0 0 10px}
+.pd-tabs{display:inline-flex;background:#eef5f1;border-radius:9px;padding:3px;gap:2px;margin:0 0 10px;align-self:flex-start}
+.pd-tabs button{padding:6px 16px;border-radius:7px;font-size:13px;font-weight:500;color:#4b6157}.pd-tabs button.on{background:#fff;color:#239660;box-shadow:0 1px 3px #0f2a1c18}
+.pd-table{flex:1;min-height:180px;overflow:auto;border-top:1px solid #e8eeea}
+.pd-table table{width:100%;border-collapse:collapse;font-size:13px}
+.pd-table th{text-align:left;font-weight:600;color:#4b5a53;padding:9px 8px;border-bottom:1px solid #e8eeea;position:sticky;top:0;background:#fff}
+.pd-table td{padding:10px 8px;border-bottom:1px solid #f0f3f1}
+.pd-table tbody tr{cursor:pointer}.pd-table tbody tr:hover,.pd-table tbody tr.on{background:#f4faf7}
+.pd-table td:first-child,.pd-table th:first-child{width:34px}
+.pd-name{display:inline-flex;align-items:center;gap:8px;font-weight:500}.pd-name svg{color:#239660;flex:none}
+.pd-pill{background:#eef1f4;border-radius:6px;padding:2px 8px;font-size:12px;color:#4b5a53}
+.pd-meta{color:#6b7680}.pd-empty{padding:30px 10px;color:#7a8a82;text-align:center;font-size:13px}
+.pd-dialog footer{display:flex;align-items:center;gap:10px;margin-top:14px}.pd-dialog footer .grow{flex:1}.pd-count{font-size:12.5px;color:#6b7680}

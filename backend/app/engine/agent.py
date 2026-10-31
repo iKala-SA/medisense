@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from ..schemas import AgentIn, Citation, CitationPassage, FlowNode, StepTrace
-from . import connectors, deid, features, llm, routing
+from . import connectors, db_tools, deid, features, llm, routing
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
 log = logging.getLogger(__name__)
@@ -110,6 +110,7 @@ class Tool:
     action: str = ""
     fixed: dict = field(default_factory=dict)  # arguments the canvas node pins; the model cannot change them
     raw_args: bool = False  # dynamic (MCP) tool: the model sends a JSON object as `arguments`
+    db: dict = field(default_factory=dict)  # 資料庫連接器 call: {connector_id, kind: query|sql, qid}
 
 
 def _fn(name: str, description: str, props: dict, required: list[str]) -> dict:
@@ -151,7 +152,7 @@ def _connector_tool(node: FlowNode, user_message: str) -> Tool | None:
     return tool
 
 
-def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bool = False) -> dict[str, Tool]:
+def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bool = False, user_email: str = "") -> dict[str, Tool]:
     tools: dict[str, Tool] = {}
     if web:
         tools["web_search"] = Tool(
@@ -173,6 +174,8 @@ def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bo
         elif n.type == "his_emr" and "query_his" not in tools:
             tools["query_his"] = Tool("query_his", "his_emr", _fn("query_his", "查詢 HIS/EMR（尚未串接）。",
                                                                   {"query": {"type": "string", "description": "查詢條件"}}, ["query"]), "HIS/EMR")
+    for sp in db_tools.tool_specs(agent.capabilities.db_connectors, user_email):
+        tools[sp["name"]] = Tool(sp["name"], "tool", _fn(sp["name"], sp["description"], sp["props"], sp["required"]), sp["label"], write=False, db=sp["meta"])
     return tools
 
 
@@ -183,7 +186,7 @@ def _clip(s: str) -> str:
 def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str, history: list[dict],
               rag_files: list[str] | None = None, resume: dict | None = None, skill_prefix: str = "",
               extra_context: str = "", pin_model: str | None = None, emit=None, web_search: bool = False,
-              images: list[dict] | None = None) -> RunResult:
+              images: list[dict] | None = None, user_email: str = "") -> RunResult:
     """One conversation turn. `resume` = the `pending` dict a previous run returned at an approval: the paused
     tool call is executed (approved) and the loop continues. `emit(event)` feeds the chat stream:
     step_start, step_skip, step_done, delta, citations."""
@@ -214,7 +217,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     elif web_search and not features.web_search_enabled():
         web_blocked = "管理員尚未開放網路搜尋"
     web_on = web_search and not web_blocked
-    tools = build_tools(agent, rag_files, user_message, web=web_on)
+    tools = build_tools(agent, rag_files, user_message, web=web_on, user_email=user_email)
     specs = [t.spec for t in tools.values()]
     system = f"{system}\n\n{LANG_GUIDE}\n{FORMAT_GUIDE}"
     if specs:
@@ -311,6 +314,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             if tool.kind == "his_emr":
                 q = str(args.get("query", ""))
                 return f"[HIS/EMR 尚未串接] 查詢條件：{q}", "HIS/EMR 閘道未啟用（stub）"
+            if tool.db:
+                return db_tools.execute(tool.db, args, user_id=user_id, email=user_email, agent_id=agent_id)
             call_args = {**tool.fixed}
             if tool.raw_args:
                 try:

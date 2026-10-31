@@ -28,22 +28,26 @@ def _client() -> httpx.Client:
                                  "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
 
 
-def dispatch(version: int, requested_by: str) -> None:
+def toolbox_run_title(version: int) -> str:
+    return f"Toolbox apply v{version}"
+
+
+def dispatch(version: int, requested_by: str, workflow: str | None = None) -> None:
     s = settings()
     with _client() as c:
-        r = c.post(f"/actions/workflows/{s.litellm_apply_workflow}/dispatches",
+        r = c.post(f"/actions/workflows/{workflow or s.litellm_apply_workflow}/dispatches",
                    json={"ref": s.github_ref, "inputs": {"version": str(version), "requested_by": requested_by}})
     r.raise_for_status()
 
 
-def find_run(version: int) -> dict | None:
+def find_run(version: int, workflow: str | None = None, title: str | None = None) -> dict | None:
     """Newest workflow_dispatch run for this version: {status, conclusion, html_url} or None if not started yet."""
     s = settings()
     with _client() as c:
-        r = c.get(f"/actions/workflows/{s.litellm_apply_workflow}/runs",
+        r = c.get(f"/actions/workflows/{workflow or s.litellm_apply_workflow}/runs",
                   params={"event": "workflow_dispatch", "per_page": 20})
     r.raise_for_status()
-    title = run_title(version)
+    title = title or run_title(version)
     for run in r.json().get("workflow_runs", []):  # newest first
         if run.get("display_title") == title:
             return {"status": run.get("status"), "conclusion": run.get("conclusion"), "html_url": run.get("html_url")}

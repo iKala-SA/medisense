@@ -11,6 +11,7 @@ from .routers import (
     calendar,
     chat,
     connectors,
+    db_connectors,
     gateway_catalog,
     feedback,
     features,
@@ -45,6 +46,7 @@ app.include_router(runs.router)
 app.include_router(knowledge.router)
 app.include_router(audit.router)
 app.include_router(connectors.router)
+app.include_router(db_connectors.router)
 app.include_router(monitoring.router)
 app.include_router(users.router)
 app.include_router(groups.router)

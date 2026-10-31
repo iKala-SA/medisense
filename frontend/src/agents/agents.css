@@ -333,3 +333,4 @@ main.card-page:has(.ad){height:calc(100vh - 44px)!important;max-height:calc(100v
 .al-tpls button>span:last-child{font-size:12.5px;line-height:1.65;color:#4a4d54;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 @media(max-width:1100px){.ad{grid-template-columns:1fr;height:auto}.ad-side{border-left:0;border-top:1px solid var(--hair);min-height:560px}.ad-main{overflow:visible}main.card-page:has(.ad){height:auto!important;max-height:none;overflow:auto}}
 .mc-msg.assistant p{margin:0 0 8px}.mc-msg.assistant p:last-child{margin:0}.mc-msg.assistant ul,.mc-msg.assistant ol{margin:4px 0 8px;padding-left:20px}.mc-msg{white-space:normal}.mc-msg.user{white-space:pre-wrap}
+.ad-link{white-space:nowrap}
