@@ -51,7 +51,7 @@ function ReviewQueue({kind,notify,onChanged}){
   return <section className="ag-review" aria-label="待審核的發布申請"><h2><ListChecks size={16}/>待審核的發布申請<span>{rows.length}</span></h2>
     {rows.map(a=><div className="ag-rv-row" key={a.id}>
       <div className="tx"><b>{a.name} <small>v{a.review.version}</small></b><small>申請人 {a.review.requested_by_email} · {ago(a.review.requested_at)}</small></div>
-      {rej===a.id?<div className="ag-rv-rej"><input autoFocus placeholder="退回原因（選填）" value={reason} onChange={e=>setReason(e.target.value)}/><button className="ag-btn" disabled={!!busy} onClick={()=>decide(a,false)}>確認退回</button><button className="ag-btn" onClick={()=>setRej(null)}>取消</button></div>
+      {rej===a.id?<div className="ag-rv-rej"><input autoFocus placeholder="退回原因（必填）" value={reason} onChange={e=>setReason(e.target.value)}/><button className="ag-btn" disabled={!!busy||!reason.trim()} onClick={()=>decide(a,false)}>確認退回</button><button className="ag-btn" onClick={()=>setRej(null)}>取消</button></div>
         :<div className="ag-rv-act"><button className="ag-btn" disabled={!!busy} onClick={()=>setRej(a.id)}>退回</button><button className="ag-btn primary" disabled={!!busy} onClick={()=>decide(a,true)}>{busy===a.id?'處理中…':'核准並發布'}</button></div>}
     </div>)}</section>;
 }
