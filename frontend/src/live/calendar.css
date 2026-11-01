@@ -22,3 +22,50 @@
 @media(max-width:640px){.lv-cal-day{grid-template-columns:1fr}.lv-cal-ev{grid-template-columns:1fr auto}.lv-cal-ev .t{grid-column:1/-1}}
 
 .lv-cal-views{display:inline-flex;gap:4px;margin-right:8px}
+
+/* ---- Google-Calendar-style grid ------------------------------------------------------------------------------------ */
+.lv-cal.gc{max-width:none;display:flex;flex-direction:column;height:calc(100vh - 196px);min-height:460px}
+.gc .lv-cal-head{margin-bottom:10px;flex:none}.gc .lv-cal-range{font-size:20px;font-weight:500;margin:0 8px}
+.gc-arrow{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#44524b;background:none;border:0;cursor:pointer}.gc-arrow:hover{background:#eef1f4}
+.gc-body{flex:1;min-height:0;border:1px solid #e3e8e5;border-radius:16px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
+.gc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#4599e0;flex:none}
+/* month */
+.gc-month{display:flex;flex-direction:column;height:100%}
+.gc-mh{display:grid;grid-template-columns:repeat(7,1fr);font-size:11.5px;color:#5f6368;text-align:center;padding:8px 0 4px;letter-spacing:.04em}
+.gc-mb{flex:1;display:grid;grid-template-rows:repeat(var(--rows),minmax(0,1fr));min-height:0}
+.gc-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #e3e8e5;min-height:0}
+.gc-cell{border-left:1px solid #e3e8e5;padding:4px 0 2px;min-width:0;min-height:0;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.gc-cell:first-child{border-left:0}.gc-cell:hover{background:#fafcfb}
+.gc-dnum{display:flex;justify-content:center;align-items:center;gap:3px;font-size:12.5px;color:#3c4043;height:24px;flex:none}
+.gc-cell.other .gc-dnum{color:#9aa0a6}.gc-dnum small{font-size:12px;color:#5f6368}.gc-dnum small.t{color:#1a56c8}
+.gc-today{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:#1a56c8;color:#fff;font-weight:500}
+.gc-office{height:14px;margin:2px 0 3px;position:relative;flex:none}
+.gc-office::before{content:'';position:absolute;left:0;right:0;top:6px;height:3px;border-radius:2px;background:#dbeaf6}
+.gc-office span{position:relative;display:inline-flex;align-items:center;gap:3px;margin-left:4px;padding:0 6px;border-radius:8px;background:#dbeaf6;color:#1f5d96;font-size:11px;line-height:14px}
+.gc-evs{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:hidden;padding:0 3px}
+.gc-ev{display:flex;align-items:center;gap:5px;min-width:0;width:100%;text-align:left;font-size:12px;line-height:20px;height:21px;padding:0 5px;border-radius:5px;background:none;border:0;cursor:pointer;color:#3c4043}
+.gc-ev:hover{background:#eef1f4}.gc-ev em{font-style:normal;color:#3c4043;flex:none}.gc-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.gc-ev.allday{background:#4599e0;color:#fff}.gc-ev.allday:hover{background:#3b8bd0}
+.gc-more{text-align:left;font-size:12px;color:#3c4043;padding:0 8px;height:20px;background:none;border:0;cursor:pointer;border-radius:5px}.gc-more:hover{background:#eef1f4}
+/* week / day */
+.gc-time{display:flex;flex-direction:column;height:100%;min-height:0}
+.gc-th{display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr));flex:none;border-bottom:1px solid #e3e8e5;padding-right:10px}
+.gc-gmt{font-size:10.5px;color:#5f6368;align-self:end;padding:0 0 6px 8px}
+.gc-thc{display:flex;flex-direction:column;align-items:center;padding:6px 2px 6px;border-left:1px solid #eef1f2;min-width:0;cursor:pointer}
+.gc-thc .wd{font-size:11px;letter-spacing:.05em;color:#5f6368}.gc-thc.today .wd{color:#1a56c8}
+.gc-thc .dn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:46px;height:50px;padding:0 6px;border-radius:26px;color:#3c4043;margin:2px 0 3px}
+.gc-thc .dn b{font-size:22px;line-height:24px;font-weight:400}.gc-thc .dn small{font-size:12px;line-height:14px;color:#5f6368}
+.gc-thc .dn.is{background:#1a56c8;color:#fff}.gc-thc .dn.is small{color:#fff}
+.gc-thc .gc-office{width:calc(100% + 4px);margin:0 -2px 3px;align-self:stretch}.gc-office.none{visibility:hidden}.gc-ad{width:calc(100% - 6px);margin:2px 3px 0;padding:0 6px;height:20px;font-size:12px;line-height:20px;text-align:left;color:#fff;background:#4599e0;border:0;border-radius:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.gc-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#d3d6db transparent}
+.gc-scroll::-webkit-scrollbar{width:8px}.gc-scroll::-webkit-scrollbar-thumb{background:#d3d6db;border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+.gc-grid{position:relative;display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr));padding-right:10px}
+.gc-hours{position:relative}.gc-hours span{position:absolute;right:8px;transform:translateY(-50%);font-size:10.5px;color:#5f6368;white-space:nowrap}
+.gc-col{position:relative;border-left:1px solid #eef1f2}
+.gc-line{position:absolute;left:0;right:0;height:0;border-top:1px solid #e8ebed;pointer-events:none}
+.gc-now{position:absolute;left:0;right:0;height:0;border-top:2px solid #d93025;z-index:3;pointer-events:none}.gc-now i{position:absolute;left:-6px;top:-6px;width:10px;height:10px;border-radius:50%;background:#d93025}
+.gc-block{position:absolute;box-sizing:border-box;overflow:hidden;text-align:left;padding:3px 6px;border-radius:7px;background:#4599e0;color:#fff;border:1px solid #fff;cursor:pointer;display:flex;flex-direction:column;gap:0;font-size:12px;line-height:1.3}
+.gc-block:hover{filter:brightness(.95);z-index:2}.gc-block b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gc-block span{font-size:11.5px;opacity:.95;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gc-block.ov{z-index:1}
+.gc-detail{width:min(380px,92vw);position:relative;text-align:left}.gc-detail h3{display:flex;gap:8px;align-items:center;font-size:17px;margin:0 22px 8px 0}.gc-detail p{margin:4px 0;font-size:13.5px;color:#44524b;display:flex;gap:6px;align-items:center}.gc-x{position:absolute;top:10px;right:10px}
+@media(max-width:700px){.gc-th,.gc-grid{grid-template-columns:40px repeat(var(--n),minmax(0,1fr))}.gc-thc .dn{font-size:16px;width:32px;height:32px;line-height:30px}}
