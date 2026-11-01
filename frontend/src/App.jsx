@@ -104,7 +104,7 @@ async function sendLive(text,onDelta){
   let acc=initRun(opt?.pin?opt.name:'');setRun(acc);setPanelTab('steps');setCiteFocus(null);if(panelWanted.current&&!voiceOpen)setRouteOpen(true);
   try{
     const res=await api.chatStream({message:text,session_id:liveSession||undefined,agent_id:ag?.id,
-      ...(opt?.pin?{model_group:'auto',model:opt.id}:{model_group:toGroup(model)}),knowledge_scope:toScope(knowledge),...(skills.length?{skill_ids:skills.map(k=>k.id)}:{}),...(!ag?.id&&knowledge==='具體資料'?{db_connectors:picked.filter(p=>p.t==='db').map(p=>p.id),space_ids:picked.filter(p=>p.t==='space').map(p=>p.id)}:{}),...(!liveSession&&newChatProject?{project_id:newChatProject}:{}),web_search:webSearch&&!!features?.web_search},
+      ...(opt?.pin?{model_group:'auto',model:opt.id}:{model_group:toGroup(model)}),knowledge_scope:toScope(knowledge),...(skills.length?{skill_ids:skills.map(k=>k.id)}:{}),...(voiceOpen?{voice:true}:{}),...(!ag?.id&&knowledge==='具體資料'?{db_connectors:picked.filter(p=>p.t==='db').map(p=>p.id),space_ids:picked.filter(p=>p.t==='space').map(p=>p.id)}:{}),...(!liveSession&&newChatProject?{project_id:newChatProject}:{}),web_search:webSearch&&!!features?.web_search},
       ev=>{acc=reduceRun(acc,ev);setRun(acc);if(onDelta&&ev.event==='delta'&&ev.kind!=='thought')onDelta(ev.text)});
     const pending=res.pending_approval?'\n\n此步驟需要核准，請由 Agent 的擁有者或管理員在沙盒測試中處理。':'';
     const entry={...toEntry(text,res.reply+pending,{trace:res.trace||[],citations:res.citations||[],ms:res.latency_ms,agent:activeAgent,msgIndex:res.message_index}),attach:sent};

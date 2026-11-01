@@ -6,6 +6,7 @@ from .auth import User, current_user
 from .config import settings
 from .engine import llm
 from .routers import (
+    tts,
     agents,
     audit,
     calendar,
@@ -47,6 +48,7 @@ app.include_router(knowledge.router)
 app.include_router(audit.router)
 app.include_router(connectors.router)
 app.include_router(db_connectors.router)
+app.include_router(tts.router)
 app.include_router(monitoring.router)
 app.include_router(users.router)
 app.include_router(groups.router)

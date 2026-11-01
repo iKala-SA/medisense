@@ -35,6 +35,9 @@ from .originals import access_for
 from .projects import own_project
 from .spaces import _load_editable, add_documents, doc_visible
 
+VOICE_HINT = ("\n\n這是語音對話，回覆會被唸出來：用自然的口語、簡短（最多三到四句），先講重點；"
+              "不要使用 Markdown、清單、標題或表格，也不要唸出網址或編號。")
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 log = logging.getLogger(__name__)
 BUILTIN_ID = "general-chat"
@@ -94,7 +97,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     else:
         agent, agent_id = _default_agent(user)
         rag_files = resolve_rag_files(agent.knowledge_doc_ids) if agent_id != BUILTIN_ID else []
-    agent = agent.model_copy(update={"model_group": body.model_group})
+    agent = agent.model_copy(update={"model_group": "fast" if body.voice and not body.model else body.model_group})
     if body.skill_ids:  # skills invoked with / : added to the agent's own; unknown, disabled or non-viewable ones are skipped by skills.build_prefix
         agent = agent.model_copy(update={"skill_ids": list(dict.fromkeys([*agent.skill_ids, *body.skill_ids]))})
     if not chosen and body.db_connectors:  # what each database returns is still decided by THIS user's group rules at call time
@@ -136,7 +139,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
                 audit_action="chat.run",
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
-                extra_context=_attachment_context(existing), session_extra=extra,
+                extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
                 pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
 
 

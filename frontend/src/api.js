@@ -202,6 +202,9 @@ export const api={
   dbApply:()=>call('/api/db-connectors/apply',{method:'POST'}),
   testDbConnection:(kind,connection,user,password)=>call('/api/db-connectors/test-connection',{method:'POST',body:body({kind,connection,user,password})}),
   dbCatalog:()=>call('/api/db-connectors/catalog'),
+  ttsVoices:()=>call('/api/tts/voices'),
+  ttsAudio:async(text,voice,rate=1)=>{const res=await fetch('/api/tts',{method:'POST',headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body({text,voice,rate})});
+    if(!res.ok)throw new Error(`${res.status} ${await res.text()}`);return res.arrayBuffer()},
   checkDbSql:(id,email,sql)=>call(`/api/db-connectors/${id}/check-sql`,{method:'POST',body:body({email,sql})}),
   myDbConnectors:()=>call('/api/db-connectors/mine'),
   // per-user OAuth connectors
