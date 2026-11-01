@@ -334,3 +334,26 @@ main.card-page:has(.ad){height:calc(100vh - 44px)!important;max-height:calc(100v
 @media(max-width:1100px){.ad{grid-template-columns:1fr;height:auto}.ad-side{border-left:0;border-top:1px solid var(--hair);min-height:560px}.ad-main{overflow:visible}main.card-page:has(.ad){height:auto!important;max-height:none;overflow:auto}}
 .mc-msg.assistant p{margin:0 0 8px}.mc-msg.assistant p:last-child{margin:0}.mc-msg.assistant ul,.mc-msg.assistant ol{margin:4px 0 8px;padding-left:20px}.mc-msg{white-space:normal}.mc-msg.user{white-space:pre-wrap}
 .ad-link{white-space:nowrap}
+
+/* 流程畫布: the type icon sits in the vertical middle of its card (it used to hug the top edge) */
+.ag-node{align-items:center}
+.ag-addpop button{align-items:center}.ag-addpop button>:first-child{align-self:center}
+/* the step-type tile is a <span> too: keep it a centred grid (the generic .ag-addpop span rule made it a top-aligned column) */
+.ag-addpop span.ag-tile,.ag-addpop button>span.ag-tile{display:grid;place-items:center;flex:none;align-self:center}
+
+/* 編輯 → 沙盒 → 發布 */
+.ag-stages{display:inline-flex;align-items:center;gap:0;list-style:none;margin:0 6px 0 0;padding:0}
+.ag-stages li{display:flex;align-items:center;font-size:12.5px;color:#6b7680}.ag-stages li+li::before{content:'';width:22px;height:2px;background:#dfe5e1;margin:0 4px}
+.ag-stages .dot{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#eef1f4;color:#6b7680;flex:none}
+.ag-stages .lb{display:inline-flex;align-items:center;gap:4px;margin-left:6px;white-space:nowrap}
+.ag-stages li.done .dot{background:#239660;color:#fff}.ag-stages li.done+li::before{background:#239660}
+.ag-stages li.warn .dot{background:#d9902a;color:#fff}
+.ag-stages li.on .dot{background:#4599e0;color:#fff}.ag-stages li.on{color:#1f5d96;font-weight:600}
+.ag-stages button{display:inline-flex;align-items:center;background:none;border:0;padding:4px 6px;border-radius:99px;cursor:pointer;color:inherit;font:inherit}.ag-stages button:hover{background:#eef1f4}
+.ag-sandbox-note{display:flex;gap:8px;align-items:flex-start;margin:0 0 10px;padding:9px 12px;border-radius:12px;background:#eaf3fb;color:#1f4d78;font-size:12.5px;line-height:1.6}
+.ag-sandbox-note svg{flex:none;margin-top:3px}.ag-sandbox-note.compact{font-size:12px;padding:7px 10px}
+.ag-runwrap{width:100%;max-width:1100px;margin:0 auto}
+.ag-review{max-width:820px;margin:0 0 14px;border:1px solid #f1e1b0;background:#fffaf0;border-radius:14px;overflow:hidden}
+.ag-review h2{display:flex;align-items:center;gap:8px;margin:0;padding:10px 16px;font-size:13.5px;font-weight:600;color:#7a5a00}.ag-review h2 span{background:#fff;border-radius:99px;padding:0 8px;font-size:12px}
+.ag-rv-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid #f1e1b0;background:#fff}.ag-rv-row .tx{flex:1;min-width:0;display:flex;flex-direction:column}.ag-rv-row b{font-size:13.5px}.ag-rv-row small{font-size:12px;color:#8a8d94;font-weight:400}
+.ag-rv-act,.ag-rv-rej{display:flex;gap:8px;align-items:center}.ag-rv-rej input{width:220px;border:1px solid #d5e0da;border-radius:8px;padding:6px 9px;font-size:13px}

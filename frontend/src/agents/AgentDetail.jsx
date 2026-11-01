@@ -1,3 +1,4 @@
+import Stages from './Stages';
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft,CaretDown,CaretRight,Check,CircleNotch,Warning,DotsThree,Info,X,TextB,TextItalic,TextStrikethrough,ListBullets,ListNumbers,Code,Quotes,ArrowCounterClockwise,ArrowClockwise,
   Sparkle,UploadSimple,FileText,Plus,Trash,Copy,DownloadSimple,Eye,PaperPlaneRight,BookOpen,Plugs,Database,Sliders,SlidersHorizontal,ArrowsClockwise,Globe,Lock} from '@phosphor-icons/react';
@@ -57,17 +58,17 @@ function Preview({a,flush,save,notify,tick}){
     catch(e){setMsgs(m=>[...m,{role:'error',text:errText(e)}])}finally{setBusy(false)}
   };
   return <div className="ad-prev">
-    <div className="ad-prevban"><Info size={16}/>您正在預覽 {a.name}。</div>
+    <div className="ad-prevban"><Info size={16}/>沙盒環境：用目前草稿試跑。讀取會真的執行，寫入動作只模擬；用量與正式環境分開統計。</div>
     <div className="ad-prevbody">
       {!msgs.length?<div className="ad-welcome"><svg width="44" height="44" viewBox="0 0 24 24"><path fill="#239660" d="M12 1c.6 5.6 5.4 10.4 11 11-5.6.6-10.4 5.4-11 11-.6-5.6-5.4-10.4-11-11C6.6 11.4 11.4 6.6 12 1z"/></svg><h2>{a.name}</h2><p>{a.description||'（尚未填寫說明）'}</p></div>
         :<div className="ad-msgs">{msgs.map((m,i)=><div key={i} className={'mc-msg '+m.role}>{m.role==='assistant'?<ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>:m.text}</div>)}{busy&&<div className="mc-msg assistant"><CircleNotch className="spin" size={14}/> 思考中…</div>}<div ref={end}/></div>}
     </div>
-    <div className="ad-prevbox"><div className="ad-prevhead">{a.name}<em>預覽</em></div>
+    <div className="ad-prevbox"><div className="ad-prevhead">{a.name}<em>沙盒</em></div>
       <div className="ad-previn"><textarea rows={2} value={text} placeholder="詢問問題…" onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();send()}}}/>
         <div><button className="ad-pill" disabled>代理程式<CaretDown size={13}/></button><span className="sp"/><button className="ag-icon primary" aria-label="送出" disabled={busy||!text.trim()||save==='saving'} onClick={()=>send()}><PaperPlaneRight size={16} weight="fill"/></button></div></div></div>
     {!msgs.length&&<div className="ad-chips">{a.opening_questions.filter(Boolean).map((q,i)=><button key={i} type="button" onClick={()=>send(q)}><Sparkle size={14}/>{q}</button>)}</div>}
     <button className="ag-icon" aria-label="重新開始預覽" title="重新開始預覽" onClick={()=>{setMsgs([]);sid.current=null}}><ArrowsClockwise size={18}/></button>
-    <p className="ad-prevnote">預覽使用目前的草稿，不會影響已發布的版本。</p>
+    <p className="ad-prevnote">沙盒使用目前的草稿，不會影響已發布的版本。</p>
   </div>;
 }
 
@@ -98,7 +99,7 @@ export default function AgentDetail({id,me,notify,onBack,onChat,onDeleted}){
           <div className="grow"><input className="ag-name big" value={a.name} maxLength={50} disabled={dis} aria-label="名稱" onChange={e=>e2({name:e.target.value})}/>
             <textarea className="ad-desc" rows={2} value={a.description||''} maxLength={300} disabled={dis} placeholder="新增說明（顯示在目錄、切換器與對話起始畫面）" aria-label="描述" onChange={e=>e2({description:e.target.value})}/></div></div>
         <div className="ad-tools2"><span className={'ag-save '+save} role="status">{save==='saving'?<><CircleNotch className="spin" size={14}/>儲存中</>:save==='dirty'?'編輯中…':save==='error'?<><Warning size={14}/>未儲存</>:<><Check size={14}/>儲存於 {clock(savedAt)}</>}</span>
-          <button className="ag-status" onClick={async()=>{await flush();setPub(true)}}>{status}<CaretDown size={13} weight="bold"/></button>
+          <Stages a={a} onSandbox={()=>document.querySelector('.ad-previn textarea')?.focus()} onPublish={async()=>{await flush();setPub(true)}}/>
           <button className="ag-btn big" disabled={dis} onClick={()=>setShare(true)}>分享</button>
           {a.status==='published'?<button className="ag-btn big primary" onClick={()=>onChat(a)}>啟動聊天</button>:<button className="ag-btn big primary" onClick={async()=>{await flush();setPub(true)}}>發布</button>}
           <div className="ag-menuwrap"><button className="ag-icon" aria-label="更多" aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={22} weight="bold"/></button>

@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from ..schemas import AgentIn, Citation, CitationPassage, FlowNode, StepTrace
-from . import connectors, db_tools, deid, features, llm, routing
+from . import connectors, db_tools, deid, features, llm, routing, runenv
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
 log = logging.getLogger(__name__)
@@ -356,7 +356,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             if tool is None:
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": "未知的工具，未執行。"})
                 continue
-            if tool.write and approval is not None and call["id"] != approved_id:
+            if tool.write and approval is not None and call["id"] != approved_id and not (runenv.is_sandbox() and tool.connector_id):  # sandbox: writes are simulated, nothing to approve
                 preview = f"{tool.label}\n{json.dumps({**tool.fixed, **args}, ensure_ascii=False, indent=2)}"
                 res.pending = {"node_id": approval.id, "message": _render(str(approval.data.get("message") or "核准這個動作？"), {"input": user_message}),
                                "preview": preview, "messages": messages, "citations": [c.model_dump() for c in res.citations],

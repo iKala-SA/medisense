@@ -44,6 +44,7 @@ function Monitoring() {
   const [range, setRange] = useState("7d");
   const [custom, setCustom] = useState(rangeDates("7d"));
   const [department, setDepartment] = useState("");
+  const [env, setEnv] = useState("production"); // 正式 vs 沙盒: the sandbox is counted apart
   const [sort, setSort] = useState("requests");
   const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState(null);
@@ -52,7 +53,7 @@ function Monitoring() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), department }), [range, custom, department]);
+  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), department, env }), [range, custom, department, env]);
   const load = useCallback(() => {
     setBusy(true);
     setErr("");
@@ -113,6 +114,9 @@ function Monitoring() {
               <span className="text-outline">→</span>
               <input type="date" className="w-auto py-1 text-xs" value={custom.to} min={custom.from} max={ymd(/* @__PURE__ */ new Date())} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} />
             </span>}
+        </div>
+        <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1" role="tablist" aria-label="環境">
+          {[["production", "正式環境"], ["sandbox", "沙盒"]].map(([k, l]) => <button key={k} role="tab" aria-selected={env === k} onClick={() => setEnv(k)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${env === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
         </div>
         <span className="hidden flex-1 md:block" />
         <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">臨床部門過濾：

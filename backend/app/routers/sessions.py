@@ -48,7 +48,8 @@ def list_sessions(limit: int = Query(30, ge=1, le=100), cursor: str | None = Non
             q = q.where(filter=firestore.FieldFilter("updated_at", "<", datetime.fromisoformat(cursor)))
         except ValueError as exc:
             raise HTTPException(422, "bad cursor") from exc
-    docs = list(q.order_by("updated_at", direction=firestore.Query.DESCENDING).limit(limit + 1).stream())
+    docs = [d for d in q.order_by("updated_at", direction=firestore.Query.DESCENDING).limit(limit + 1).stream()
+            if (d.to_dict() or {}).get("env") != "sandbox"]  # draft tests live in the sandbox, not in 最近項目
     page = docs[:limit]
     nxt = None
     if len(docs) > limit and page:

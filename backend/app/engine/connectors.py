@@ -458,6 +458,19 @@ def _calendar_call(config: dict, action: str, args: dict, user_id: str | None) -
     return json.dumps(out, ensure_ascii=False)[:8000]
 
 
+def is_write(type_: str, config: dict, action: str) -> bool:
+    """Does this action change something outside the platform? Unknown (e.g. a free-form MCP tool) counts as yes."""
+    spec = TYPES.get(type_, {})
+    acts = spec.get("actions")
+    if isinstance(acts, list):
+        a = next((x for x in acts if x["id"] == action), None)
+        return bool((a or {}).get("write", True))
+    if type_ == "gateway":
+        a = next((x for x in ga.describe(config) if x["id"] == action), None)
+        return bool(a["write"]) if a else True
+    return True
+
+
 def invoke(type_: str, config: dict, secrets: dict, action: str, args: dict, *, redact_pii: bool, user_id: str | None = None,
            connector_id: str | None = None) -> str:
     """Run one action. Called by the flow interpreter's `tool` node. `user_id` is the signed-in user the flow runs as."""

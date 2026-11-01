@@ -46,5 +46,8 @@ def expiry(days: int) -> datetime | None:
 
 
 def audit(actor_uid: str, action: str, actor_email: str = "", **details) -> None:
+    from .engine import runenv
+    if runenv.is_sandbox():
+        details.setdefault("env", runenv.SANDBOX)  # sandbox runs are tagged so they can be told apart (and left out of production counts)
     client().collection("audit").add({"actor": actor_uid, "actor_email": actor_email, "action": action,
                                       "at": now(), **details})

@@ -14,6 +14,7 @@ from google.cloud import firestore
 
 from .. import db
 from ..schemas import AgentIn
+from . import runenv
 
 TZ = ZoneInfo("Asia/Taipei")
 log = logging.getLogger(__name__)
@@ -31,16 +32,18 @@ def model_key(model: str) -> str:
 def record(*, agent: AgentIn, agent_id: str, user_id: str, group: str, model: str, prompt_tokens: int,
            completion_tokens: int, cost_usd: float, ms: int, ok: bool, fallback: bool) -> None:
     at = db.now()
+    env = runenv.get()
     try:
         c = db.client()
         c.collection("usage").add({
-            "at": at, "day": day_key(at), "agent_id": agent_id, "agent_name": agent.name, "department": agent.department,
+            "at": at, "day": day_key(at), "env": env, "agent_id": agent_id, "agent_name": agent.name, "department": agent.department,
             "uid": user_id, "group": group, "model": model, "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens, "cost_usd": cost_usd, "ms": ms, "ok": ok, "fallback": fallback,
         })
         inc = firestore.Increment
-        c.collection("usage_daily").document(f"{day_key(at)}_{agent_id}").set({
-            "day": day_key(at), "agent_id": agent_id, "agent_name": agent.name, "department": agent.department,
+        suffix = "" if env == runenv.PRODUCTION else f"__{env}"  # the sandbox keeps its own per-agent daily document
+        c.collection("usage_daily").document(f"{day_key(at)}_{agent_id}{suffix}").set({
+            "day": day_key(at), "env": env, "agent_id": agent_id, "agent_name": agent.name, "department": agent.department,
             "requests": inc(1), "failed": inc(0 if ok else 1), "fallbacks": inc(1 if fallback else 0),
             "prompt_tokens": inc(prompt_tokens), "completion_tokens": inc(completion_tokens),
             "cost_usd": inc(cost_usd), "ms_total": inc(ms),

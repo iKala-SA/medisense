@@ -1,3 +1,4 @@
+import Stages,{SandboxNote} from './Stages';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Play,PencilSimple,DotsThree,Check,CircleNotch,Warning,Copy,DownloadSimple,Trash,Eye,CaretDown,ClockCounterClockwise} from '@phosphor-icons/react';
 import {api} from '../api';
@@ -68,7 +69,7 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
       <div className="ag-toprow">
         <div className="ag-titlebox">
           <div className="ag-line"><input className="ag-name big" value={a.name} maxLength={50} disabled={!canEdit} aria-label="名稱" onChange={e=>edit({name:e.target.value})}/>
-            <button className={'ag-status '+status[1]} onClick={async()=>{await flush();setPub(true)}} title="發布狀態">{status[0]}<CaretDown size={13} weight="bold"/></button>
+            <Stages a={a} sandboxActive={mode==='run'} onSandbox={()=>setMode('run')} onPublish={async()=>{await flush();setPub(true)}}/>
             <span className={'ag-save '+save} role="status">{save==='saving'?<><CircleNotch className="spin" size={14}/>儲存中</>:save==='dirty'?'編輯中…':save==='error'?<><Warning size={14}/>未儲存</>:<><Check size={14}/>儲存於 {clock(savedAt)}</>}</span></div>
           <input className="ag-desc" value={a.description||''} maxLength={300} disabled={!canEdit} placeholder="新增描述（顯示在目錄）" aria-label="描述" onChange={e=>edit({description:e.target.value})}/></div>
         <div className="ag-tools">{tools}</div>
@@ -83,7 +84,7 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
       </div>
       <StepCanvas hideAgent steps={a.steps} setSteps={s=>edit({steps:s})} sel={sel} setSel={setSel} connectors={lib.connectors} canEdit={canEdit} agent={a}/>
     </div>
-    :<div className="ag-canvas run"><RunDrawer inline agent={a} notify={notify} onClose={()=>setMode('edit')}/></div>}
+    :<div className="ag-canvas run"><div className="ag-runwrap"><SandboxNote/><RunDrawer inline agent={a} notify={notify} onClose={()=>setMode('edit')}/></div></div>}
     {hist&&<div className="ag-modal" onClick={()=>setHist(false)}><div className="ag-dialog wide" onClick={e=>e.stopPropagation()}><h3>執行紀錄</h3><Runs id={id} notify={notify}/><div><button className="ag-btn" onClick={()=>setHist(false)}>關閉</button></div></div></div>}
     {pub&&<div className="ag-modal" onClick={()=>setPub(false)}><div className="ag-dialog wide" onClick={e=>e.stopPropagation()}><h3>發布與版本</h3>
       {errs>0&&<div className="ag-banner err"><Warning size={16}/><div>步驟有 {errs} 個錯誤，修正後才能發布。</div></div>}

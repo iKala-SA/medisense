@@ -10,7 +10,7 @@ from .. import db, sharing
 from ..auth import User, current_user
 from ..config import settings
 from ..engine import agent as agent_runtime
-from ..engine import deid, llm, skills
+from ..engine import deid, llm, runenv, skills
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -56,7 +56,13 @@ def _meta(r) -> dict:
     return {"trace": [t.model_dump() for t in r.trace], "citations": [c.model_dump() for c in r.citations]}
 
 
-def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
+def execute_run(*args, use_published: bool = False, **kw) -> RunResponse:
+    """The shared pipeline (see _execute_run), inside the right environment: a draft runs in the sandbox, a published agent in production."""
+    with runenv.use(runenv.of(use_published)):
+        return _execute_run(*args, use_published=use_published, **kw)
+
+
+def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
                 session_extra: dict | None = None, pin_model: str | None = None, emit=None,
@@ -91,6 +97,8 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None
     sess.update(session_extra or {})
+    if runenv.is_sandbox():
+        sess["env"] = runenv.SANDBOX  # kept out of 最近項目; counted separately
     sess["updated_at"] = db.now()
     sess["expire_at"] = db.expiry(settings().session_retention_days)
     sess_ref.set(sess)
@@ -145,26 +153,27 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
                            trace=[StepTrace(node_id=pending["node_id"], type="approval", summary="負責人拒絕，流程停止")])
 
     agent, rag_files = _agent_def(agent_id, user, bool(pending.get("use_published")), pending.get("version"))
-    history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
-    t0 = time.perf_counter()
-    try:
-        r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
-                                    history=history, rag_files=rag_files, resume=pending, user_email=user.email,
-                                    skill_prefix=skills.build_prefix(agent.skill_ids, user))
-    except APIStatusError as exc:
-        if exc.status_code == 401:
-            llm.reset_client_cache()
-        raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    latency = int((time.perf_counter() - t0) * 1000)
-    sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply}]
-    sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
-                       "version": pending.get("version"), "at": db.now()} if r.pending else None
-    sess["updated_at"] = db.now()
-    sess["expire_at"] = db.expiry(settings().session_retention_days)
-    sess_ref.set(sess)
-    db.audit(user.uid, "agent.approve", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"],
-             latency_ms=latency, models=[t.model for t in r.trace if t.model])
+    with runenv.use(runenv.of(bool(pending.get("use_published")))):
+        history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
+        t0 = time.perf_counter()
+        try:
+            r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
+                                        history=history, rag_files=rag_files, resume=pending, user_email=user.email,
+                                        skill_prefix=skills.build_prefix(agent.skill_ids, user))
+        except APIStatusError as exc:
+            if exc.status_code == 401:
+                llm.reset_client_cache()
+            raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        latency = int((time.perf_counter() - t0) * 1000)
+        sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply}]
+        sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
+                           "version": pending.get("version"), "at": db.now()} if r.pending else None
+        sess["updated_at"] = db.now()
+        sess["expire_at"] = db.expiry(settings().session_retention_days)
+        sess_ref.set(sess)
+        db.audit(user.uid, "agent.approve", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"],
+                 latency_ms=latency, models=[t.model for t in r.trace if t.model])
     return RunResponse(session_id=body.session_id, reply=r.reply, trace=r.trace, citations=r.citations,
                        structured=r.structured, pending_approval=_public_pending(r.pending), latency_ms=latency)
