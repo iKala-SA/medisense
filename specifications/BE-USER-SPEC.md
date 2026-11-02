@@ -4,9 +4,9 @@
 |---|---|
 | 文件性質 | 現有 API 的逆向整理（as-built），供前端對接與後續調整參考 |
 | 範圍 | `/api/users` 帳號目錄、預先註冊、角色與狀態變更、原檔閱覽權限、CSV 匯出 |
-| 主要程式 | `backend/app/routers/users.py`、`backend/app/auth.py`（帳號記錄與權限依賴）、`backend/app/schemas.py`（`UserOut`、`UserDetail`、`UserCreate`、`UserPatch` 等）、`backend/app/db.py`（`users` 集合、稽核）、`backend/app/routers/audit.py`（稽核分類） |
-| 版本基準 | commit `6aa5f54e`（`test-sdd` 分支） |
-| 測試現況 | 無。`backend/tests/` 沒有 users 相關測試 |
+| 主要程式 | `backend/app/routers/users.py`、`backend/app/auth.py`（`users` 集合存取、帳號記錄與權限依賴）、`backend/app/schemas.py`（`UserOut`、`UserDetail`、`UserCreate`、`UserPatch` 等）、`backend/app/db.py`（`audit` 稽核寫入）、`backend/app/routers/audit.py`（稽核分類） |
+| 版本基準 | 目前工作目錄（分支 `dev-role`），核對日期 2026-11-02 |
+| 測試現況 | 專用測試僅有 `backend/tests/test_sessions.py` 中的一則案例（`test_admin_grants_original_view_with_reason_and_audit`），涵蓋 `original_view` 缺原因回 422、有原因回 200 並寫入稽核。其餘規則（`ADMIN_EMAILS` 保護、最後 admin 保護、停權與快取失效等）沒有測試 |
 
 > 本文件以程式碼為準。標示為「**待確認**」的項目是程式行為與直覺或文件不一致之處，需與負責人確認。
 
@@ -16,7 +16,7 @@
 
 | 項目 | 規則 | 來源 |
 |---|---|---|
-| 路由層級 | `APIRouter(prefix="/api/users", dependencies=[Depends(require_admin)])`，全部端點僅限 `admin` | `users.py` 第 30 行 |
+| 路由層級 | `APIRouter(prefix="/api/users", dependencies=[Depends(require_admin)])`，全部端點僅限 `admin` | `users.py` 第 35 行 |
 | 身分驗證 | `Authorization: Bearer <Firebase ID token>`，由 `current_user` 驗證 | `auth.py` `current_user` |
 | 非管理員 | 403，`admin role required` | `auth.py` `require_admin` |
 | 被停權帳號 | 403，`account suspended`（`ADMIN_EMAILS` 內的帳號除外） | `auth.py` `current_user` |
@@ -74,8 +74,7 @@
 ### 3.1 GET `/api/users`
 
 - 回傳 `UserDirectory`：`{ "users": [UserOut], "domains": [{ "domain", "users" }] }`。
-- `users`：`users` 集合全部文件，**未分頁**。排序依 `str(last_seen_at)` 降序。
-  - **待確認**：`last_seen_at` 為 `null` 時會被轉成字串 `"None"`，降序排列時會排在最前面。因此從未登入或僅預先註冊的帳號會出現在列表頂端。
+- `users`：`users` 集合全部文件，**未分頁**。排序依 `last_seen_at` 降序；`last_seen_at` 為 `null` 時以空字串排序，因此從未登入或僅預先註冊的帳號排在列表最後。
 - `domains`：`ALLOWED_DOMAINS` 的每個網域與其帳號數。環境變數未設定時為空陣列。網域清單唯讀，無法由 API 修改。
 
 ### 3.2 GET `/api/users/export.csv`
@@ -162,6 +161,7 @@
 
 - `suspended`：停用 Firebase 帳號並撤銷 refresh token。
 - `active`：重新啟用 Firebase 帳號（不撤銷 token）。
+- `uid` 為空（尚未登入的預先註冊）時不呼叫 Firebase，`firebase_synced` 為 `false`。
 - 失敗只記 log，不中斷請求，結果記在稽核的 `firebase_synced`。
 - 即使 Firebase 同步失敗，`auth.current_user` 的狀態檢查仍會擋下 API 呼叫。
 
@@ -174,6 +174,8 @@
 | 復權 | `user.reactivate` | `target_email`、`reason`、`firebase_synced` |
 | 原檔閱覽 | `user.original_view` | `target_email`、`old`、`new`、`reason` |
 | 部門 | `user.update` | `target_email`、`old`、`department` |
+
+上列稽核 action 在 `routers/audit.py` 歸類為 `access`；`user.suspend` 列為警示、`user.reactivate` 列為成功。
 
 回應：`UserDetail`（含 `owned`）。
 
@@ -198,7 +200,7 @@
 **首次登入**（非本 API，但會改變本 API 回傳的資料）：
 
 - 文件不存在時自動建立，角色為 `admin`（若在 `ADMIN_EMAILS`）或 `user`，`created_by=""`，稽核 `user.first_login`。
-- 文件已存在（預先註冊）時回填 `uid`、`first_login_at`，稽核 `user.first_login`，並帶 `preregistered=true`。
+- 文件已存在且尚無 `first_login_at`（預先註冊）時回填 `uid`、`first_login_at`，稽核 `user.first_login`，並帶 `preregistered=true`。
 
 **角色的保護規則**：
 
@@ -216,15 +218,14 @@
 | 403 | 非 admin；帳號停權；e-mail 未驗證；網域不允許 |
 | 404 | 帳號不存在 |
 | 409 | 重複預先註冊；自我變更；bootstrap admin 變更；最後一位 admin；對已登入帳號執行 DELETE |
-| 422 | e-mail 格式錯誤；網域不允許（預先註冊）；科別不存在；缺少原因 |
+| 422 | e-mail 格式錯誤；網域不允許（預先註冊）；科別不存在；缺少原因；欄位型別或長度不符（例如 `reason` 超過 200 字、`role` 不在列舉內，由 Pydantic 回傳預設格式） |
 
 ---
 
 ## 6. 待確認事項
 
 1. **預先註冊可直接指派 `admin` 而不需原因**，但 `PATCH` 變更角色需要原因。建議統一。
-2. **`GET /api/users` 的排序**：`last_seen_at` 為 null 時排在最前。是否預期？
-3. **角色與原檔閱覽的原因不寫入文件**，僅存在稽核紀錄。前端若要顯示「最近一次變更原因」，只能查稽核。
-4. **`/api/users` 未列入 `backend/INTEGRATION-API.md`**。該文件目前只有 `/api/groups` 與 `/api/directory`。依 `AGENTS.md`，新增路由需同步更新文件。
-5. **無測試**。`backend/tests/` 沒有 users 路由的測試，尤其是 `ADMIN_EMAILS` 保護、最後 admin 保護、停權與快取失效等規則。
-6. **`GET /api/users` 未分頁**，帳號數量增加後回應會變大。目前規模下是否可接受？
+2. **角色與原檔閱覽的原因不寫入文件**，僅存在稽核紀錄。前端若要顯示「最近一次變更原因」，只能查稽核。
+3. **`/api/users` 未列入 `backend/INTEGRATION-API.md`**。該文件目前只有 `/api/groups` 與 `/api/directory`。依 `AGENTS.md`，新增路由需同步更新文件。
+4. **users 路由測試覆蓋不足**。除 `test_sessions.py` 的 `original_view` 案例外，`ADMIN_EMAILS` 保護、最後 admin 保護、停權與快取失效等規則沒有測試。
+5. **`GET /api/users` 未分頁**，帳號數量增加後回應會變大。目前規模下是否可接受？
