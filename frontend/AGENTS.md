@@ -128,3 +128,14 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - The assignment lists (指派使用者 / 關聯群組) stay editable for the 管理員 role, unlike the role's own fields. Backend accepts `admin` for both `users.roles` and group `role_ids`.
 - Role detail 權限 section (2026-11-02): the 權限標籤 free-text chips are replaced by a 權限 list backed by `roles/{id}.permissions` (resource ids from `GET /api/permissions`). 新增權限 opens the same multi-select dialog as the assignment lists (`AddLinksModal`); each change PATCHes the whole list. The `can` labels stay in the API for display but are no longer edited in the UI. Missing `permissions` on existing documents counts as an empty list; no backfill. 管理員 remains read-only.
 - The 權限, 指派使用者 and 關聯群組 lists on the role detail page show about 5 rows (`.rl-scroll`, max-height 296px) and scroll beyond that (2026-11-02).
+
+## Groups menu gated by the `groups` permission (2026-11-02)
+
+- 群組管理 (`Groups`) in the 治理 menu and its AdminHome tile appear only when `me.permissions` contains `groups` (from `GET /api/me`; ids from `app/permissions.py`). Users without it do not see the entry, and the page does not render even if the page key is set.
+- This is a UI convenience only. `GET/PUT/POST/PATCH/DELETE /api/groups` still require `admin` (`require_admin`); a non-admin user with the `groups` permission will see the page but get 403 from the API until the permission matrix is enforced on the backend.
+- Preview mode (`VITE_BK_PREVIEW_ROLE`) builds `me` without `permissions`, so 群組管理 is hidden there.
+
+## Users and Roles menus gated by permissions (2026-11-02)
+
+- 使用者管理 (`Users`, permission `users`) and 角色管理 (`Roles`, permission `roles`) follow the same rule as 群組管理: the menu item and AdminHome tile appear, and the page renders, only when `me.permissions` contains the id. `adminNavPerm` in `App.jsx` maps each page key to its permission; items without an entry (e.g. `Monitoring`) are not gated.
+- Still UI only: the backend guards (`require_admin`) are unchanged. `UsersPage` keeps its own 系統管理員-only notice for non-admin users.
