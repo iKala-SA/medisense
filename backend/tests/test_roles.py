@@ -214,3 +214,36 @@ def test_admin_role_can_be_assigned_to_users_and_groups(fs, as_user):
     c = as_user(ADMIN)
     assert c.patch("/api/users/b@ikala.ai", json={"roles": ["admin"]}).json()["roles"] == ["admin"]
     assert c.patch("/api/groups/g1", json={"role_ids": ["admin"]}).json()["role_ids"] == ["admin"]
+
+
+def test_permission_resources_are_unique_and_match_design():
+    from app.permissions import RESOURCES
+    ids = [r[0] for r in RESOURCES]
+    assert len(ids) == 11 and len(set(ids)) == 11
+    assert ids[0] == "chat" and ids[-1] == "settings"
+
+
+def test_permissions_list_is_admin_only_and_ordered(fs, as_user):
+    assert as_user(PLAIN).get("/api/permissions").status_code == 403
+    rows = as_user(ADMIN).get("/api/permissions").json()
+    assert [r["id"] for r in rows][:2] == ["chat", "workbench"] and len(rows) == 11
+    assert rows[0] == {"id": "chat", "name": "對話", "desc": "AI 對話與聊天紀錄", "order": 1}
+
+
+def test_role_permissions_are_selected_from_catalog(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    r = c.patch("/api/roles/auditor", json={"permissions": [" chat ", "agent", "chat"]})
+    assert r.status_code == 200
+    assert r.json()["permissions"] == ["chat", "agent"]
+    listed = {x["id"]: x for x in c.get("/api/roles").json()["roles"]}
+    assert listed["auditor"]["permissions"] == ["chat", "agent"]
+    assert listed["user"]["permissions"] == []  # built-in without a document
+
+
+def test_role_permissions_reject_unknown_and_admin_is_fixed(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    assert c.patch("/api/roles/auditor", json={"permissions": ["ghost"]}).status_code == 422
+    assert c.patch("/api/roles/admin", json={"permissions": ["chat"]}).status_code == 403
+    assert c.patch("/api/roles/auditor", json={"permissions": []}).json()["permissions"] == []

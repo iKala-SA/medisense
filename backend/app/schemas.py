@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .permissions import RESOURCES
+
 ModelGroup = Literal["fast", "reasoning", "budget", "sovereign", "auto"]  # "auto" = smart-router (engine/routing.py)
 RealGroup = Literal["fast", "reasoning", "budget", "sovereign"]  # groups that exist as LiteLLM model_name aliases
 # Node palette (matches the Agent Studio design):
@@ -724,6 +726,7 @@ class RoleOut(BaseModel):
     member_count: int = 0  # users whose effective role is this id
     permission_count: int = 0  # len(can); a label count, as the frontend shows it
     can: list[str] = Field(default_factory=list)  # capability labels shown on the page, e.g. "發布核可"
+    permissions: list[str] = Field(default_factory=list)  # permission resource ids (app/permissions.py), e.g. ["chat"]
 
 
 class RoleStats(BaseModel):
@@ -755,6 +758,21 @@ class RolePatch(BaseModel):
     desc: str | None = Field(default=None, max_length=300)
     status: bool | None = None
     can: list[str] | None = Field(default=None, max_length=20)
+    permissions: list[str] | None = Field(default=None, max_length=11)  # replaces the whole list
+
+    @field_validator("permissions", mode="after")
+    @classmethod
+    def _known_permissions(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        known = {r[0] for r in RESOURCES}
+        out: list[str] = []
+        for p in (x.strip() for x in v):
+            if p not in known:
+                raise ValueError(f"unknown permission: {p}")
+            if p not in out:
+                out.append(p)
+        return out
 
     @field_validator("name", mode="after")
     @classmethod
@@ -783,6 +801,13 @@ class RolePatch(BaseModel):
             if label not in out:
                 out.append(label)
         return out
+
+
+class PermissionOut(BaseModel):
+    id: str
+    name: str
+    desc: str
+    order: int
 
 
 class RoleListOut(BaseModel):

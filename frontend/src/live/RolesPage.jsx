@@ -161,11 +161,11 @@ function RoleLinks({kind,role,notify}){
       </div>
       <div className="lt" style={{'--cols':K.cols}}>
         <div className="lt-head">{K.head.map(h=><span key={h}>{h}</span>)}<span/></div>
-        {shown.map(x=><div className="lt-row" key={idOf(x)}>
+        <div className="rl-scroll">{shown.map(x=><div className="lt-row" key={idOf(x)}>
           {K.text(x).map((v,i)=><span key={i} className={i===0?'':'muted'}>{v}</span>)}
           <span><button type="button" className="icon-btn" aria-label={'移除 '+K.label(x)} disabled={busy} onClick={()=>unlink(x)}><X size={14}/></button></span>
         </div>)}
-        {!shown.length&&<Empty text={linked.length?'沒有符合條件的資料。':K.empty}/>}
+        {!shown.length&&<Empty text={linked.length?'沒有符合條件的資料。':K.empty}/>}</div>
       </div>
     </>}
     {adding&&<AddLinksModal kind={kind} title={K.title} candidates={candidates} label={K.label} text={K.text} keys={K.keys} busy={busy}
@@ -196,16 +196,56 @@ function AddLinksModal({title,candidates,label,text,keys,busy,onClose,onSubmit})
   </div></div>;
 }
 
-// 角色細節：名稱、英文名稱（非必填）、說明、狀態與權限標籤可編輯。系統管理員為固定角色，整頁唯讀。
-const LABEL_LIMIT=20;
+// 權限：從 GET /api/permissions 選取資源，寫入 roles/{id}.permissions（每次變更直接 PATCH，同指派清單）。
+function RolePermissions({role,notify,disabled,onSaved}){
+  const [catalog,setCatalog]=useState(null),[q,setQ]=useState(''),[adding,setAdding]=useState(false),[busy,setBusy]=useState(false);
+  useEffect(()=>{api.listPermissions().then(r=>setCatalog(Array.isArray(r)?r:[])).catch(e=>{notify?.('載入權限資源失敗：'+errText(e));setCatalog([])})},[]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  const selected=role.permissions||[];
+  const linked=(catalog||[]).filter(p=>selected.includes(p.id));
+  const needle=lc(q);
+  const shown=linked.filter(p=>!needle||[p.name,p.desc].some(v=>(v||'').toLowerCase().includes(needle)));
+  const candidates=(catalog||[]).filter(p=>!selected.includes(p.id));
+
+  // 寫入完整清單；成功後回傳角色資料，失敗則保留目前清單
+  async function save(ids){
+    setBusy(true);
+    try{const r=await api.updateRole(role.id,{permissions:ids});onSaved(r);notify?.('已更新權限');return true}
+    catch(e){notify?.('更新權限失敗：'+errText(e));return false}
+    finally{setBusy(false)}
+  }
+
+  return <div className="lv-card">
+    <h2>權限（{linked.length}）</h2>
+    <p className="lv-sub">選取此角色可執行的平台資源。目前僅記錄設定，尚未套用到功能存取；權限矩陣尚未開放。</p>
+    {catalog===null?<span className="muted small">載入中…</span>:<>
+      <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:8}}>
+        <ListToolbar search={q} onSearch={setQ} placeholder="搜尋資源名稱或說明" tabs={[]} tab="" onTab={()=>{}}/>
+        {!disabled&&<button type="button" className="btn primary" disabled={busy||!candidates.length} onClick={()=>setAdding(true)}><Plus/>新增權限</button>}
+      </div>
+      <div className="lt" style={{'--cols':'1.2fr 2fr 24px'}}>
+        <div className="lt-head"><span>資源</span><span>說明</span><span/></div>
+        <div className="rl-scroll">{shown.map(p=><div className="lt-row" key={p.id}>
+          <b>{p.name}</b><span className="muted">{p.desc}</span>
+          <span>{!disabled&&<button type="button" className="icon-btn" aria-label={'移除 '+p.name} disabled={busy} onClick={()=>save(selected.filter(x=>x!==p.id))}><X size={14}/></button>}</span>
+        </div>)}
+        {!shown.length&&<Empty text={linked.length?'沒有符合條件的資料。':'尚未設定權限'}/>}</div>
+      </div>
+    </>}
+    {adding&&<AddLinksModal title="新增權限" candidates={candidates} label={p=>p.name} text={p=>[p.name,p.desc]} keys={p=>[p.name,p.desc]} busy={busy}
+      onClose={()=>setAdding(false)} onSubmit={async picked=>{const ok=await save([...selected,...picked.map(p=>p.id)]);if(ok)setAdding(false);return ok}}/>}
+  </div>;
+}
+
+// 角色細節：名稱、英文名稱（非必填）、說明與狀態可編輯；權限見 RolePermissions。系統管理員為固定角色，整頁唯讀。
 function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
   const [role,setRole]=useState(initial);
   const [delOpen,setDelOpen]=useState(false),[delBusy,setDelBusy]=useState(false);
   const [name,setName]=useState(initial.name||''),[en,setEn]=useState(initial.en||''),[desc,setDesc]=useState(initial.desc||'');
-  const [status,setStatus]=useState(!!initial.status),[can,setCan]=useState(initial.can||[]),[canDraft,setCanDraft]=useState('');
+  const [status,setStatus]=useState(!!initial.status);
   const [busy,setBusy]=useState(false),[err,setErr]=useState('');
   const fixed=role.id==='admin';
-  const dirty=name.trim()!==(role.name||'')||en.trim()!==(role.en||'')||desc.trim()!==(role.desc||'')||status!==!!role.status||can.join('\n')!==(role.can||[]).join('\n');
+  const dirty=name.trim()!==(role.name||'')||en.trim()!==(role.en||'')||desc.trim()!==(role.desc||'')||status!==!!role.status;
   const back=()=>{if(dirty&&!window.confirm('放棄未儲存的變更？'))return;onBack()};
   // 內建角色（含 admin）後端一律回 403，這裡同步停用按鈕並說明原因
   const deletable=!fixed&&!!role.custom;
@@ -216,29 +256,20 @@ function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
     catch(x){notify?.('刪除失敗：'+errText(x))}finally{setDelBusy(false)}  // keep the dialog open on failure, as in GroupDetail
   }
 
-  function addLabel(){
-    const v=canDraft.trim();
-    if(!v)return;
-    if(v.length>LABEL_LIMIT)return setErr(`權限標籤不可超過 ${LABEL_LIMIT} 字`);
-    if(can.length>=20)return setErr('權限標籤最多 20 個');
-    if(!can.includes(v))setCan([...can,v]);
-    setCanDraft('');setErr('');
-  }
-
   async function save(e){
     e.preventDefault();
     if(!name.trim())return setErr('請輸入角色名稱');
     setBusy(true);setErr('');
     try{
-      const r=await api.updateRole(role.id,{name:name.trim(),en:en.trim(),desc:desc.trim(),status,can});
-      setRole({...role,...r});setName(r.name);setEn(r.en||'');setDesc(r.desc);setStatus(!!r.status);setCan(r.can||[]);onSaved(r);notify?.('已更新角色');
+      const r=await api.updateRole(role.id,{name:name.trim(),en:en.trim(),desc:desc.trim(),status});
+      setRole({...role,...r});setName(r.name);setEn(r.en||'');setDesc(r.desc);setStatus(!!r.status);onSaved(r);notify?.('已更新角色');
     }catch(x){setErr('儲存失敗：'+errText(x))}finally{setBusy(false)}
   }
 
   return <div className="card-page lv-page rl-page">
     <button className="lv-back" onClick={back}><ArrowLeft/>返回角色列表</button>
     <div className="page-heading"><h1>{role.name}</h1><div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} disabled={!deletable||busy} title={fixed?'管理員不可刪除':!role.custom?'內建角色無法刪除':undefined} onClick={()=>setDelOpen(true)}><Trash/>刪除角色</button></div></div>
-    <p className="subtitle">{fixed?'系統管理員為固定角色，不可編輯。':'編輯角色的名稱、說明、狀態與權限標籤。'}</p>
+    <p className="subtitle">{fixed?'系統管理員為固定角色，不可編輯。':'編輯角色的名稱、說明與狀態，並設定權限。'}</p>
 
     <form className="lv-card" onSubmit={save} style={{maxWidth:560,display:'grid',gap:12}}>
       <h2>基本資料</h2>
@@ -249,21 +280,12 @@ function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
         <div className="lv-actions"><Toggle on={status} onChange={setStatus} label="角色狀態" disabled={fixed||busy}/><span className="small muted">{status?'啟用':'停用'}</span></div>
       </div>
 
-      <div className="field"><label>權限標籤</label>
-        <p className="lv-sub" style={{margin:'0 0 4px'}}>目前僅供顯示，尚未套用到功能存取；權限矩陣尚未開放。</p>
-        <div className="lv-actions" style={{flexWrap:'wrap'}}>
-          {can.length?can.map(c=><span key={c} className="lv-chip">{c}{!fixed&&<button type="button" aria-label={'移除 '+c} className="icon-btn" style={{padding:0}} disabled={busy} onClick={()=>setCan(can.filter(x=>x!==c))}><X size={10}/></button>}</span>):<span className="muted small">尚未設定</span>}
-        </div>
-        {!fixed&&<div className="lv-actions" style={{marginTop:6}}>
-          <input aria-label="新增權限標籤" maxLength={LABEL_LIMIT} value={canDraft} disabled={busy} placeholder="輸入後按 Enter 新增" onChange={e=>setCanDraft(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addLabel()}}}/>
-          <button type="button" className="btn" disabled={busy||!canDraft.trim()} onClick={addLabel}>新增</button>
-        </div>}
-      </div>
 
       {err&&<p className="lv-o-err" role="alert">{err}</p>}
       <div className="lv-actions"><button className="btn primary" disabled={fixed||busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>
     </form>
 
+    <RolePermissions role={role} notify={notify} disabled={fixed} onSaved={r=>{setRole(x=>({...x,...r}));onSaved(r)}}/>
     <RoleLinks kind="user" role={role} notify={notify}/>
     <RoleLinks kind="group" role={role} notify={notify}/>
 

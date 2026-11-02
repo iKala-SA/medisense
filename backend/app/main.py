@@ -24,6 +24,7 @@ from .routers import (
     my_connectors,
     oauth_proxy,
     originals,
+    permissions,
     projects,
     roles,
     routing,
@@ -57,6 +58,7 @@ app.include_router(skills.router)
 app.include_router(schedules.router)
 app.include_router(spaces.router)
 app.include_router(roles.router)
+app.include_router(permissions.router)
 app.include_router(routing.router)
 app.include_router(features.router)
 app.include_router(model_registry.router)

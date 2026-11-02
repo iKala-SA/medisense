@@ -96,6 +96,7 @@ export const api={
   // roles (admin; backend returns mock data for now)
   listRoles:()=>call('/api/roles'),
   createRole:r=>call('/api/roles',{method:'POST',body:body(r)}),
+  listPermissions:()=>call('/api/permissions'),
   deleteRole:id=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'DELETE'}),
   updateRole:(id,patch)=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'PATCH',body:body(patch)}),
   // sharing

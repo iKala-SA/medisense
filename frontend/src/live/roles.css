@@ -11,3 +11,5 @@
 .rl-icon{width:32px;height:32px;border-radius:8px;background:#ecfaf3;color:#1e6242;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .rl-tag.custom{background:#eef0f7;color:#4a5a8a}
 .rl-icon.custom{background:#eef0f7;color:#4a5a8a}
+/* 指派與權限清單：約 5 列高，超過時捲動（lt-row 最小高度 58px） */
+.rl-scroll{max-height:296px;overflow-y:auto}
