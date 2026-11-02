@@ -109,5 +109,13 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 ## Deferred role features removed (2026-10-30)
 - Removed from `RolesPage` per the 暫緩 list in `FE-ROLE-SPEC.md`: the 權限設定 page (`RolePermissionsPage.jsx` deleted), the row action menu (編輯 / 權限設定 / 停用 / 刪除), the 權限數 and 操作 columns, and the 自訂 tab and 自訂角色 stat card.
+- 2026-10-30 follow-up: a 自訂角色 stat card (`stats.custom_roles`) was added back at the user's request, so the stats row has three cards again.
 - Kept: the 類型 column (系統預設 / 自訂), 全部 / 系統預設 tabs, the 角色總數 and 系統預設角色 stat cards, search, 重新整理, the disabled 新增角色 button, and the footer notice.
 - `GET /api/roles` still returns `can`, `permission_count` and `custom` stats; the page no longer reads them. Backend is unchanged.
+
+## Role detail editing (2026-11-02)
+- `RolesPage` gained a `>` column; clicking a row opens `RoleDetail` (same pattern as 使用者 / 群組), with 返回角色列表 and an unsaved-change confirm.
+- Editable: 角色名稱 and 說明 only, saved via `api.updateRole` (`PATCH /api/roles/{id}`, which writes `roles/{id}` and an audit entry). 英文名稱, 類型, 狀態, 成員數 and the 權限標籤 are read-only.
+- 系統管理員 is fixed: the page is read-only and the backend returns 403.
+- Permission matrix and custom-role creation are still not implemented; the 權限標籤 are display-only.
+- 新增角色 is enabled. `CreateRoleModal` (in `RolesPage.jsx`) mirrors the 新增群組 dialog: name (required, ≤40) and description; it calls `POST /api/roles`, then opens the new role's detail page. Custom roles are created with `custom: true` and no permission labels.

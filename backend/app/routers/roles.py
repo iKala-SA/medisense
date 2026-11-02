@@ -1,4 +1,4 @@
-"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; only GET /api/roles is implemented so far.
+"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; GET /api/roles, POST /api/roles (custom roles) and PATCH /api/roles/{id} (name / desc only).
 
 Contract follows the frontend as-built page (specifications/FE-ROLE-SPEC.md): `can` holds the capability labels
 shown on the page, `permission_count` is len(can), and custom roles have no English name and no permissions.
@@ -8,11 +8,11 @@ the built-in values, and a missing document falls back to them. Every other stor
 """
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import db
-from ..auth import effective_role, require_admin
-from ..schemas import RoleListOut, RoleOut, RoleStats
+from ..auth import User, effective_role, require_admin
+from ..schemas import RoleIn, RoleListOut, RoleOut, RolePatch, RoleStats
 
 router = APIRouter(prefix="/api/roles", tags=["roles"], dependencies=[Depends(require_admin)])
 
@@ -70,3 +70,30 @@ def list_roles(search: str = Query("", max_length=100),
                       custom_roles=sum(r.custom for r in rows),
                       assigned_users=sum(r.member_count for r in rows))
     return RoleListOut(roles=picked, stats=stats)
+
+
+@router.post("", response_model=RoleOut, status_code=201)
+def create_role(body: RoleIn, user: User = Depends(require_admin)):
+    ref = db.client().collection("roles").document()
+    data = {"name": body.name, "en": "", "desc": body.desc, "custom": True, "suspended": False, "can": [],
+            "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
+    ref.set(data)
+    db.audit(user.uid, "role.create", user.email, role_id=ref.id, name=body.name)
+    return _out(ref.id, data, {})
+
+
+@router.patch("/{role_id}", response_model=RoleOut)
+def patch_role(role_id: str, body: RolePatch, user: User = Depends(require_admin)):
+    # The built-in administrator role is fixed (BE-ROLE-SPEC: admin is always full access and cannot be edited).
+    if role_id == "admin":
+        raise HTTPException(403, "admin role is fixed")
+    ref = db.client().collection("roles").document(role_id)
+    snap = ref.get()
+    if not snap.exists and role_id not in SYSTEM_ROLES:
+        raise HTTPException(404, "role not found")
+    changes = body.model_dump(exclude_none=True)
+    if changes:
+        ref.set({**changes, "id": role_id, "updated_at": db.now(), "updated_by": user.email}, merge=True)
+        db.audit(user.uid, "role.update", user.email, role_id=role_id, fields=sorted(changes))
+    stored = (ref.get().to_dict() or {})
+    return _out(role_id, {**SYSTEM_ROLES.get(role_id, {}), **stored}, _member_counts())

@@ -16,13 +16,15 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 `my_role` on skills/schedules/spaces = caller's effective access: `owner | admin | edit | use`.
 `PUT .../share` takes a bare `Share` body and returns the full updated object. Group members must exist (422 otherwise).
 
-## Roles (admin-only, read-only so far; reads Firestore `roles`)
+## Roles (admin-only; reads, creates and name/desc edits in Firestore `roles`)
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/api/roles?search=&type=all\|system\|custom` | admin | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
+| POST | `/api/roles` | admin | create a custom role `{name (1–40, required), desc? (≤300)}`; the id is generated; returns 201 with the role (`custom: true`, `en: ""`, `can: []`); records `role.create` in the audit log |
+| PATCH | `/api/roles/{id}` | admin | partial update of `name` / `desc` (`{name?, desc?}`, name 1–40 chars, desc ≤300); writes `roles/{id}` (merged, so system roles get an override document) and records `role.update` in the audit log; `admin` returns 403 (fixed role); unknown custom id 404; returns the updated role. Permission labels (`can`) are not editable yet |
 
-Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "suspended", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. Create, update and delete, and the per-resource matrix, are not implemented yet.
+Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "suspended", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. Delete and the per-resource matrix are not implemented yet.
 
 ## Sharing
 

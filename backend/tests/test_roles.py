@@ -57,3 +57,66 @@ def test_filter_by_type_and_search(fs, as_user):
     assert [r["id"] for r in c.get("/api/roles", params={"type": "system"}).json()["roles"]] == ["admin", "builder", "user"]
     assert [r["id"] for r in c.get("/api/roles", params={"search": "  稽核 "}).json()["roles"]] == ["auditor"]
     assert c.get("/api/roles", params={"type": "bogus"}).status_code == 422
+
+
+def test_patch_role_is_admin_only(fs, as_user):
+    assert as_user(PLAIN).patch("/api/roles/user", json={"name": "x"}).status_code == 403
+
+
+def test_patch_admin_role_is_refused(fs, as_user):
+    seed(fs)
+    assert as_user(ADMIN).patch("/api/roles/admin", json={"name": "x"}).status_code == 403
+
+
+def test_patch_unknown_custom_role_is_404(fs, as_user):
+    assert as_user(ADMIN).patch("/api/roles/ghost", json={"name": "x"}).status_code == 404
+
+
+def test_patch_system_role_overrides_name_and_desc(fs, as_user):
+    seed(fs)
+    r = as_user(ADMIN).patch("/api/roles/user", json={"name": "  員工  ", "desc": "新說明"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "user" and body["name"] == "員工" and body["desc"] == "新說明" and body["custom"] is False
+    listed = {x["id"]: x for x in as_user(ADMIN).get("/api/roles").json()["roles"]}
+    assert listed["user"]["name"] == "員工"
+
+
+def test_patch_custom_role_keeps_custom_flag_and_other_fields(fs, as_user):
+    seed(fs)
+    r = as_user(ADMIN).patch("/api/roles/auditor", json={"desc": "新稽核說明"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "稽核員" and body["desc"] == "新稽核說明"
+    assert body["custom"] is True and body["suspended"] is True and body["can"] == ["稽核紀錄"]
+
+
+def test_patch_rejects_blank_name_and_empty_body_is_noop(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    assert c.patch("/api/roles/user", json={"name": "   "}).status_code == 422
+    assert c.patch("/api/roles/user", json={}).status_code == 200
+
+
+def test_create_role_is_admin_only(fs, as_user):
+    assert as_user(PLAIN).post("/api/roles", json={"name": "現場主管"}).status_code == 403
+
+
+def test_create_custom_role_appears_in_list(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    r = c.post("/api/roles", json={"name": "  現場主管  ", "desc": "負責現場排班"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["name"] == "現場主管" and body["desc"] == "負責現場排班"
+    assert body["custom"] is True and body["suspended"] is False and body["can"] == [] and body["member_count"] == 0
+    listed = {x["id"]: x for x in c.get("/api/roles").json()["roles"]}
+    assert listed[body["id"]]["custom"] is True
+    assert c.get("/api/roles").json()["stats"]["custom_roles"] == 2
+
+
+def test_create_role_validates_name(fs, as_user):
+    c = as_user(ADMIN)
+    assert c.post("/api/roles", json={"name": "   "}).status_code == 422
+    assert c.post("/api/roles", json={"name": "x" * 41}).status_code == 422
+    assert c.post("/api/roles", json={}).status_code == 422
