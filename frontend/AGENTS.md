@@ -119,3 +119,5 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - 系統管理員 is fixed: the page is read-only and the backend returns 403.
 - Permission matrix and custom-role creation are still not implemented; the 權限標籤 are display-only.
 - 新增角色 is enabled. `CreateRoleModal` (in `RolesPage.jsx`) mirrors the 新增群組 dialog: name (required, ≤40) and description; it calls `POST /api/roles`, then opens the new role's detail page. Custom roles are created with `custom: true` and no permission labels.
+- The role detail page is one 基本資料 card: 角色名稱, 英文名稱 (optional, editable through `PATCH /api/roles/{id}` `en`), 說明, then read-only 類型 and 狀態. The separate 角色資訊 card and the 成員數 line are removed from the detail page; the list keeps its 成員數 column.
+- Role detail: 狀態 is a switch (true = 啟用, disabled for 管理員). 權限標籤 can be added and removed (display-only). 類型 stays read-only because it follows the role id. Everything saves through one 儲存 button via `PATCH /api/roles/{id}`.

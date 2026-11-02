@@ -683,7 +683,7 @@ class RoleOut(BaseModel):
     en: str = ""
     desc: str = ""
     custom: bool = False
-    suspended: bool = False
+    status: bool = True  # true = 啟用 (the `status` boolean on roles/{id}; a missing field counts as 啟用)
     member_count: int = 0  # users whose effective role is this id
     permission_count: int = 0  # len(can); a label count, as the frontend shows it
     can: list[str] = Field(default_factory=list)  # capability labels shown on the page, e.g. "發布核可"
@@ -711,9 +711,13 @@ class RoleIn(BaseModel):
 
 
 class RolePatch(BaseModel):
-    """Partial update of the display name and description. Permission labels (`can`) are not editable yet."""
+    """Partial update of the display name, English name (optional, may be cleared), description, status (true = 啟用)
+    and permission labels. Labels are display-only until the permission matrix is implemented."""
     name: str | None = Field(default=None, min_length=1, max_length=40)
+    en: str | None = Field(default=None, max_length=40)
     desc: str | None = Field(default=None, max_length=300)
+    status: bool | None = None
+    can: list[str] | None = Field(default=None, max_length=20)
 
     @field_validator("name", mode="after")
     @classmethod
@@ -724,6 +728,24 @@ class RolePatch(BaseModel):
         if not v:
             raise ValueError("name must not be blank")
         return v
+
+    @field_validator("en", mode="after")
+    @classmethod
+    def _strip_en(cls, v: str | None) -> str | None:
+        return None if v is None else v.strip()
+
+    @field_validator("can", mode="after")
+    @classmethod
+    def _clean_can(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        out: list[str] = []
+        for label in (x.strip() for x in v):
+            if not label or len(label) > 20:
+                raise ValueError("each label must be 1–20 characters")
+            if label not in out:
+                out.append(label)
+        return out
 
 
 class RoleListOut(BaseModel):

@@ -43,7 +43,7 @@ def _out(role_id: str, data: dict, counts: dict[str, int]) -> RoleOut:
     # The stored `custom` flag decides; documents without it fall back to "not a built-in system role".
     custom = data["custom"] if isinstance(data.get("custom"), bool) else role_id not in SYSTEM_ROLES
     return RoleOut(id=role_id, name=data.get("name", ""), en=data.get("en", ""), desc=data.get("desc", ""),
-                   custom=custom, suspended=bool(data.get("suspended", False)),
+                   custom=custom, status=data.get("status", True) is True,
                    member_count=counts.get(role_id, 0), permission_count=len(can), can=can)
 
 
@@ -75,7 +75,7 @@ def list_roles(search: str = Query("", max_length=100),
 @router.post("", response_model=RoleOut, status_code=201)
 def create_role(body: RoleIn, user: User = Depends(require_admin)):
     ref = db.client().collection("roles").document()
-    data = {"name": body.name, "en": "", "desc": body.desc, "custom": True, "suspended": False, "can": [],
+    data = {"name": body.name, "en": "", "desc": body.desc, "custom": True, "status": True, "can": [],
             "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
     ref.set(data)
     db.audit(user.uid, "role.create", user.email, role_id=ref.id, name=body.name)
