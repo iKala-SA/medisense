@@ -54,6 +54,8 @@ class DocRef:
                 cur[k] = list(cur.get(k) or []) + [x for x in v.values if x not in (cur.get(k) or [])]
             elif isinstance(v, firestore.ArrayRemove):
                 cur[k] = [x for x in (cur.get(k) or []) if x not in v.values]
+            elif v is firestore.DELETE_FIELD:
+                cur.pop(k, None)
             else:
                 cur[k] = v
 

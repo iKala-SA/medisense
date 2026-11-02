@@ -3,7 +3,7 @@
 A document carries `owner_uid` and `share` {access, role, members[]} (schemas.Share):
   * the owner and any admin can always view and edit;
   * access == "account": every signed-in user gets `role` (use = view/run, edit = view/run/edit);
-  * members are matched by e-mail (type user) or by group membership (type group; groups/{id}.member_emails).
+  * members are matched by e-mail (type user) or by group membership (type group; users/{email}.groups).
 "use" means view/run; "edit" implies "use". Deleting and changing the share list stay owner/admin only
 (`can_manage`). Callers add their own extra rules (e.g. agents: published == hospital-wide).
 
@@ -30,9 +30,9 @@ def is_owner(user: Any, doc: dict) -> bool:
 
 
 def group_ids_of(email: str) -> set[str]:
-    """Ids of the groups that list this e-mail."""
-    q = db.client().collection("groups").where(filter=firestore.FieldFilter("member_emails", "array_contains", email.lower()))
-    return {d.id for d in q.stream()}
+    """Ids of the groups this e-mail belongs to (users/{email}.groups)."""
+    snap = db.client().collection("users").document(email.lower()).get()
+    return {g for g in (snap.to_dict() or {}).get("groups") or [] if isinstance(g, str)}
 
 
 def granted_role(user: Any, doc: dict, groups: set[str] | None = None) -> str | None:

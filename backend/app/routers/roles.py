@@ -44,7 +44,8 @@ def _out(role_id: str, data: dict, counts: dict[str, int]) -> RoleOut:
     custom = data["custom"] if isinstance(data.get("custom"), bool) else role_id not in SYSTEM_ROLES
     return RoleOut(id=role_id, name=data.get("name", ""), en=data.get("en", ""), desc=data.get("desc", ""),
                    custom=custom, status=data.get("status", True) is True,
-                   member_count=counts.get(role_id, 0), permission_count=len(can), can=can)
+                   member_count=counts.get(role_id, 0), permission_count=len(can), can=can,
+                   permissions=[p for p in data.get("permissions") or [] if isinstance(p, str)])
 
 
 def _all() -> list[RoleOut]:

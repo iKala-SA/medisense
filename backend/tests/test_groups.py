@@ -15,13 +15,21 @@ def any_domain(monkeypatch):
 
 
 def seed_group(fs, gid="g1", name="護理部", members=()):
-    fs.put(f"groups/{gid}", {"name": name, "description": "", "member_emails": list(members),
-                             "created_by": ADMIN.email, "created_at": None, "updated_at": None})
+    fs.put(f"groups/{gid}", {"name": name, "description": "", "created_by": ADMIN.email, "created_at": None,
+                             "updated_at": None})
+    for email in members:  # membership lives on the user: users/{email}.groups
+        seed_user(fs, email, groups=[*fs.store.get(f"users/{email}", {}).get("groups", []), gid])
 
 
-def seed_user(fs, email, name="", status="active", department="護理部"):
-    fs.put(f"users/{email}", {"email": email, "name": name, "status": status, "department": department,
-                              "role": "user"})
+def seed_user(fs, email, name="", status="active", department="護理部", groups=None):
+    cur = fs.store.get(f"users/{email}", {})
+    fs.put(f"users/{email}", {**cur, "email": email, "name": name, "status": status, "department": department,
+                              "role": "user", "groups": list(groups if groups is not None else cur.get("groups", []))})
+
+
+def members_of(fs, gid):
+    return sorted(p.split("/", 1)[1] for p, d in fs.store.items()
+                  if p.startswith("users/") and gid in (d.get("groups") or []))
 
 
 def test_patch_updates_name_and_keeps_members(fs, as_user, audit_log):
@@ -62,8 +70,8 @@ def test_add_members_reports_added_skipped_and_rejected(fs, as_user, audit_log):
     assert body["skipped"] == ["already@example.test", "new-a@example.test"]
     assert {"email": "ghost@example.test", "reason": "not_a_registered_account"} in body["rejected"]
     assert {"email": "not-an-email", "reason": "invalid_email"} in body["rejected"]
-    assert fs.store["groups/g1"]["member_emails"] == ["already@example.test", "new-a@example.test",
-                                                      "new-b@example.test"]
+    assert members_of(fs, "g1") == ["already@example.test", "new-a@example.test", "new-b@example.test"]
+    assert "member_emails" not in fs.store["groups/g1"]
     assert not any(p == "users/ghost@example.test" for p in fs.store)  # never creates an account
     assert any(a["action"] == "group.member_add" and a["added"] == 2 for a in audit_log())
 
@@ -81,20 +89,21 @@ def test_add_members_limit_rejects_whole_batch(fs, as_user):
     seed_user(fs, "late@example.test")
     r = as_user(ADMIN).post("/api/groups/g1/members", json={"emails": ["late@example.test"]})
     assert r.status_code == 422
-    assert len(fs.store["groups/g1"]["member_emails"]) == 1000
+    assert len(members_of(fs, "g1")) == 1000
 
 
 def test_remove_member_and_missing_member(fs, as_user, audit_log):
     seed_group(fs, members=["staff-a@example.test", "staff-b@example.test"])
     client = as_user(ADMIN)
     assert client.delete("/api/groups/g1/members/Staff-A@example.test").status_code == 204
-    assert fs.store["groups/g1"]["member_emails"] == ["staff-b@example.test"]
+    assert members_of(fs, "g1") == ["staff-b@example.test"]
+    assert fs.store["users/staff-a@example.test"]["groups"] == []
     assert client.delete("/api/groups/g1/members/staff-a@example.test").status_code == 404
     assert any(a["action"] == "group.member_remove" and a["email"] == "staff-a@example.test" for a in audit_log())
 
 
 def test_list_members_shows_account_state(fs, as_user):
-    seed_group(fs, members=["zeta@example.test", "alpha@example.test", "gone@example.test"])
+    seed_group(fs, members=["zeta@example.test", "alpha@example.test"])
     seed_user(fs, "zeta@example.test", "甲", status="suspended")
     seed_user(fs, "alpha@example.test", "")
     r = as_user(ADMIN).get("/api/groups/g1/members")
@@ -102,9 +111,8 @@ def test_list_members_shows_account_state(fs, as_user):
     rows = {m["email"]: m for m in r.json()}
     assert rows["zeta@example.test"]["status"] == "suspended"
     assert rows["alpha@example.test"]["has_account"] is True
-    assert rows["gone@example.test"]["has_account"] is False
     # sorted by name, falling back to e-mail when the name is empty
-    assert [m["email"] for m in r.json()] == ["alpha@example.test", "gone@example.test", "zeta@example.test"]
+    assert [m["email"] for m in r.json()] == ["alpha@example.test", "zeta@example.test"]
 
 
 def test_member_endpoints_are_admin_only(fs, as_user):

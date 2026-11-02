@@ -33,8 +33,10 @@ def body(**kw):
 
 
 def groups(fs):
-    fs.put("groups/g_pharm", {"name": "藥劑部", "member_emails": [BUILDER.email]})
-    fs.put("groups/g_nurse", {"name": "護理部", "member_emails": [BUILDER2.email, BUILDER.email]})
+    fs.put("groups/g_pharm", {"name": "藥劑部"})
+    fs.put("groups/g_nurse", {"name": "護理部"})
+    fs.put(f"users/{BUILDER.email}", {"email": BUILDER.email, "groups": ["g_pharm", "g_nurse"]})
+    fs.put(f"users/{BUILDER2.email}", {"email": BUILDER2.email, "groups": ["g_nurse"]})
 
 
 def test_only_admins_manage_and_passwords_never_come_back(fs, as_user, secrets, audit_log):
