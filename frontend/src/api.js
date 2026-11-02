@@ -95,6 +95,9 @@ export const api={
   usersCsv:()=>blob('/api/users/export.csv'),
   // roles (admin; backend returns mock data for now)
   listRoles:()=>call('/api/roles'),
+  createRole:r=>call('/api/roles',{method:'POST',body:body(r)}),
+  deleteRole:id=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'DELETE'}),
+  updateRole:(id,patch)=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'PATCH',body:body(patch)}),
   // sharing
   directory:(q='')=>call(`/api/directory?${query({q})}`),
   listGroups:()=>call('/api/groups'),

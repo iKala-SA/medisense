@@ -1,7 +1,7 @@
 import React from 'react';
 import {MagnifyingGlass,X} from '@phosphor-icons/react';
 
-export const Toggle=({on,onChange,label})=><button type="button" role="switch" aria-checked={on} aria-label={label} className={'switch '+(on?'on':'')} onClick={()=>onChange(!on)}><span/></button>;
+export const Toggle=({on,onChange,label,disabled})=><button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} className={'switch '+(on?'on':'')} onClick={()=>onChange(!on)}><span/></button>;
 
 export function ListToolbar({search,onSearch,placeholder,tabs,tab,onTab,filters}){
   return <div className="lt-toolbar"><div className="lt-filters"><label className="search"><MagnifyingGlass size={16}/><input aria-label="搜尋" placeholder={placeholder} value={search} onChange={e=>onSearch(e.target.value)}/></label>{filters}</div><div className="tabs">{tabs.map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>onTab(t)}>{t}</button>)}</div></div>;

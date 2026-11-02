@@ -31,6 +31,7 @@ from ..schemas import (
     UserOut,
     UserPatch,
 )
+from .roles import SYSTEM_ROLES
 
 router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(require_admin)])
 log = logging.getLogger(__name__)
@@ -40,6 +41,13 @@ EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def _out(data: dict, cls: type[UserOut] = UserOut, **extra) -> UserOut:
     email = data.get("email", "")
     return cls(**{**data, "role": effective_role(data), "bootstrap_admin": is_bootstrap_admin(email), **extra})
+
+
+def _check_roles(ids: list[str]) -> None:
+    known = set(SYSTEM_ROLES) | {d.id for d in db.client().collection("roles").stream()}
+    for rid in ids:
+        if rid not in known:
+            raise HTTPException(422, f"unknown role: {rid}")
 
 
 def _load(email: str):
@@ -163,6 +171,9 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
             raise HTTPException(409, "cannot remove the last active admin")
     if body.department is not None and body.department and body.department not in DEPARTMENTS:
         raise HTTPException(422, f"unknown department {body.department}")
+    roles_change = body.roles is not None and body.roles != list(data.get("roles") or [])
+    if roles_change:
+        _check_roles(body.roles)
     view_change = body.original_view is not None and body.original_view != bool(data.get("original_view", False))
     if view_change:
         if email == user.email:
@@ -176,6 +187,8 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
         patch["department"] = body.department
     if role_change:
         patch |= {"role": body.role, "role_changed_at": at, "role_changed_by": user.email}
+    if roles_change:
+        patch |= {"roles": body.roles, "roles_changed_at": at, "roles_changed_by": user.email}
     if view_change:
         patch |= {"original_view": body.original_view, "original_view_changed_at": at, "original_view_changed_by": user.email}
     if status_change:
@@ -191,6 +204,8 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
         synced = _set_firebase_disabled(data.get("uid", ""), body.status == "suspended")
         db.audit(user.uid, "user.suspend" if body.status == "suspended" else "user.reactivate", user.email,
                  target_email=email, reason=reason, firebase_synced=synced)
+    if roles_change:
+        db.audit(user.uid, "user.roles", user.email, target_email=email, old=list(data.get("roles") or []), new=body.roles)
     if view_change:
         db.audit(user.uid, "user.original_view", user.email, target_email=email, old=bool(data.get("original_view", False)),
                  new=body.original_view, reason=reason)
