@@ -518,6 +518,8 @@ class UserOut(BaseModel):
     uid: str = ""  # "" until a pre-registered person signs in for the first time
     name: str = ""
     role: Role = "user"  # effective role (ADMIN_EMAILS are always admin)
+    # Assigned role ids (roles/{id}). Record only: access still follows `role` (2026-11-02 decision).
+    roles: list[str] = Field(default_factory=list)
     status: AccountStatus = "active"
     department: str = ""
     bootstrap_admin: bool = False  # listed in ADMIN_EMAILS: role/status are not editable here
@@ -568,10 +570,23 @@ class UserCreate(BaseModel):
 
 class UserPatch(BaseModel):
     role: Role | None = None
+    roles: list[str] | None = Field(default=None, max_length=50)  # assigned role ids; replaces the whole list
     status: AccountStatus | None = None
     department: str | None = None
     original_view: bool | None = None
     reason: str = Field(default="", max_length=200)  # required when role, status or original_view changes
+
+    @field_validator("roles", mode="after")
+    @classmethod
+    def _clean_roles(cls, v: list[str] | None) -> list[str] | None:
+        # Strip, drop empty strings and de-duplicate, keeping the first occurrence.
+        if v is None:
+            return v
+        out: list[str] = []
+        for r in (x.strip() for x in v):
+            if r and r not in out:
+                out.append(r)
+        return out
 
 
 # ------------------------------------------------------------------ sharing: groups + directory

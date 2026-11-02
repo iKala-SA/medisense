@@ -177,3 +177,40 @@ def test_delete_role_guards(fs, as_user):
     assert c.delete("/api/roles/user").status_code == 403  # built-in, even with an override document
     assert c.delete("/api/roles/builder").status_code == 403  # built-in without a document
     assert c.delete("/api/roles/ghost").status_code == 404
+
+
+def test_assign_roles_to_user_is_record_only(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    r = c.patch("/api/users/b@ikala.ai", json={"roles": [" auditor ", "auditor", "", "builder"]})
+    assert r.status_code == 200
+    assert r.json()["roles"] == ["auditor", "builder"]
+    assert r.json()["role"] == "user"  # access still follows the effective role
+    assert fs.store["users/b@ikala.ai"]["roles"] == ["auditor", "builder"]
+    assert c.get("/api/users/b@ikala.ai").json()["roles"] == ["auditor", "builder"]
+
+
+def test_assign_unknown_role_is_422(fs, as_user):
+    seed(fs)
+    assert as_user(ADMIN).patch("/api/users/b@ikala.ai", json={"roles": ["ghost"]}).status_code == 422
+
+
+def test_assign_roles_needs_no_reason_and_is_audited(fs, as_user):
+    seed(fs)
+    r = as_user(ADMIN).patch("/api/users/b@ikala.ai", json={"roles": ["auditor"]})
+    assert r.status_code == 200
+
+
+def test_deleting_role_removes_user_assignments(fs, as_user):
+    seed(fs)
+    fs.put("users/b@ikala.ai", {"email": "b@ikala.ai", "role": "user", "roles": ["auditor", "builder"]})
+    assert as_user(ADMIN).delete("/api/roles/auditor").status_code == 204
+    assert fs.store["users/b@ikala.ai"]["roles"] == ["builder"]
+
+
+def test_admin_role_can_be_assigned_to_users_and_groups(fs, as_user):
+    seed(fs)
+    fs.put("groups/g1", {"name": "護理部", "role_ids": [], "member_emails": []})
+    c = as_user(ADMIN)
+    assert c.patch("/api/users/b@ikala.ai", json={"roles": ["admin"]}).json()["roles"] == ["admin"]
+    assert c.patch("/api/groups/g1", json={"role_ids": ["admin"]}).json()["role_ids"] == ["admin"]

@@ -113,5 +113,10 @@ def delete_role(role_id: str, user: User = Depends(require_admin)):
         ids = list((g.to_dict() or {}).get("role_ids") or [])
         if role_id in ids:
             g.reference.update({"role_ids": [x for x in ids if x != role_id]})
+    # Users' assigned role ids are cleaned up the same way.
+    for u in db.client().collection("users").stream():
+        ids = list((u.to_dict() or {}).get("roles") or [])
+        if role_id in ids:
+            u.reference.update({"roles": [x for x in ids if x != role_id]})
     ref.delete()
     db.audit(user.uid, "role.delete", user.email, role_id=role_id, name=data.get("name", ""))

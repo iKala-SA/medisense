@@ -8,6 +8,7 @@ import './admin.css';
 import './roles.css';
 
 const TABS=['全部','系統預設'];
+const lc=s=>String(s||'').trim().toLowerCase();
 // 圖示由前端依角色 id 對應（後端不回傳圖示）；未知的角色使用通用圖示
 const ICON={admin:Shield,builder:Wrench,user:User};
 const COLS='2.4fr 1fr .8fr 24px';
@@ -93,6 +94,108 @@ function CreateRoleModal({onClose,onCreated,notify}){
   </form></div>;
 }
 
+// 角色的指派清單：使用者寫入 users.roles（僅記錄，不影響存取）；群組寫入 groups.role_ids（僅關聯，不影響存取）。
+// 清單可搜尋、移除，並以多選加入；每次變更都直接 PATCH 該筆資料。
+const LINK_KIND={
+  user:{title:'指派使用者',field:'roles',empty:'尚未指派使用者',add:'指派使用者',search:'搜尋姓名、電子郵件或群組',
+    cols:'1.2fr 1.6fr .8fr .6fr 24px',head:['姓名','電子郵件','群組','狀態'],
+    text:u=>[u.name||'—',u.email,u.department||'—',u.status==='suspended'?'停用':'啟用'],
+    keys:u=>[u.name,u.email,u.department],
+    label:u=>u.name||u.email,
+    desc:'指派此角色的使用者。僅記錄指派，不影響任何存取權限；使用者的實際存取仍由「使用者管理」中的角色決定。'},
+  group:{title:'關聯群組',field:'role_ids',empty:'尚未關聯群組',add:'關聯群組',search:'搜尋群組名稱或說明',
+    cols:'1.2fr 2fr .8fr 24px',head:['名稱','說明','成員數'],
+    text:g=>[g.name,g.description||'—',String(g.member_count??g.member_emails?.length??0)],
+    keys:g=>[g.name,g.description],
+    label:g=>g.name,
+    desc:'關聯此角色的群組。僅記錄關聯，不影響任何存取權限。'},
+};
+
+function RoleLinks({kind,role,notify}){
+  const K=LINK_KIND[kind];
+  const isUser=kind==='user';
+  const [rows,setRows]=useState(null),[q,setQ]=useState(''),[adding,setAdding]=useState(false),[busy,setBusy]=useState(false);
+  useEffect(()=>{
+    const req=isUser?api.listUsers().then(r=>r.users||[]):api.listGroups().then(r=>Array.isArray(r)?r:(r.groups||[]));
+    req.then(setRows).catch(e=>{notify?.(`載入${isUser?'使用者':'群組'}失敗：`+errText(e));setRows([])});
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  const idOf=x=>isUser?x.email:x.id;
+  const has=x=>(x[K.field]||[]).includes(role.id);
+  const linked=(rows||[]).filter(has);
+  const needle=lc(q);
+  const shown=linked.filter(x=>!needle||K.keys(x).some(v=>(v||'').toLowerCase().includes(needle)));
+
+  // 依 role id 更新單筆資料，回傳新的列資料
+  async function save(x,on){
+    const ids=on?[...(x[K.field]||[]),role.id]:(x[K.field]||[]).filter(v=>v!==role.id);
+    return isUser?api.updateUser(x.email,{roles:ids}):api.updateGroupInfo(x.id,{[K.field]:ids});
+  }
+  async function unlink(x){
+    setBusy(true);
+    try{const r=await save(x,false);setRows(rs=>rs.map(y=>idOf(y)===idOf(r)?{...y,...r}:y));notify?.(`已移除${isUser?'使用者':'群組'}：${K.label(x)}`)}
+    catch(e){notify?.('移除失敗：'+errText(e))}finally{setBusy(false)}
+  }
+  // 多選加入：逐筆送出，失敗的保留在對話框中並回報數量
+  async function linkMany(picked){
+    setBusy(true);
+    const done=[];const failed=[];
+    for(const x of picked){
+      try{const r=await save(x,true);done.push(r)}catch(e){failed.push(K.label(x))}
+    }
+    if(done.length)setRows(rs=>rs.map(y=>{const r=done.find(d=>idOf(d)===idOf(y));return r?{...y,...r}:y}));
+    setBusy(false);
+    if(failed.length){notify?.(`已加入 ${done.length} 筆，${failed.length} 筆失敗：${failed.join('、')}`);return false}
+    notify?.(`已加入 ${done.length} 筆`);return true;
+  }
+
+  const candidates=(rows||[]).filter(x=>!has(x));
+
+  return <div className="lv-card">
+    <h2>{K.title}（{linked.length}）</h2>
+    <p className="lv-sub">{K.desc}</p>
+    {rows===null?<span className="muted small">載入中…</span>:<>
+      <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:8}}>
+        <ListToolbar search={q} onSearch={setQ} placeholder={K.search} tabs={[]} tab="" onTab={()=>{}}/>
+        <button type="button" className="btn primary" disabled={busy||!candidates.length} onClick={()=>setAdding(true)}><Plus/>{K.add}</button>
+      </div>
+      <div className="lt" style={{'--cols':K.cols}}>
+        <div className="lt-head">{K.head.map(h=><span key={h}>{h}</span>)}<span/></div>
+        {shown.map(x=><div className="lt-row" key={idOf(x)}>
+          {K.text(x).map((v,i)=><span key={i} className={i===0?'':'muted'}>{v}</span>)}
+          <span><button type="button" className="icon-btn" aria-label={'移除 '+K.label(x)} disabled={busy} onClick={()=>unlink(x)}><X size={14}/></button></span>
+        </div>)}
+        {!shown.length&&<Empty text={linked.length?'沒有符合條件的資料。':K.empty}/>}
+      </div>
+    </>}
+    {adding&&<AddLinksModal kind={kind} title={K.title} candidates={candidates} label={K.label} text={K.text} keys={K.keys} busy={busy}
+      onClose={()=>setAdding(false)} onSubmit={async picked=>{const ok=await linkMany(picked);if(ok)setAdding(false);return ok}}/>}
+  </div>;
+}
+
+// 多選加入對話框：可搜尋候選清單，勾選後一次加入
+function AddLinksModal({title,candidates,label,text,keys,busy,onClose,onSubmit}){
+  const [q,setQ]=useState(''),[picked,setPicked]=useState([]);
+  const needle=lc(q);
+  const shown=candidates.filter(x=>!needle||keys(x).some(v=>(v||'').toLowerCase().includes(needle)));
+  const idOf=x=>x.email??x.id;
+  const isOn=x=>picked.some(p=>idOf(p)===idOf(x));
+  const toggle=x=>setPicked(ps=>isOn(x)?ps.filter(p=>idOf(p)!==idOf(x)):[...ps,x]);
+  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onClose()}}><div className="modal" role="dialog" aria-modal="true" aria-label={'加入'+title} style={{width:'min(640px,94vw)'}}>
+    <button type="button" className="icon-btn modal-close" aria-label="關閉" disabled={busy} onClick={onClose}><X/></button>
+    <h2>{title}</h2>
+    <ListToolbar search={q} onSearch={setQ} placeholder="搜尋" tabs={[]} tab="" onTab={()=>{}}/>
+    <div className="lt" style={{'--cols':'24px 1.4fr 1.8fr 1fr',maxHeight:360,overflow:'auto',marginTop:8}}>
+      {shown.map(x=><label className="lt-row" key={idOf(x)} style={{cursor:'pointer'}}>
+        <input type="checkbox" checked={isOn(x)} onChange={()=>toggle(x)} aria-label={'選取 '+label(x)}/>
+        {text(x).slice(0,3).map((v,i)=><span key={i} className={i===0?'':'muted'}>{v}</span>)}
+      </label>)}
+      {!shown.length&&<Empty text="沒有符合條件的資料。"/>}
+    </div>
+    <div className="modal-actions"><span className="muted small" style={{marginRight:'auto'}}>已選 {picked.length} 筆</span><button type="button" className="btn" disabled={busy} onClick={onClose}>取消</button><button type="button" className="btn primary" disabled={busy||!picked.length} onClick={()=>onSubmit(picked)}>{busy?'加入中…':`加入（${picked.length}）`}</button></div>
+  </div></div>;
+}
+
 // 角色細節：名稱、英文名稱（非必填）、說明、狀態與權限標籤可編輯。系統管理員為固定角色，整頁唯讀。
 const LABEL_LIMIT=20;
 function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
@@ -160,6 +263,9 @@ function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
       {err&&<p className="lv-o-err" role="alert">{err}</p>}
       <div className="lv-actions"><button className="btn primary" disabled={fixed||busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>
     </form>
+
+    <RoleLinks kind="user" role={role} notify={notify}/>
+    <RoleLinks kind="group" role={role} notify={notify}/>
 
     {fixed&&<Notice icon={<Info size={16}/>}>管理員為系統預設角色，權限固定為全部允許，不可在此修改。</Notice>}
     {delOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
