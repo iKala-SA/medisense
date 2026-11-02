@@ -106,3 +106,8 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Basic info saves with `PATCH` so editing a name cannot overwrite the member list. `api.updateGroup` (PUT) is no longer called from the UI; the backend keeps PUT until `BE-GROUP-SPEC.md` Q4 is decided.
 - Member e-mail check matches the backend (contains `@`, no whitespace). Suspended accounts are not suggested but can be typed in.
 - Not yet implemented: Esc to close and unsaved-change prompt in the add dialog. Browser verification was not run.
+
+## Deferred role features removed (2026-10-30)
+- Removed from `RolesPage` per the 暫緩 list in `FE-ROLE-SPEC.md`: the 權限設定 page (`RolePermissionsPage.jsx` deleted), the row action menu (編輯 / 權限設定 / 停用 / 刪除), the 權限數 and 操作 columns, and the 自訂 tab and 自訂角色 stat card.
+- Kept: the 類型 column (系統預設 / 自訂), 全部 / 系統預設 tabs, the 角色總數 and 系統預設角色 stat cards, search, 重新整理, the disabled 新增角色 button, and the footer notice.
+- `GET /api/roles` still returns `can`, `permission_count` and `custom` stats; the page no longer reads them. Backend is unchanged.
