@@ -9,7 +9,7 @@
 | 版本基準 | 分支 `remove-deferred-role-features`，2026-11-02 |
 | 遷移紀錄 | `backend/scripts/migrate_role_status.py`（`suspended` → `status`，已於正式資料執行） |
 
-> **範圍說明**：本 API 僅管理系統角色 `admin`、`builder`、`user` 的顯示名稱、英文名稱、說明、狀態與權限標籤（僅供顯示），以及新增自訂角色。下列項目 **暫緩**，不屬於目前實作：刪除角色、單一角色的詳細端點、權限矩陣（資源 × 操作）、寫入時必填的變更原因、自訂角色的成員指派。第 5 節保留這些項目的想法。
+> **範圍說明**：本 API 僅管理系統角色 `admin`、`builder`、`user` 的顯示名稱、英文名稱、說明、狀態與權限標籤（僅供顯示），以及新增與刪除自訂角色。下列項目 **暫緩**，不屬於目前實作：單一角色的詳細端點、權限矩陣（資源 × 操作）、寫入時必填的變更原因、自訂角色的成員指派。第 5 節保留這些項目的想法。
 
 ---
 
@@ -59,6 +59,7 @@
 | GET | `/api/roles?search=&type=` | 200 `RoleListOut` | 403 | 角色列表與統計 |
 | POST | `/api/roles` | 201 `RoleOut` | 403、422 | 新增自訂角色 |
 | PATCH | `/api/roles/{role_id}` | 200 `RoleOut` | 403（`admin`）、404（不存在的自訂角色）、422 | 修改基本資料、狀態與權限標籤 |
+| DELETE | `/api/roles/{role_id}` | 204 | 403（內建角色）、404（不存在） | 刪除自訂角色，並移除群組中的關聯 |
 
 ### 3.1 GET `/api/roles`
 
@@ -113,6 +114,16 @@
 - **稽核**：`role.update`（`role_id`、`fields`）。
 - **回應**：200 與更新後的 `RoleOut`。
 
+### 3.4 DELETE `/api/roles/{role_id}`（刪除自訂角色）
+
+- **行為**：刪除 `roles/{role_id}` 文件，並把該代號從所有群組的 `role_ids` 移除（同一次請求完成）。群組只保存代號，不會留下指向不存在角色的關聯。
+- **錯誤**：
+  - 403（`built-in role cannot be deleted`）：`admin`、`builder`、`user` 一律不可刪除，即使有覆寫文件。
+  - 404（`role not found`）：不是系統角色，且文件不存在。
+- **成功**：204，無回應內容。
+- **成員**：自訂角色的有效角色只會是 `admin`、`builder`、`user`，因此自訂角色不會有成員，刪除時不需檢查成員數。
+- **稽核**：`role.delete`（`role_id`、`name`）。
+
 ---
 
 ## 4. 回應欄位（`RoleOut`）
@@ -135,7 +146,6 @@
 
 | 項目 | 說明 | 狀態 |
 |---|---|---|
-| `DELETE /api/roles/{id}` | 刪除自訂角色。系統角色不可刪除。若仍有成員指派，需先處理成員 | 暫緩 |
 | `GET /api/roles/{id}` | 單一角色詳細資料（含權限矩陣） | 暫緩 |
 | 權限矩陣 | 11 項資源 × `create` / `read` / `update` / `delete`，儲存格式尚未決定。目前後端的存取控制仍寫死在程式碼中（`require_admin`、`require_builder`） | 暫緩 |
 | 變更原因 `reason` | 狀態或權限變更時必填，寫入稽核。目前 `PATCH` 不要求此欄位 | **待確認**（與使用者管理的規則是否一致） |
