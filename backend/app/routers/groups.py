@@ -1,5 +1,6 @@
-"""Groups (groups/{id}: name, description, member_emails[]): admin-only CRUD and member management
-(specifications/BE-GROUP-SPEC.md). Membership does not affect access; sharing still reads member_emails.
+"""Groups (groups/{id}: name, description, role_ids[]): admin-only CRUD and member management
+(specifications/BE-GROUP-SPEC.md). Membership is stored on the user (users/{email}.groups, a list of group ids);
+`member_emails` in responses is derived from it. Membership does not affect access; sharing still reads it.
 `/api/directory` is the search used by the share dialog (any signed-in, non-suspended user)."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from google.cloud import firestore
@@ -31,8 +32,14 @@ def _col():
     return db.client().collection("groups")
 
 
-def _out(doc) -> GroupOut:
-    return GroupOut(id=doc.id, **(doc.to_dict() or {}))
+def _users():
+    return db.client().collection("users")
+
+
+def _out(doc, members: list[str]) -> GroupOut:
+    # Legacy documents may still hold member_emails until scripts/migrate_group_membership.py has run; ignore them.
+    data = {k: v for k, v in (doc.to_dict() or {}).items() if k != "member_emails"}
+    return GroupOut(id=doc.id, **data, member_emails=members)
 
 
 def _load(group_id: str):
@@ -42,8 +49,35 @@ def _load(group_id: str):
     return snap
 
 
-def _members(snap) -> list[str]:
-    return list((snap.to_dict() or {}).get("member_emails") or [])
+def _member_emails(group_id: str) -> list[str]:
+    q = _users().where(filter=firestore.FieldFilter("groups", "array_contains", group_id))
+    return sorted(d.id for d in q.stream())
+
+
+def _member_map() -> dict[str, list[str]]:
+    """Every group id -> member e-mails, from one pass over users."""
+    out: dict[str, list[str]] = {}
+    for d in _users().stream():
+        for gid in (d.to_dict() or {}).get("groups") or []:
+            out.setdefault(gid, []).append(d.id)
+    return {gid: sorted(emails) for gid, emails in out.items()}
+
+
+def _link(email: str, group_id: str, actor: str, add: bool) -> None:
+    op = firestore.ArrayUnion if add else firestore.ArrayRemove
+    _users().document(email).update({"groups": op([group_id]), "groups_changed_at": db.now(), "groups_changed_by": actor})
+
+
+def _set_membership(group_id: str, emails: list[str], actor: str) -> None:
+    """Replace the group's members with `emails`. Only existing accounts can be members; others are ignored."""
+    wanted = list(dict.fromkeys(emails))
+    snaps = db.client().get_all([_users().document(e) for e in wanted]) if wanted else []
+    desired = {s.id for s in snaps if s.exists}
+    current = set(_member_emails(group_id))
+    for email in sorted(desired - current):
+        _link(email, group_id, actor, add=True)
+    for email in sorted(current - desired):
+        _link(email, group_id, actor, add=False)
 
 
 def _check_role_ids(ids: list[str]) -> list[str]:
@@ -73,22 +107,24 @@ def _domain_allowed(email: str) -> bool:
 
 @router.get("", response_model=list[GroupOut])
 def list_groups():
-    return sorted((_out(d) for d in _col().stream()), key=lambda g: g.name.lower())
+    members = _member_map()
+    return sorted((_out(d, members.get(d.id, [])) for d in _col().stream()), key=lambda g: g.name.lower())
 
 
 @router.post("", response_model=GroupOut, status_code=201)
 def create_group(body: GroupIn, user: User = Depends(require_admin)):
     ref = _col().document()
-    data = {**body.model_dump(), "role_ids": _check_role_ids(body.role_ids), "created_by": user.email, "created_at": db.now(), "updated_at": db.now(),
-            "updated_by": user.email}
+    data = {**body.model_dump(exclude={"member_emails"}), "role_ids": _check_role_ids(body.role_ids),
+            "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
     ref.set(data)
+    _set_membership(ref.id, body.member_emails, user.email)
     db.audit(user.uid, "group.create", user.email, group_id=ref.id, name=body.name, members=len(body.member_emails))
-    return GroupOut(id=ref.id, **data)
+    return _out(ref.get(), _member_emails(ref.id))
 
 
 @router.get("/{group_id}", response_model=GroupOut)
 def get_group(group_id: str):
-    return _out(_load(group_id))
+    return _out(_load(group_id), _member_emails(group_id))
 
 
 @router.patch("/{group_id}", response_model=GroupOut)
@@ -103,28 +139,30 @@ def patch_group(group_id: str, body: GroupPatch, user: User = Depends(require_ad
     if changes:
         snap.reference.update({**changes, "updated_at": db.now(), "updated_by": user.email})
         db.audit(user.uid, "group.update", user.email, group_id=group_id, fields=sorted(changes), **audit_extra)
-    return _out(snap.reference.get())
+    return _out(snap.reference.get(), _member_emails(group_id))
 
 
 @router.put("/{group_id}", response_model=GroupOut)
 def update_group(group_id: str, body: GroupIn, user: User = Depends(require_admin)):
     snap = _load(group_id)
-    snap.reference.update({**body.model_dump(), "role_ids": _check_role_ids(body.role_ids),
+    snap.reference.update({**body.model_dump(exclude={"member_emails"}), "role_ids": _check_role_ids(body.role_ids),
                            "updated_at": db.now(), "updated_by": user.email})
+    _set_membership(group_id, body.member_emails, user.email)
     db.audit(user.uid, "group.update", user.email, group_id=group_id, name=body.name, members=len(body.member_emails))
-    return _out(snap.reference.get())
+    return _out(snap.reference.get(), _member_emails(group_id))
 
 
 @router.delete("/{group_id}", status_code=204)
 def delete_group(group_id: str, user: User = Depends(require_admin)):
     snap = _load(group_id)
+    _set_membership(group_id, [], user.email)  # drop the group id from every member's `groups`
     snap.reference.delete()
     db.audit(user.uid, "group.delete", user.email, group_id=group_id, name=(snap.to_dict() or {}).get("name", ""))
 
 
 @router.get("/{group_id}/members", response_model=list[GroupMemberOut])
 def list_members(group_id: str):
-    emails = _members(_load(group_id))
+    emails = _member_emails(_load(group_id).id)
     refs = [db.client().collection("users").document(e) for e in emails]
     # get_all does not return snapshots in request order, so match them by document id (the e-mail).
     by_id = {snap.id: snap for snap in db.client().get_all(refs)} if refs else {}
@@ -141,8 +179,8 @@ def list_members(group_id: str):
 
 @router.post("/{group_id}/members", response_model=MemberAddResult)
 def add_members(group_id: str, body: MemberAddIn, user: User = Depends(require_admin)):
-    snap = _load(group_id)
-    current = _members(snap)
+    _load(group_id)
+    current = _member_emails(group_id)
     result = MemberAddResult()
     candidates: list[str] = []
     for raw in body.emails:
@@ -153,15 +191,15 @@ def add_members(group_id: str, body: MemberAddIn, user: User = Depends(require_a
             result.skipped.append(email)
         elif not _domain_allowed(email):
             result.rejected.append(MemberRejected(email=email, reason="domain_not_allowed"))
-        elif not db.client().collection("users").document(email).get().exists:
+        elif not _users().document(email).get().exists:
             result.rejected.append(MemberRejected(email=email, reason="not_a_registered_account"))
         else:
             candidates.append(email)
     if len(current) + len(candidates) > MEMBER_LIMIT:
         raise HTTPException(422, f"group member limit is {MEMBER_LIMIT}")
     if candidates:
-        snap.reference.update({"member_emails": firestore.ArrayUnion(candidates), "updated_at": db.now(),
-                               "updated_by": user.email})
+        for email in candidates:
+            _link(email, group_id, user.email, add=True)
         result.added = candidates
         db.audit(user.uid, "group.member_add", user.email, group_id=group_id, added=len(candidates),
                  rejected=len(result.rejected), emails=candidates)
@@ -170,12 +208,11 @@ def add_members(group_id: str, body: MemberAddIn, user: User = Depends(require_a
 
 @router.delete("/{group_id}/members/{email}", status_code=204)
 def remove_member(group_id: str, email: str, user: User = Depends(require_admin)):
-    snap = _load(group_id)
+    _load(group_id)
     target = _normalize(email)
-    if target not in _members(snap):
+    if target not in _member_emails(group_id):
         raise HTTPException(404, "member not found")
-    snap.reference.update({"member_emails": firestore.ArrayRemove([target]), "updated_at": db.now(),
-                           "updated_by": user.email})
+    _link(target, group_id, user.email, add=False)
     db.audit(user.uid, "group.member_remove", user.email, group_id=group_id, email=target)
 
 
@@ -185,7 +222,7 @@ def directory(q: str = Query("", max_length=100), user: User = Depends(current_u
     are left out; group members are not listed (only a count)."""
     needle = q.strip().lower()
     people: list[DirectoryUser] = []
-    for d in db.client().collection("users").stream():
+    for d in _users().stream():
         u = d.to_dict() or {}
         if u.get("status") == "suspended" or not u.get("email"):
             continue
@@ -193,8 +230,9 @@ def directory(q: str = Query("", max_length=100), user: User = Depends(current_u
         if needle in hay:
             people.append(DirectoryUser(email=u["email"], name=u.get("name", ""), department=u.get("department", "")))
     people.sort(key=lambda p: (p.name or p.email).lower())
+    members = _member_map()
     groups = [DirectoryGroup(id=d.id, name=g.get("name", ""), description=g.get("description", ""),
-                             member_count=len(g.get("member_emails") or []))
+                             member_count=len(members.get(d.id, [])))
               for d in _col().stream() if needle in (g := d.to_dict() or {}).get("name", "").lower()]
     groups.sort(key=lambda g: g.name.lower())
     return DirectoryOut(users=people[:DIRECTORY_LIMIT], groups=groups[:DIRECTORY_LIMIT])

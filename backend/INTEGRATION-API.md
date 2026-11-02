@@ -16,6 +16,11 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 `my_role` on skills/schedules/spaces = caller's effective access: `owner | admin | edit | use`.
 `PUT .../share` takes a bare `Share` body and returns the full updated object. Group members must exist (422 otherwise).
 
+## Profile  (`/api/me`)  — any signed-in user
+
+Response: `{ "uid", "email", "name", "role": "admin" | "builder" | "user", "department", "roles": ["<role id>", ...], "groups": ["<group id>", ...], "permissions": ["<resource id>", ...] }`. `groups` is the user's group membership (`users/{email}.groups`).
+`roles` is the user's assigned role ids (`users/{email}.roles`, record only). `permissions` is the distinct union of the `permissions` stored on the user's roles (`roles/{id}`) and on the roles assigned to each group the user belongs to (`groups/{id}.role_ids`, via `users/{email}.groups`). Limited to known ids from `GET /api/permissions` and ordered as in `app/permissions.py`; a missing role or group document contributes nothing. Use it for UI only: `role` still decides access. Not enforced yet.
+
 ## Roles (admin-only; reads, creates and name/desc edits in Firestore `roles`)
 
 | Method | Path | Role | Notes |
@@ -49,7 +54,7 @@ Response: `[{ "id", "name", "desc", "order" }]`, e.g. `{ "id": "chat", "name": "
 
 `GET /api/directory?q=nin` -> `{ "users": [{"email","name","department"}], "groups": [{"id","name","description","member_count"}] }` (max 20 each; suspended users hidden; empty q lists everyone up to the cap).
 
-Group body/response: `{ "name": str(1-80), "description": str, "member_emails": [str] }` (+ `id, created_by, created_at, updated_at` on output). Duplicate names are allowed. E-mails are lower-cased and de-duplicated.
+Group body/response: `{ "name": str(1-80), "description": str, "member_emails": [str] }` (+ `id, created_by, created_at, updated_at` on output). Duplicate names are allowed. E-mails are lower-cased and de-duplicated. Membership is stored on each user (`users/{email}.groups`); POST/PUT `member_emails` set it and only existing accounts are linked (others ignored); responses derive `member_emails` from users.
 
 Agents: `AgentIn`/`AgentOut` gained `share: Share` (default restricted/empty), `skill_ids: [str]` (default `[]`), and `model_group` may now be `"auto"`. `PUT /api/agents/{id}` ignores `share` (use the share endpoint) and keeps the stored `skill_ids` if the body omits it. `GET /api/agents` now also returns agents shared with the caller (drafts included). Published agents are still hospital-wide.
 
