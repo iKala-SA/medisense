@@ -21,10 +21,11 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/api/roles?search=&type=all\|system\|custom` | admin | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
+| DELETE | `/api/roles/{id}` | admin | delete a custom role; 204. Built-in roles (`admin`, `builder`, `user`, with or without an override document) return 403; unknown id 404. Group `role_ids` referencing the role are cleaned up in the same request; records `role.delete` in the audit log |
 | POST | `/api/roles` | admin | create a custom role `{name (1–40, required), desc? (≤300)}`; the id is generated; returns 201 with the role (`custom: true`, `en: ""`, `can: []`); records `role.create` in the audit log |
 | PATCH | `/api/roles/{id}` | admin | partial update of `name` / `en` / `desc` / `status` / `can` (`{name?, en?, desc?, status?, can?}`, name 1–40 chars, `en` ≤40 and may be empty, desc ≤300, `status` boolean with true = 啟用, `can` ≤20 labels of 1–20 chars, trimmed and de-duplicated); writes `roles/{id}` (merged, so system roles get an override document) and records `role.update` in the audit log; `admin` returns 403 (fixed role); unknown custom id 404; returns the updated role. Labels are display-only until the permission matrix exists |
 
-Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "status", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. Delete and the per-resource matrix are not implemented yet.
+Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "status", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. The per-resource matrix is not implemented yet.
 
 ## Sharing
 

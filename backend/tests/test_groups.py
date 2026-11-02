@@ -181,3 +181,18 @@ def test_role_ids_survive_member_changes(fs, as_user):
     client.patch("/api/groups/g1", json={"role_ids": ["builder"]})
     client.delete("/api/groups/g1/members/staff-a@example.test")
     assert fs.store["groups/g1"]["role_ids"] == ["builder"]
+
+
+def test_create_and_put_strip_name_and_description(fs, as_user):
+    c = as_user(ADMIN)
+    r = c.post("/api/groups", json={"name": "  護理部  ", "description": "  說明  ", "member_emails": [], "role_ids": []})
+    assert r.status_code == 201
+    assert r.json()["name"] == "護理部" and r.json()["description"] == "說明"
+    assert c.post("/api/groups", json={"name": "   ", "member_emails": []}).status_code == 422
+
+
+def test_patch_role_ids_drops_empty_strings(fs, as_user):
+    seed_group(fs)
+    r = as_user(ADMIN).patch("/api/groups/g1", json={"role_ids": ["", " user ", "user", "  "]})
+    assert r.status_code == 200
+    assert r.json()["role_ids"] == ["user"]

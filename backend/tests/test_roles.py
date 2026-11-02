@@ -157,3 +157,23 @@ def test_patch_label_validation_and_admin_is_fixed(fs, as_user):
     assert c.patch("/api/roles/auditor", json={"can": ["a"] * 21}).status_code == 422
     assert c.patch("/api/roles/admin", json={"status": False}).status_code == 403
     assert c.patch("/api/roles/admin", json={"can": []}).status_code == 403
+
+
+def test_delete_custom_role_unlinks_groups(fs, as_user):
+    seed(fs)
+    fs.put("groups/g1", {"name": "護理部", "role_ids": ["auditor", "user"], "member_emails": []})
+    fs.put("groups/g2", {"name": "資訊室", "role_ids": ["user"], "member_emails": []})
+    c = as_user(ADMIN)
+    assert c.delete("/api/roles/auditor").status_code == 204
+    assert [r["id"] for r in c.get("/api/roles").json()["roles"]] == ["admin", "builder", "user"]
+    assert fs.store["groups/g1"]["role_ids"] == ["user"]
+    assert fs.store["groups/g2"]["role_ids"] == ["user"]
+
+
+def test_delete_role_guards(fs, as_user):
+    seed(fs)
+    c = as_user(ADMIN)
+    assert as_user(PLAIN).delete("/api/roles/auditor").status_code == 403
+    assert c.delete("/api/roles/user").status_code == 403  # built-in, even with an override document
+    assert c.delete("/api/roles/builder").status_code == 403  # built-in without a document
+    assert c.delete("/api/roles/ghost").status_code == 404

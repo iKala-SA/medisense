@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ArrowClockwise,ArrowLeft,CaretRight,IdentificationBadge,Info,Plus,Shield,Wrench,User,X} from '@phosphor-icons/react';
+import {ArrowClockwise,ArrowLeft,CaretRight,IdentificationBadge,Info,Plus,Shield,Trash,Wrench,User,X} from '@phosphor-icons/react';
 import {api} from '../api';
 import {errText} from './constants';
 import {Loading,Notice} from './shared';
@@ -10,7 +10,7 @@ import './roles.css';
 const TABS=['全部','系統預設'];
 // 圖示由前端依角色 id 對應（後端不回傳圖示）；未知的角色使用通用圖示
 const ICON={admin:Shield,builder:Wrench,user:User};
-const COLS='2.4fr 1fr .8fr .8fr 24px';
+const COLS='2.4fr 1fr .8fr 24px';
 
 // 角色資料由 GET /api/roles 提供。列表僅供檢視；點選列可編輯名稱與說明（系統管理員除外）。
 export default function RolesPage({me,notify}){
@@ -35,7 +35,7 @@ export default function RolesPage({me,notify}){
   const shown=useMemo(()=>(roles||[]).filter(r=>(tab==='全部'||!r.custom)&&(!needle||[r.name,r.en,r.desc].some(s=>(s||'').toLowerCase().includes(needle)))),[roles,tab,needle]);
 
   if(!admin)return <div className="card-page lv-page"><Empty text="此頁面僅限系統管理員。"/></div>;
-  if(opened)return <RoleDetail role={opened} notify={notify} onBack={()=>{setOpened(null)}} onSaved={r=>setData(d=>({...d,roles:d.roles.map(x=>x.id===r.id?{...x,...r}:x)}))}/>;
+  if(opened)return <RoleDetail role={opened} notify={notify} onBack={()=>{setOpened(null)}} onSaved={r=>setData(d=>({...d,roles:d.roles.map(x=>x.id===r.id?{...x,...r}:x)}))} onDeleted={id=>{setOpened(null);setData(d=>({...d,roles:d.roles.filter(x=>x.id!==id)}));load()}}/>;
 
   return <div className="card-page lv-page rl-page">
     <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button><button className="btn primary" onClick={()=>setCreating(true)}><Plus/>新增角色</button></div></div>
@@ -50,12 +50,11 @@ export default function RolesPage({me,notify}){
     <ListToolbar search={search} onSearch={setSearch} placeholder="搜尋角色名稱" tabs={TABS} tab={tab} onTab={setTab}/>
 
     {data===null?<Loading/>:<div className="lt rl-table">
-      <div className="lt-head" style={{'--cols':COLS}}><span>角色</span><span>類型</span><span>狀態</span><span>成員數</span><span/></div>
+      <div className="lt-head" style={{'--cols':COLS}}><span>角色</span><span>類型</span><span>狀態</span><span/></div>
       {shown.map(r=>{const Icon=ICON[r.id]||IdentificationBadge;return <div key={r.id} className="lt-row" style={{'--cols':COLS,cursor:'pointer'}} role="button" tabIndex={0} onClick={()=>setOpened(r)} onKeyDown={e=>{if(e.key==='Enter')setOpened(r)}}>
         <span className="rl-role"><span className={'rl-icon'+(r.custom?' custom':'')}><Icon size={16}/></span><span><b>{r.name}</b><small>{r.desc}</small></span></span>
         <span><span className={'rl-tag'+(r.custom?' custom':'')}>{r.custom?'自訂':'系統預設'}</span></span>
         <span>{r.status?<span className="lv-pill ok"><i/>啟用</span>:<span className="lv-pill"><i/>停用</span>}</span>
-        <span className="muted">{r.member_count} 人</span>
         <CaretRight className="muted"/>
       </div>})}
       {shown.length===0&&<Empty text="沒有符合條件的角色。"/>}
@@ -94,16 +93,25 @@ function CreateRoleModal({onClose,onCreated,notify}){
   </form></div>;
 }
 
-// 角色細節：名稱、英文名稱（非必填）、說明、狀態與權限標籤可編輯；類型由角色 id 決定，僅供檢視。系統管理員為固定角色，整頁唯讀。
+// 角色細節：名稱、英文名稱（非必填）、說明、狀態與權限標籤可編輯。系統管理員為固定角色，整頁唯讀。
 const LABEL_LIMIT=20;
-function RoleDetail({role:initial,notify,onBack,onSaved}){
+function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
   const [role,setRole]=useState(initial);
+  const [delOpen,setDelOpen]=useState(false),[delBusy,setDelBusy]=useState(false);
   const [name,setName]=useState(initial.name||''),[en,setEn]=useState(initial.en||''),[desc,setDesc]=useState(initial.desc||'');
   const [status,setStatus]=useState(!!initial.status),[can,setCan]=useState(initial.can||[]),[canDraft,setCanDraft]=useState('');
   const [busy,setBusy]=useState(false),[err,setErr]=useState('');
   const fixed=role.id==='admin';
   const dirty=name.trim()!==(role.name||'')||en.trim()!==(role.en||'')||desc.trim()!==(role.desc||'')||status!==!!role.status||can.join('\n')!==(role.can||[]).join('\n');
   const back=()=>{if(dirty&&!window.confirm('放棄未儲存的變更？'))return;onBack()};
+  // 內建角色（含 admin）後端一律回 403，這裡同步停用按鈕並說明原因
+  const deletable=!fixed&&!!role.custom;
+
+  async function remove(){
+    setDelBusy(true);
+    try{await api.deleteRole(role.id);notify?.('已刪除角色');onDeleted(role.id)}
+    catch(x){notify?.('刪除失敗：'+errText(x))}finally{setDelBusy(false)}  // keep the dialog open on failure, as in GroupDetail
+  }
 
   function addLabel(){
     const v=canDraft.trim();
@@ -126,7 +134,7 @@ function RoleDetail({role:initial,notify,onBack,onSaved}){
 
   return <div className="card-page lv-page rl-page">
     <button className="lv-back" onClick={back}><ArrowLeft/>返回角色列表</button>
-    <div className="page-heading"><h1>{role.name}</h1></div>
+    <div className="page-heading"><h1>{role.name}</h1><div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} disabled={!deletable||busy} title={fixed?'管理員不可刪除':!role.custom?'內建角色無法刪除':undefined} onClick={()=>setDelOpen(true)}><Trash/>刪除角色</button></div></div>
     <p className="subtitle">{fixed?'系統管理員為固定角色，不可編輯。':'編輯角色的名稱、說明、狀態與權限標籤。'}</p>
 
     <form className="lv-card" onSubmit={save} style={{maxWidth:560,display:'grid',gap:12}}>
@@ -137,7 +145,6 @@ function RoleDetail({role:initial,notify,onBack,onSaved}){
       <div className="field"><label>狀態</label>
         <div className="lv-actions"><Toggle on={status} onChange={setStatus} label="角色狀態" disabled={fixed||busy}/><span className="small muted">{status?'啟用':'停用'}</span></div>
       </div>
-      <dl className="lv-dl" style={{margin:0}}><dt>類型</dt><dd>{role.custom?'自訂':'系統預設'}（由角色代號決定，不可修改）</dd></dl>
 
       <div className="field"><label>權限標籤</label>
         <p className="lv-sub" style={{margin:'0 0 4px'}}>目前僅供顯示，尚未套用到功能存取；權限矩陣尚未開放。</p>
@@ -155,5 +162,9 @@ function RoleDetail({role:initial,notify,onBack,onSaved}){
     </form>
 
     {fixed&&<Notice icon={<Info size={16}/>}>管理員為系統預設角色，權限固定為全部允許，不可在此修改。</Notice>}
+    {delOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
+      <h2>刪除角色</h2><p>確定要刪除「{role.name}」？刪除後，群組中的此角色關聯也會一併移除。</p>
+      <div className="modal-actions"><button type="button" className="btn" disabled={delBusy} onClick={()=>setDelOpen(false)}>取消</button><button type="button" className="btn primary" disabled={delBusy} onClick={remove}>{delBusy?'刪除中…':'刪除'}</button></div>
+    </div></div>}
   </div>;
 }

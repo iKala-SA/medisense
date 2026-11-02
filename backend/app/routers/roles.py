@@ -1,4 +1,4 @@
-"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; GET /api/roles, POST /api/roles (custom roles) and PATCH /api/roles/{id} (name / desc only).
+"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; GET /api/roles, POST /api/roles and PATCH /api/roles/{id} (custom roles and system overrides), DELETE for custom roles.
 
 Contract follows the frontend as-built page (specifications/FE-ROLE-SPEC.md): `can` holds the capability labels
 shown on the page, `permission_count` is len(can), and custom roles have no English name and no permissions.
@@ -97,3 +97,21 @@ def patch_role(role_id: str, body: RolePatch, user: User = Depends(require_admin
         db.audit(user.uid, "role.update", user.email, role_id=role_id, fields=sorted(changes))
     stored = (ref.get().to_dict() or {})
     return _out(role_id, {**SYSTEM_ROLES.get(role_id, {}), **stored}, _member_counts())
+
+
+@router.delete("/{role_id}", status_code=204)
+def delete_role(role_id: str, user: User = Depends(require_admin)):
+    ref = db.client().collection("roles").document(role_id)
+    snap = ref.get()
+    if not snap.exists and role_id not in SYSTEM_ROLES:
+        raise HTTPException(404, "role not found")
+    data = {**SYSTEM_ROLES.get(role_id, {}), **(snap.to_dict() or {})}
+    if not _out(role_id, data, {}).custom:
+        raise HTTPException(403, "built-in role cannot be deleted")
+    # Groups keep role links as ids; drop the deleted id so no group points at a missing role.
+    for g in db.client().collection("groups").stream():
+        ids = list((g.to_dict() or {}).get("role_ids") or [])
+        if role_id in ids:
+            g.reference.update({"role_ids": [x for x in ids if x != role_id]})
+    ref.delete()
+    db.audit(user.uid, "role.delete", user.email, role_id=role_id, name=data.get("name", ""))

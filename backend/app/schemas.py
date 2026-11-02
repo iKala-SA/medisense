@@ -582,15 +582,23 @@ class GroupIn(BaseModel):
     # roles/{id} references. Stored only: a granted role's permissions are not enforced yet (2026-10-30).
     role_ids: list[str] = Field(default_factory=list, max_length=50)
 
+    @field_validator("name", mode="after")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be blank")
+        return v
+
+    @field_validator("description", mode="after")
+    @classmethod
+    def _strip_description(cls, v: str) -> str:
+        return v.strip()
+
     @field_validator("role_ids", mode="after")
     @classmethod
     def _role_ids(cls, v: list[str]) -> list[str]:
-        out: list[str] = []
-        for r in v:
-            r = r.strip()
-            if r and r not in out:
-                out.append(r)
-        return out
+        return _clean_role_ids(v)
 
     @field_validator("member_emails", mode="after")
     @classmethod
@@ -613,11 +621,25 @@ class GroupOut(GroupIn):
     updated_by: str = ""
 
 
+def _clean_role_ids(v: list[str]) -> list[str]:
+    # Strip, drop empty strings and de-duplicate, keeping the first occurrence.
+    out: list[str] = []
+    for r in (x.strip() for x in v):
+        if r and r not in out:
+            out.append(r)
+    return out
+
+
 class GroupPatch(BaseModel):
     """Partial update of name / description / role_ids. Members change only through the /members endpoints."""
     name: str | None = Field(default=None, min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=500)
     role_ids: list[str] | None = Field(default=None, max_length=50)
+
+    @field_validator("role_ids", mode="after")
+    @classmethod
+    def _role_ids(cls, v: list[str] | None) -> list[str] | None:
+        return None if v is None else _clean_role_ids(v)
 
     @field_validator("name", mode="after")
     @classmethod
