@@ -67,3 +67,6 @@
 .shell .bk nav button{height:auto;padding:0;border-radius:0;font-size:inherit;font-weight:inherit;color:inherit;gap:.25rem;white-space:normal;margin:0}
 .shell .bk nav button:hover{background:transparent}
 .shell .bk nav button>svg{width:auto;height:auto}
+
+/* Bumped on 2026-10-31: a browser cached a bad copy of this stylesheet under its old hashed URL (see main.jsx); changing the content gives it a new URL. */
+.bk-cache-v2{--bk-cache:2}

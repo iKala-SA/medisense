@@ -4,6 +4,7 @@ import {Icon} from '@iconify/react';
 import calendarIcon from '@iconify-icons/logos/google-calendar';
 import {api} from '../api';
 import {Loading} from './pkit';
+import {MonthGrid,TimeGrid,EventDetail,addDays as addD,sundayOf,startOfDay,isOffice as isOff} from './CalendarViews';
 import {connectAccount,connectErr} from './connectFlow';
 import './pages.css';
 import './calendar.css';
@@ -33,10 +34,10 @@ function groupByDay(events,start,count=7){
 const isOffice=e=>e.all_day&&/^office$/i.test((e.title||'').trim());
 const VIEWS=[['day','日'],['week','週'],['month','月']];
 const rangeOf=(view,anchor)=>{
-  if(view==='day'){const s=new Date(anchor);s.setHours(0,0,0,0);return {start:s,count:1}}
-  if(view==='week')return {start:mondayOf(anchor),count:7};
-  const s=new Date(anchor.getFullYear(),anchor.getMonth(),1);
-  return {start:s,count:new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate()};
+  if(view==='day'){const s=startOfDay(anchor);return {start:s,count:1}}
+  if(view==='week')return {start:sundayOf(anchor),count:7};
+  const first=new Date(anchor.getFullYear(),anchor.getMonth(),1),s=sundayOf(first);
+  return {start:s,count:Math.ceil((first.getDay()+new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate())/7)*7};
 };
 const shift=(view,d,n)=>view==='month'?new Date(d.getFullYear(),d.getMonth()+n,1):addDays(d,n*(view==='week'?7:1));
 const timeText=e=>e.all_day?'全天':e.end?`${hm(e.start)} – ${hm(e.end)}`:hm(e.start);
@@ -47,7 +48,7 @@ function Hero({title,children,action}){
 
 export default function LiveCalendar({notify,go}){
   const [status,setStatus]=useState(null),[mine,setMine]=useState(null),[busy,setBusy]=useState(false);
-  const [view,setView]=useState('day'),[anchor,setAnchor]=useState(()=>new Date()),[data,setData]=useState(null),[loading,setLoading]=useState(false);
+  const [picked,setPicked]=useState(null),[view,setView]=useState('week'),[anchor,setAnchor]=useState(()=>new Date()),[data,setData]=useState(null),[loading,setLoading]=useState(false);
 
   const init=useCallback(async()=>{
     setStatus(null);
@@ -89,31 +90,23 @@ export default function LiveCalendar({notify,go}){
       {mine.state==='reauth_required'?'授權已過期，請重新授權。':unavailable?(mine.problem||'連接器暫時無法使用，請聯絡管理員。'):'授權後，Medisense 只會以您自己的帳號讀取日曆，其他人看不到您的內容。'}</Hero>;
   }
 
-  let days=groupByDay((data?.events||[]).filter(e=>!isOffice(e)),start,count);
-  const today=dayKey(new Date());
-  if(view==='month')days=days.filter(d=>d.items.length);
-  const label=view==='day'?`${md(start)} ${WD[start.getDay()]}`:view==='week'?`${md(start)} – ${md(addDays(start,6))}`:`${start.getFullYear()}年${start.getMonth()+1}月`;
+  const evs=data?.events||[];
+  const label=view==='day'?`${start.getFullYear()}年${md(start)} ${WD[start.getDay()]}`:view==='week'?`${start.getFullYear()}年${md(start)} – ${md(addDays(start,6))}`:`${anchor.getFullYear()}年${anchor.getMonth()+1}月`;
   const unit={day:'天',week:'週',month:'月'}[view];
-  return <div className="lv-cal">
+  const goDay=d=>{setAnchor(d);setView('day')};
+  return <div className="lv-cal gc">
     <div className="lv-cal-head">
-      <span className="lv-cal-acct"><Icon icon={calendarIcon} width={20} height={20}/>{data?.account_label||status.account_label||'Google 日曆'}</span>
+      <button className="btn sm" onClick={()=>setAnchor(new Date())}>今天</button>
+      <button className="gc-arrow" aria-label={`上一${unit}`} onClick={()=>setAnchor(a=>shift(view,a,-1))}><CaretLeft size={16}/></button>
+      <button className="gc-arrow" aria-label={`下一${unit}`} onClick={()=>setAnchor(a=>shift(view,a,1))}><CaretRight size={16}/></button>
+      <span className="lv-cal-range">{label}</span>
+      <button className="gc-arrow" aria-label="重新整理" disabled={loading} onClick={loadEvents}><ArrowClockwise size={15}/></button>
       <span className="grow"/>
-      <div className="lv-cal-nav">
-        <span className="lv-cal-views" role="tablist">{VIEWS.map(([k,l])=><button key={k} role="tab" aria-selected={view===k} className={'btn sm'+(view===k?' primary':'')} onClick={()=>setView(k)}>{l}</button>)}</span>
-        <button className="btn sm" aria-label={`上一${unit}`} onClick={()=>setAnchor(a=>shift(view,a,-1))}><CaretLeft size={14}/></button>
-        <button className="btn sm" onClick={()=>setAnchor(new Date())}>今天</button>
-        <button className="btn sm" aria-label={`下一${unit}`} onClick={()=>setAnchor(a=>shift(view,a,1))}><CaretRight size={14}/></button>
-        <span className="lv-cal-range">{label}</span>
-        <button className="btn sm" aria-label="重新整理" disabled={loading} onClick={loadEvents}><ArrowClockwise size={14}/></button>
-      </div>
+      <span className="lv-cal-acct"><Icon icon={calendarIcon} width={18} height={18}/>{data?.account_label||status.account_label||'Google 日曆'}</span>
+      <span className="lv-cal-views" role="tablist">{VIEWS.map(([k,l])=><button key={k} role="tab" aria-selected={view===k} className={'btn sm'+(view===k?' primary':'')} onClick={()=>setView(k)}>{l}</button>)}</span>
     </div>
-    {!data&&loading?<Loading/>:view==='month'&&!days.length?<div className="lv-cal-none" style={{padding:'24px 0',textAlign:'center'}}>這個月沒有行程</div>:days.map(d=><section key={dayKey(d.date)} className={'lv-cal-day'+(dayKey(d.date)===today?' today':'')}>
-      <div className="lv-cal-dh"><b>{WD[d.date.getDay()]}</b><span>{md(d.date)}{dayKey(d.date)===today?' · 今天':''}</span></div>
-      <div className="lv-cal-evs">{d.items.length?d.items.map(e=><div className="lv-cal-ev" key={e.id+dayKey(d.date)}>
-        <span className="t">{timeText(e)}</span>
-        <div style={{minWidth:0}}><b>{e.title||'（無標題）'}</b>{e.location&&<small><MapPin size={11} style={{verticalAlign:-1}}/> {e.location}</small>}</div>
-        {e.link&&<a href={e.link} target="_blank" rel="noreferrer" aria-label="在 Google 日曆開啟" title="在 Google 日曆開啟"><ArrowSquareOut size={16}/></a>}
-      </div>):<span className="lv-cal-none">這天沒有行程</span>}</div>
-    </section>)}
+    <div className="gc-body">{!data&&loading?<Loading/>:view==='month'?<MonthGrid events={evs} anchor={anchor} onPick={setPicked} onDay={goDay}/>
+      :<TimeGrid events={evs} days={Array.from({length:count},(_,i)=>addD(start,i))} onPick={setPicked} onDay={view==='week'?goDay:undefined}/>}</div>
+    {picked&&<EventDetail ev={picked} onClose={()=>setPicked(null)}/>}
   </div>;
 }

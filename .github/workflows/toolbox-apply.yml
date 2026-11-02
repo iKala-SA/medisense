@@ -1,0 +1,49 @@
+# 套用 on the 資料庫連接器 page: dispatched by the backend (POST /api/db-connectors/apply). Runs infra/13-deploy-toolbox.sh
+# against the snapshot in Firestore config/toolbox_deploy (tools.yaml -> Secret Manager -> redeploy the Toolbox Cloud Run service).
+# Unlike the LiteLLM apply nothing is committed: the YAML names hospital database hosts, which do not belong in git.
+# The backend matches its run by run-name, so keep "Toolbox apply v<version>" in sync with engine/github_actions.py.
+# Secrets: reuses LITELLM_DEPLOY_SA_KEY (infra/10 + infra/14).
+name: Apply Toolbox config
+run-name: Toolbox apply v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Render version (config/toolbox_deploy)
+        required: true
+      requested_by:
+        description: Admin who pressed 套用
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# One deploy at a time; a second request waits instead of racing the first.
+concurrency:
+  group: toolbox-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      VERSION: ${{ inputs.version }}
+      REQUESTED_BY: ${{ inputs.requested_by }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.LITELLM_DEPLOY_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Toolbox (infra/13)
+        run: |
+          source infra/env.sh
+          YES=1 RENDER_DOC=toolbox_deploy bash infra/13-deploy-toolbox.sh

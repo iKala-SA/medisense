@@ -192,6 +192,21 @@ export const api={
   calendarStatus:()=>call('/api/calendar/status'),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
   calendarFreebusy:(from,to)=>call(`/api/calendar/freebusy?${query({from,to})}`),
+  // database connectors (admin)
+  listDbConnectors:()=>call('/api/db-connectors'),
+  createDbConnector:c=>call('/api/db-connectors',{method:'POST',body:body(c)}),
+  updateDbConnector:(id,c)=>call(`/api/db-connectors/${id}`,{method:'PUT',body:body(c)}),
+  deleteDbConnector:id=>call(`/api/db-connectors/${id}`,{method:'DELETE'}),
+  resolveDbAccess:(id,email)=>call(`/api/db-connectors/${id}/resolve`,{method:'POST',body:body({email})}),
+  dbApplyState:()=>call('/api/db-connectors/apply/state'),
+  dbApply:()=>call('/api/db-connectors/apply',{method:'POST'}),
+  testDbConnection:(kind,connection,user,password)=>call('/api/db-connectors/test-connection',{method:'POST',body:body({kind,connection,user,password})}),
+  dbCatalog:()=>call('/api/db-connectors/catalog'),
+  ttsVoices:()=>call('/api/tts/voices'),
+  ttsAudio:async(text,voice,rate=1)=>{const res=await fetch('/api/tts',{method:'POST',headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body({text,voice,rate})});
+    if(!res.ok)throw new Error(`${res.status} ${await res.text()}`);return res.arrayBuffer()},
+  checkDbSql:(id,email,sql)=>call(`/api/db-connectors/${id}/check-sql`,{method:'POST',body:body({email,sql})}),
+  myDbConnectors:()=>call('/api/db-connectors/mine'),
   // per-user OAuth connectors
   myConnectors:()=>call('/api/my-connectors'),
   myConnectorStatus:id=>call(`/api/my-connectors/${id}/status`),

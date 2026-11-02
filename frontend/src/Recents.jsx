@@ -100,22 +100,22 @@ export function Recents({chats,projects,actions,activeId,activeProject,onOpen,on
     return chats.filter(c=>!!c.archived===arch).filter(c=>arch||!c.project_id||!pref.projects).filter(c=>!days||now-tOf(c,'updated')<=days*864e5).sort((a,b)=>(arch?0:byPin(a,b))||tOf(b,pref.sort)-tOf(a,pref.sort));
   },[chats,pref.sort,pref.projects,pref.range,days]);
   const newProject=async(chat)=>{const p=await actions.createProject(naming?.name);if(p&&chat?.id)await actions.moveChat(chat.id,p.id);setNaming(null)};
-  const projectsBlock=pref.projects&&<div className="rc-sec" key="projects">
+  const projectsBlock=pref.projects&&<div className={"rc-sec proj-sec"+(pref.projOpen?" open":"")} key="projects">
     <div className="rc-head"><button type="button" className="rc-title" aria-expanded={pref.projOpen} onClick={()=>set({projOpen:!pref.projOpen})}><span>專案</span>{pref.projOpen?<CaretDown size={13}/>:<CaretRight size={13}/>}</button><button type="button" className="rc-ico" aria-label="新專案" title="新專案" onClick={()=>setNaming({name:''})}><Plus size={16}/></button></div>
-    {pref.projOpen&&(projects.length===0?<p className="rc-empty">沒有專案</p>:projects.map(p=><div key={p.id} className={'rc-row proj'+(activeProject===p.id?' active':'')}>
+    {pref.projOpen&&<div className="rc-body">{(projects.length===0?<p className="rc-empty">沒有專案</p>:projects.map(p=><div key={p.id} className={'rc-row proj'+(activeProject===p.id?' active':'')}>
       {projEdit===p.id?<NameInput value={p.name} onDone={v=>{setProjEdit(null);if(v!=null&&v.trim()&&v.trim()!==p.name)actions.renameProject(p.id,v)}}/>
         :<button type="button" className="rc-main" title={p.name} onClick={()=>onOpenProject(p)}><FolderSimple size={18}/><span>{p.name}</span></button>}
       {projEdit!==p.id&&<button type="button" className="rc-dots" aria-label={`專案「${p.name}」的更多選項`} onClick={e=>setProjMenu({p,el:e.currentTarget})}><DotsThree size={20} weight="bold"/></button>}
-    </div>))}
+    </div>))}</div>}
   </div>;
-  const recentBlock=<div className="rc-sec" key="recent">
+  const recentBlock=<div className={"rc-sec recent-sec"+(pref.open?" open":"")} key="recent">
     <div className="rc-head"><button type="button" className="rc-title" aria-expanded={pref.open} onClick={()=>set({open:!pref.open})}><span>最近項目</span>{pref.open?<CaretDown size={13}/>:<CaretRight size={13}/>}</button>
       <span className="rc-tools">
         <button type="button" ref={dots} className="rc-ico" aria-label="側邊欄選項" aria-haspopup="menu" onClick={()=>setMenu('main')}><DotsThree size={20} weight="bold"/></button>
         <button type="button" ref={filt} className={'rc-ico'+(pref.range!=='all'?' on':'')} aria-label="篩選對話" aria-haspopup="menu" onClick={()=>setMenu('filter')}><FilterIcon/></button>
         <button type="button" className="rc-ico" aria-label="新對話" title="新對話" onClick={onNewChat}><NotePencil size={18}/></button>
       </span></div>
-    {pref.open&&(list.length===0?<p className="rc-empty">{pref.range==='archived'?'沒有已封存的對話':pref.range!=='all'?'這個時間範圍沒有對話':'尚無聊天記錄'}</p>:list.map(c=><ChatRow key={c.id} chat={c} active={c.id===activeId} onOpen={onOpen} projects={projects} actions={actions} onAsk={setAsk} onNewProject={ch=>setNaming({name:'',chat:ch})}/>))}
+    {pref.open&&<div className="rc-body">{(list.length===0?<p className="rc-empty">{pref.range==='archived'?'沒有已封存的對話':pref.range!=='all'?'這個時間範圍沒有對話':'尚無聊天記錄'}</p>:list.map(c=><ChatRow key={c.id} chat={c} active={c.id===activeId} onOpen={onOpen} projects={projects} actions={actions} onAsk={setAsk} onNewProject={ch=>setNaming({name:'',chat:ch})}/>))}</div>}
   </div>;
   return <div className="recents rc">
     {pref.order==='projects'?<>{projectsBlock}{recentBlock}</>:<>{recentBlock}{projectsBlock}</>}

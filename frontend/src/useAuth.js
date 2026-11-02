@@ -8,7 +8,7 @@ import {api} from './api';
 export function useAuth({onSignedIn,onSignedOut}){
   const [me,setMe]=useState(null),[authError,setAuthError]=useState(''),[checking,setChecking]=useState(!MOCK&&!PREVIEW);
   useEffect(()=>{
-    if(PREVIEW){const m={uid:'u-lin',email:'chlin@vghtc.gov.tw',name:'Paggie',role:'admin',department:'資訊室'};setMe(m);setChecking(false);onSignedIn?.(m);return}
+    if(PREVIEW){const m={uid:'u-lin',email:'chlin@vghtc.gov.tw',name:'Paggie',role:import.meta.env.VITE_BK_PREVIEW_ROLE||'admin',department:'資訊室'};setMe(m);setChecking(false);onSignedIn?.(m);return}
     if(MOCK)return;
     return onAuthStateChanged(auth,async u=>{
       if(!u){setMe(null);setChecking(false);onSignedOut?.();return}

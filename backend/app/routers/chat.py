@@ -26,6 +26,7 @@ from ..auth import User, current_user, require_builder
 from ..config import settings
 from ..engine import chat_images, deid, llm, routing
 from ..engine import connectors as connectors_engine
+from ..engine import db_tools
 from ..engine.extract import NoTextError, extract_text
 from ..schemas import DEPARTMENTS, AgentIn, AttachmentOut, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments
 from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
@@ -33,6 +34,9 @@ from .runs import _agent_def, execute_run
 from .originals import access_for
 from .projects import own_project
 from .spaces import _load_editable, add_documents, doc_visible
+
+VOICE_HINT = ("\n\n這是語音對話，回覆會被唸出來：用自然的口語、簡短（最多三到四句），先講重點；"
+              "不要使用 Markdown、清單、標題或表格，也不要唸出網址或編號。")
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 log = logging.getLogger(__name__)
@@ -93,12 +97,19 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     else:
         agent, agent_id = _default_agent(user)
         rag_files = resolve_rag_files(agent.knowledge_doc_ids) if agent_id != BUILTIN_ID else []
-    agent = agent.model_copy(update={"model_group": body.model_group})
+    agent = agent.model_copy(update={"model_group": "fast" if body.voice and not body.model else body.model_group})
+    if body.skill_ids:  # skills invoked with / : added to the agent's own; unknown, disabled or non-viewable ones are skipped by skills.build_prefix
+        agent = agent.model_copy(update={"skill_ids": list(dict.fromkeys([*agent.skill_ids, *body.skill_ids]))})
+    if not chosen and body.db_connectors:  # what each database returns is still decided by THIS user's group rules at call time
+        agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"db_connectors": list(dict.fromkeys(body.db_connectors))})})
 
     doc_ids = []
     if chosen:  # a picked agent does exactly what it was built to do: its own knowledge (and spaces, by YOUR rights), its connectors, no wider scope
         from ..engine.capabilities import rag_files_for
         rag_files = rag_files_for(agent, user, rag_files)
+    elif body.knowledge_scope == "selected" and body.space_ids:  # 具體資料: the chosen spaces, limited to what THIS user may see
+        from ..engine.capabilities import rag_files_for
+        rag_files = rag_files_for(agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"spaces": list(dict.fromkeys(body.space_ids))})}), user, rag_files)
     elif body.knowledge_scope == "general":  # model only: no retrieval, whatever the agent has attached
         rag_files = []
     elif body.knowledge_scope == "all" and settings().rag_enabled:
@@ -128,7 +139,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
                 audit_action="chat.run",
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
-                extra_context=_attachment_context(existing), session_extra=extra,
+                extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
                 pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
 
 
@@ -153,11 +164,18 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
         act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
         cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("label") or d.get("name") or spec.get("label") or d.get("type", ""),
                      "action": (act or {}).get("label") or action})
+    dbs = []  # databases the agent lists, and whether THIS user's group rules let them query it
+    for c, g in db_tools.grants_for(agent.capabilities.db_connectors, user.email):
+        dbs.append({"id": c["id"], "name": c.get("name", ""), "kind": c.get("kind", ""), "allowed": True, "queries": len(g["queries"]), "views": len(g["views"])})
+    granted = {d["id"] for d in dbs}
+    for cid in agent.capabilities.db_connectors:
+        if cid not in granted and (snap := db.client().collection("db_connectors").document(cid).get()).exists:
+            dbs.append({"id": cid, "name": (snap.to_dict() or {}).get("name", ""), "kind": (snap.to_dict() or {}).get("kind", ""), "allowed": False, "queries": 0, "views": 0})
     inputs = [{"id": st.id, "type": st.type, "title": st.title, "placeholder": st.config.get("placeholder", ""), "default": st.config.get("default", ""),
                "allow_override": st.config.get("allow_override", True), "required": st.config.get("required", True)}
               for st in agent.steps if st.enabled and st.type in ("text_input", "file_upload")]
     return {"id": agent_id, "name": agent.name, "description": agent.description, "icon": agent.icon, "opening_questions": agent.opening_questions,
-            "connectors": cons, "web_search": agent.capabilities.web_search, "knowledge": bool(rag_files or agent.capabilities.spaces),
+            "connectors": cons, "databases": dbs, "web_search": agent.capabilities.web_search, "knowledge": bool(rag_files or agent.capabilities.spaces),
             "documents": len(agent.knowledge_doc_ids), "has_steps": bool(agent.steps), "inputs": inputs}
 
 

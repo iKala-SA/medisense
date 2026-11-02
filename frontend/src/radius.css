@@ -396,3 +396,15 @@ body,#root{background:transparent!important}
 .lg-center .login-error{margin:0;max-width:320px;text-align:center}
 .lg-center .btn,.lg-center button{font-size:17px;font-weight:600;min-height:48px;min-width:220px}
 .lg-center button svg{width:20px;height:20px}
+
+/* model menu: smaller type, the grey note UNDER the title, one thin scrollbar (the outer menu only) */
+.quick-composer-wrap .model-menu{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#d3d6db transparent;overscroll-behavior:contain}
+.quick-composer-wrap .model-menu::-webkit-scrollbar{width:8px}
+.quick-composer-wrap .model-menu::-webkit-scrollbar-thumb{background:#d3d6db;border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+.quick-composer-wrap .model-options{overflow:visible!important;max-height:none!important}
+.quick-composer-wrap .model-options>button{min-height:32px;padding:5px 10px;gap:9px;align-items:center}
+.quick-composer-wrap .model-options>button>span:not(.lv-gc-ico){display:flex;flex-direction:column;justify-content:center;gap:1px}
+.quick-composer-wrap .model-options>button.model-auto{min-height:40px}
+.quick-composer-wrap .model-options b,.quick-composer-wrap .model-options b:has(+small.model-note){display:block;font-size:12.5px;line-height:1.3;font-weight:400;color:#1f242b}
+.quick-composer-wrap .model-options small,.quick-composer-wrap .model-options small.model-note{display:block;font-size:10.5px;line-height:1.25;color:#8a919c;margin:0}
+.quick-composer-wrap .model-options>button:disabled b{color:#8a919c}

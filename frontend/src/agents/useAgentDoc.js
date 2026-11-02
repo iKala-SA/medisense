@@ -3,7 +3,7 @@ import {api} from '../api';
 import {errText,canEditAgent} from '../live/kit';
 import {agentToIn} from './stepkit';
 
-export const blankSafe=x=>({...x,kind:x.kind||(x.steps?.length?'flow':'agent'),capabilities:{web_search:false,spaces:[],connectors:[],model_pref:'balanced',thinking:'low',...(x.capabilities||{})},steps:x.steps||[],opening_questions:x.opening_questions||[],icon:x.icon||'',original_prompt:x.original_prompt||''});
+export const blankSafe=x=>({...x,kind:x.kind||(x.steps?.length?'flow':'agent'),capabilities:{web_search:false,spaces:[],connectors:[],db_connectors:[],model_pref:'balanced',thinking:'low',...(x.capabilities||{})},steps:x.steps||[],opening_questions:x.opening_questions||[],icon:x.icon||'',original_prompt:x.original_prompt||''});
 
 /* One agent document with autosave (1.2 s after the last edit) and the lists the editors pick from. */
 export default function useAgentDoc(id,me,notify,onMissing){
@@ -11,7 +11,7 @@ export default function useAgentDoc(id,me,notify,onMissing){
   const timer=useRef(null),latest=useRef(null),inflight=useRef(Promise.resolve());
   useEffect(()=>{
     api.getAgent(id).then(x=>{const v=blankSafe(x);setA(v);latest.current=v;setSavedAt(x.updated_at)}).catch(e=>{notify(errText(e));onMissing?.()});
-    Promise.allSettled([api.listConnectors(),api.listSpaces(),api.listDocs(),api.features()]).then(([c,s,d,f])=>setLib({connectors:c.value||[],spaces:(s.value||[]).map(x=>({id:x.id,name:x.name})),docs:(d.value||[]).filter(x=>x.status!=='error').map(x=>({id:x.id,name:x.name})),features:f.value||null}));
+    Promise.allSettled([api.listConnectors(),api.listSpaces(),api.listDocs(),api.features(),api.dbCatalog()]).then(([c,s,d,f,b])=>setLib({dbs:b.value||[],connectors:c.value||[],spaces:(s.value||[]).map(x=>({id:x.id,name:x.name})),docs:(d.value||[]).filter(x=>x.status!=='error').map(x=>({id:x.id,name:x.name})),features:f.value||null}));
   },[id]);// eslint-disable-line
   const canEdit=canEditAgent(a,me);
   const flush=useCallback(()=>{

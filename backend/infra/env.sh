@@ -34,6 +34,13 @@ export MODEL_ARMOR_PROJECT="$PROJECT_ID"
 export MODEL_ARMOR_LOCATION="us-central1"
 export MODEL_ARMOR_TEMPLATE_ID="esther-modelArmor"
 
+# MCP Toolbox for Databases (資料庫連接器): infra/13-deploy-toolbox.sh. Internal only; the backend SA is the only invoker.
+export TOOLBOX_SERVICE="tcvgh-toolbox"
+export TOOLBOX_SA="tcvgh-toolbox-sa"
+export TOOLBOX_INGRESS="internal"
+# Pinned to the version tested on 2026-10-31 (local + Cloud Run); bump deliberately after re-running the DB connector tests.
+export TOOLBOX_IMAGE="us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.15.0"
+
 # Who may sign in. Comma-separated Google Workspace domains.
 # For the sandbox we allow iKala; for TCVGH replace with their Workspace domain.
 export ALLOWED_DOMAINS="ikala.ai,cloud.ikala.tv"  # cloud.ikala.tv: non-admin test account (2026-10-26)

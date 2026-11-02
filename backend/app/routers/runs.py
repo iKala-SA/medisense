@@ -76,7 +76,7 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
     try:
         r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=safe_message,
                                     history=history, rag_files=rag_files, skill_prefix=skill_prefix, extra_context=extra_context,
-                                    pin_model=pin_model, emit=emit, web_search=web_search, images=images)
+                                    pin_model=pin_model, emit=emit, web_search=web_search, images=images, user_email=user.email)
     except APIStatusError as exc:
         if exc.status_code == 401:
             llm.reset_client_cache()
@@ -149,7 +149,7 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
     t0 = time.perf_counter()
     try:
         r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
-                                    history=history, rag_files=rag_files, resume=pending,
+                                    history=history, rag_files=rag_files, resume=pending, user_email=user.email,
                                     skill_prefix=skills.build_prefix(agent.skill_ids, user))
     except APIStatusError as exc:
         if exc.status_code == 401:
