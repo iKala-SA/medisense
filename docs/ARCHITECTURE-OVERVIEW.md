@@ -1,5 +1,7 @@
 # Medisense 架構總覽（含資料庫連接器與 Cloud SQL）
 
+> **2026-11-03 起資料庫連接器改為 MVP**：後端直接連資料庫（不經 Toolbox）、BigQuery 用使用者自己的 Google token；預先定義查詢、檢視表白名單、群組規則已移除。詳見 `DB-CONNECTORS-DESIGN.md` 開頭。下方圖與流程中 Toolbox 相關部分為舊設計。
+
 依 repo 現況整理（2026-10-31）。標 ⚠ 的是尚未在真實環境驗證的部分。
 
 ## 1. 全貌
@@ -84,8 +86,8 @@
 
 ## 7. 未驗證 / 待辦
 
-- ⚠ Toolbox 實機：`/mcp` 路徑、`execute-sql` 參數名 `sql`、SSL 值、空設定是否能啟動、映像版本（目前 `:latest`）。
+- 直接連線（PostgreSQL / MySQL / SQL Server）需對真實資料庫驗證；後端需能經 VPC 連到院內網段。
 - ⚠ 部署腳本與 GitHub 工作流程只做過語法檢查。
-- SQL Server 無查詢逾時（上游限制），靠資料庫端 Resource Governor。
+- SQL Server 查詢逾時改由驅動程式（python-tds）取消，需對真實 SQL Server 驗證。
 - 「流程」多步驟接資料庫、範例問答的管理畫面（第 6 步）。
 - Oracle HIS 刻意暫緩。

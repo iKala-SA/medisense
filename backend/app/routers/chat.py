@@ -165,13 +165,8 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
         act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
         cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("label") or d.get("name") or spec.get("label") or d.get("type", ""),
                      "action": (act or {}).get("label") or action})
-    dbs = []  # databases the agent lists, and whether THIS user's group rules let them query it
-    for c, g in db_tools.grants_for(agent.capabilities.db_connectors, user.email):
-        dbs.append({"id": c["id"], "name": c.get("name", ""), "kind": c.get("kind", ""), "allowed": True, "queries": len(g["queries"]), "views": len(g["views"])})
-    granted = {d["id"] for d in dbs}
-    for cid in agent.capabilities.db_connectors:
-        if cid not in granted and (snap := db.client().collection("db_connectors").document(cid).get()).exists:
-            dbs.append({"id": cid, "name": (snap.to_dict() or {}).get("name", ""), "kind": (snap.to_dict() or {}).get("kind", ""), "allowed": False, "queries": 0, "views": 0})
+    dbs = [{"id": c["id"], "name": c.get("name", ""), "kind": c.get("kind", ""), "allowed": True}  # MVP: anyone using the agent
+           for c in db_tools.connectors_for(agent.capabilities.db_connectors)]
     inputs = [{"id": st.id, "type": st.type, "title": st.title, "placeholder": st.config.get("placeholder", ""), "default": st.config.get("default", ""),
                "allow_override": st.config.get("allow_override", True), "required": st.config.get("required", True)}
               for st in agent.steps if st.enabled and st.type in ("text_input", "file_upload")]

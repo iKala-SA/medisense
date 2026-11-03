@@ -3,7 +3,7 @@
 The browser obtains a short-lived Google access token (scope `bigquery`) and sends it with the chat request in the
 `X-BigQuery-Auth` header; the backend calls the BigQuery REST API with it and never stores it. Google IAM decides what the
 user can read (BigQuery Job User on the project, Data Viewer on the datasets/views). Rows come back in the same shape as
-Toolbox results — one JSON object per line — so the row cut, de-identification and audit are shared with the other engines."""
+the other engines' results — one JSON object per line — so the row cut, de-identification and audit are shared."""
 import contextlib
 import contextvars
 import json
@@ -123,3 +123,21 @@ def run(conn: dict, sql: str, *, max_rows: int, param_defs: list[dict] | None = 
     finally:
         if client is None:
             http.close()
+
+
+def datasets(conn: dict) -> list[str]:
+    return [d.strip() for d in (conn.get("datasets") or "").split(",") if d.strip()]
+
+
+def schema(conn: dict, match: str = "", *, token: str | None = None, client: httpx.Client | None = None) -> str:
+    """Tables and columns of the connector's datasets (what the user's own Google account can see)."""
+    from .db_direct import describe
+
+    rows = []
+    for ds in datasets(conn):
+        sql = (f"SELECT table_name, column_name, data_type FROM `{conn['project']}.{ds}`.INFORMATION_SCHEMA.COLUMNS "
+               "ORDER BY table_name, ordinal_position")
+        for ln in run(conn, sql, max_rows=20000, token=token, client=client).splitlines():
+            r = json.loads(ln)
+            rows.append((f"{ds}.{r['table_name']}", r["column_name"], r["data_type"]))
+    return describe(rows, match)

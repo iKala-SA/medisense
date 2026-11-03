@@ -28,10 +28,6 @@ def _client() -> httpx.Client:
                                  "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
 
 
-def toolbox_run_title(version: int) -> str:
-    return f"Toolbox apply v{version}"
-
-
 def dispatch(version: int, requested_by: str, workflow: str | None = None) -> None:
     s = settings()
     with _client() as c:

@@ -1,5 +1,12 @@
 # 資料庫連接器（Database）設計
 
+> **2026-11-03 改為 MVP（本節優先於下文）**：
+> - 連線 = 位置＋一組帳號密碼。PostgreSQL / MySQL / SQL Server 由後端用建立連線時填的帳號直接登入（`backend/app/engine/db_direct.py`），**不再經過 MCP Toolbox**（無 `tools.yaml`、無「套用」、無 GitHub Actions 部署）。Cloud SQL 請填私有 IP。
+> - BigQuery 不需帳號：使用者在對話中點「授權 BigQuery」，用自己的 Google token 查詢（`engine/bigquery.py`）；管理員填專案、區域、資料集。
+> - **移除**：預先定義查詢（A）、可查詢的檢視表（B 的白名單）、依群組的存取規則、每種權限等級一個帳號。使用連結了該連線的 Agent 的人都能查詢。
+> - 模型每個連線有兩個工具：列出資料表與欄位、執行一個唯讀 SELECT。保護：sqlglot 檢查（單一 SELECT、無註解、擋危險函式）、強制筆數上限、唯讀 session、30 秒逾時（SQL Server 由驅動程式取消查詢）、結果去識別化、稽核。
+> - **主要防線仍是資料庫帳號本身**：請用只讀得到去識別化 View 的唯讀帳號（見 DBA 檢查清單）。
+
 狀態：草案，待確認後實作。日期：2026-10-30。
 
 ## 1. 目標與範圍

@@ -134,7 +134,7 @@ export default function AgentDetail({id,me,notify,onBack,onChat,onDeleted}){
           {conns.map((c,i)=><ConnRow key={i} c={c} lib={lib} dis={dis} onChange={p=>setConn(i,p)} onRemove={()=>setCap({connectors:conns.filter((_,j)=>j!==i)})}/>)}
           {!conns.length&&<span className="ag-muted">沒有連結動作。</span>}
         </Section>
-        <Section title="資料庫" count={(cap.db_connectors||[]).length} sub="可查詢的院內資料庫。能查到什麼，由「使用者本人」所屬群組的規則決定，分享 Agent 不會分享資料" open={open.db} onToggle={()=>tog('db')}
+        <Section title="資料庫" count={(cap.db_connectors||[]).length} sub="Agent 可查詢的資料庫（唯讀）。使用這個 Agent 的人都能查詢；BigQuery 以使用者自己的 Google 帳號查詢" open={open.db} onToggle={()=>tog('db')}
           action={<button className="ad-link" disabled={dis} onClick={()=>{setOpen(o=>({...o,db:true}));setPick(pick==='db'?null:'db')}}>連結資料庫</button>}>
           <div className="ag-chips">{(cap.db_connectors||[]).map(s=>{const it=(lib.dbs||[]).find(x=>x.id===s);return <span className="ag-chip big" key={s}><Database size={13}/>{it?.name||'（已不存在）'}{!dis&&<button aria-label="移除" onClick={()=>setCap({db_connectors:cap.db_connectors.filter(x=>x!==s)})}><X size={11}/></button>}</span>})}{!(cap.db_connectors||[]).length&&<span className="ag-muted">沒有連結資料庫。</span>}</div>
           {pick==='db'&&<div className="ag-pop static">{(lib.dbs||[]).filter(x=>!(cap.db_connectors||[]).includes(x.id)).map(x=><button key={x.id} onClick={()=>{setCap({db_connectors:[...(cap.db_connectors||[]),x.id]});setPick(null)}}><Database size={15}/>{x.name}</button>)}{!(lib.dbs||[]).filter(x=>!(cap.db_connectors||[]).includes(x.id)).length&&<p className="ag-muted">沒有可連結的資料庫（管理員需先在「連接器 → Database」建立）</p>}</div>}
