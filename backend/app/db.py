@@ -9,9 +9,10 @@ sessions/{sessionId}             test-chat / channel conversations, pseudonymize
 audit/{autoId}                   who did what, when (append-only)
 usage/{autoId}                   one row per LLM call: tokens, cost, served model (no prompt text)
 usage_daily/{day}_{agentId}      per-agent daily rollup read by the admin monitoring dashboard
-groups/{id}                      admin-managed groups: name, description, member_emails[] (also used by sharing; see BE-GROUP-SPEC)
+users/{email}                    accounts: role, status, department, roles[] (role ids), groups[] (group ids = membership)
+groups/{id}                      admin-managed groups: name, description, role_ids[] (membership lives on users.groups; see BE-GROUP-SPEC)
 roles/{id}                       role definitions: system roles (admin/builder/user) may be overridden; custom roles are the rest.
-                                 id, name, en, desc, custom, suspended, can[labels], created_at, created_by, updated_at, updated_by
+                                 id, name, en, desc, custom, status (bool, true = 啟用), can[labels], created_at, created_by, updated_at, updated_by
 skills/{id}                      reusable instructions: name, description, instructions, enabled, share, owner_*
 schedules/{id}                   agent runs on a rhythm: agent_id, frequency, time, prompt, enabled, last_run, share
 schedule_locks/{id}_{slot}       one doc per schedule per minute, created atomically so a run happens once

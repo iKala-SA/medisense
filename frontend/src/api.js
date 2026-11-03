@@ -98,6 +98,10 @@ export const api={
   usersCsv:()=>blob('/api/users/export.csv'),
   // roles (admin; backend returns mock data for now)
   listRoles:()=>call('/api/roles'),
+  createRole:r=>call('/api/roles',{method:'POST',body:body(r)}),
+  listPermissions:()=>call('/api/permissions'),
+  deleteRole:id=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'DELETE'}),
+  updateRole:(id,patch)=>call(`/api/roles/${encodeURIComponent(id)}`,{method:'PATCH',body:body(patch)}),
   // sharing
   directory:(q='')=>call(`/api/directory?${query({q})}`),
   listGroups:()=>call('/api/groups'),
@@ -191,6 +195,7 @@ export const api={
   },
   chatAgent:id=>call(`/api/chat/agents/${id}`),
   chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
+  chatImage:(sid,aid)=>blob(`/api/chat/attachments/${sid}/${aid}/image`), // the stored (redacted) copy; 410 once expired
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),

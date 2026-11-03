@@ -44,6 +44,8 @@ class User:
     role: str  # "admin" | "builder" | "user"
     department: str = ""
     original_view: bool = False  # may open original files that contain personal data (an admin grants it per account)
+    roles: tuple[str, ...] = ()  # assigned role ids (roles/{id}); record only, access still follows `role`
+    groups: tuple[str, ...] = ()  # group ids the user belongs to (groups/{id}); membership, grants no access itself
 
 
 def is_bootstrap_admin(email: str) -> bool:
@@ -134,7 +136,9 @@ def current_user(token: str = Depends(_bearer)) -> User:
     if account.get("status") == "suspended" and not is_bootstrap_admin(email):
         raise HTTPException(403, "account suspended")
     return User(uid=claims["uid"], email=email, name=name, role=effective_role(account),
-                department=account.get("department", ""), original_view=bool(account.get("original_view", False)))
+                department=account.get("department", ""), original_view=bool(account.get("original_view", False)),
+                roles=tuple(r for r in account.get("roles") or [] if isinstance(r, str)),
+                groups=tuple(g for g in account.get("groups") or [] if isinstance(g, str)))
 
 
 def require_builder(user: User = Depends(current_user)) -> User:

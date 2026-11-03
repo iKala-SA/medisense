@@ -30,7 +30,8 @@ def test_member_by_email_roles(fs):
 
 
 def test_group_membership(fs):
-    fs.put("groups/g1", {"name": "ICU", "member_emails": ["user@example.com"]})
+    fs.put("groups/g1", {"name": "ICU"})
+    fs.put("users/user@example.com", {"email": "user@example.com", "groups": ["g1"]})
     d = doc(access="restricted", members=[{"type": "group", "id": "g1", "role": "edit"}])
     assert sharing.can_edit(PLAIN, d)
     assert not sharing.can_view(BUILDER2, d)
@@ -90,10 +91,10 @@ def test_published_still_hospital_wide(fs, as_user):
 def test_groups_admin_only_and_directory(fs, as_user):
     assert as_user(BUILDER).post("/api/groups", json={"name": "ICU"}).status_code == 403
     c = as_user(ADMIN)
-    r = c.post("/api/groups", json={"name": "ICU", "member_emails": ["Nurse@Example.com", "nurse@example.com"]})
-    assert r.status_code == 201 and r.json()["member_emails"] == ["nurse@example.com"]
-    assert c.post("/api/groups", json={"name": "ICU"}).status_code == 201  # duplicate names are allowed
     fs.put("users/nurse@example.com", {"email": "nurse@example.com", "name": "Nina", "department": "護理部", "status": "active"})
+    r = c.post("/api/groups", json={"name": "ICU", "member_emails": ["Nurse@Example.com", "nobody@example.com"]})
+    assert r.status_code == 201 and r.json()["member_emails"] == ["nurse@example.com"]  # only existing accounts join
+    assert c.post("/api/groups", json={"name": "ICU"}).status_code == 201  # duplicate names are allowed
     fs.put("users/gone@example.com", {"email": "gone@example.com", "name": "Nina Gone", "status": "suspended"})
     d = as_user(PLAIN).get("/api/directory", params={"q": "nin"}).json()
     assert [u["email"] for u in d["users"]] == ["nurse@example.com"]

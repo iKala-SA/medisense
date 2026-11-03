@@ -62,8 +62,11 @@ def list_sessions(limit: int = Query(30, ge=1, le=100), cursor: str | None = Non
 def get_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     d = snap.to_dict() or {}
+    from ..engine import chat_images
+    imgs = chat_images.message_images(d)
     return SessionDetail(**_summary(snap.id, d).model_dump(),
-                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta")) for m in d.get("messages") or []],
+                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []))
+                                   for i, m in enumerate(d.get("messages") or [])],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],
                          feedback={str(k): v for k, v in (d.get("feedback") or {}).items()})

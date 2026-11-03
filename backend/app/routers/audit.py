@@ -47,6 +47,7 @@ CATEGORY = {
     "user.suspend": "access", "user.reactivate": "access", "user.update": "access",
     # Sharing, skills, schedules, spaces, routing + model registry, chat (added with the Medisense integration).
     "agent.share": "access", "group.create": "access", "group.update": "access", "group.delete": "access",
+    "group.member_add": "access", "group.member_remove": "access",
     "skill.share": "access", "schedule.share": "access", "space.share": "access",
     "skill.create": "build", "skill.update": "build", "skill.delete": "build", "skill.enable": "build", "skill.disable": "build",
     "schedule.create": "build", "schedule.update": "build", "schedule.delete": "build", "schedule.enable": "build",

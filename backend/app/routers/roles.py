@@ -1,4 +1,4 @@
-"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; only GET /api/roles is implemented so far.
+"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; GET /api/roles, POST /api/roles and PATCH /api/roles/{id} (custom roles and system overrides), DELETE for custom roles.
 
 Contract follows the frontend as-built page (specifications/FE-ROLE-SPEC.md): `can` holds the capability labels
 shown on the page, `permission_count` is len(can), and custom roles have no English name and no permissions.
@@ -8,11 +8,11 @@ the built-in values, and a missing document falls back to them. Every other stor
 """
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import db
-from ..auth import effective_role, require_admin
-from ..schemas import RoleListOut, RoleOut, RoleStats
+from ..auth import User, effective_role, require_admin
+from ..schemas import RoleIn, RoleListOut, RoleOut, RolePatch, RoleStats
 
 router = APIRouter(prefix="/api/roles", tags=["roles"], dependencies=[Depends(require_admin)])
 
@@ -43,8 +43,9 @@ def _out(role_id: str, data: dict, counts: dict[str, int]) -> RoleOut:
     # The stored `custom` flag decides; documents without it fall back to "not a built-in system role".
     custom = data["custom"] if isinstance(data.get("custom"), bool) else role_id not in SYSTEM_ROLES
     return RoleOut(id=role_id, name=data.get("name", ""), en=data.get("en", ""), desc=data.get("desc", ""),
-                   custom=custom, suspended=bool(data.get("suspended", False)),
-                   member_count=counts.get(role_id, 0), permission_count=len(can), can=can)
+                   custom=custom, status=data.get("status", True) is True,
+                   member_count=counts.get(role_id, 0), permission_count=len(can), can=can,
+                   permissions=[p for p in data.get("permissions") or [] if isinstance(p, str)])
 
 
 def _all() -> list[RoleOut]:
@@ -70,3 +71,53 @@ def list_roles(search: str = Query("", max_length=100),
                       custom_roles=sum(r.custom for r in rows),
                       assigned_users=sum(r.member_count for r in rows))
     return RoleListOut(roles=picked, stats=stats)
+
+
+@router.post("", response_model=RoleOut, status_code=201)
+def create_role(body: RoleIn, user: User = Depends(require_admin)):
+    ref = db.client().collection("roles").document()
+    data = {"name": body.name, "en": "", "desc": body.desc, "custom": True, "status": True, "can": [],
+            "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
+    ref.set(data)
+    db.audit(user.uid, "role.create", user.email, role_id=ref.id, name=body.name)
+    return _out(ref.id, data, {})
+
+
+@router.patch("/{role_id}", response_model=RoleOut)
+def patch_role(role_id: str, body: RolePatch, user: User = Depends(require_admin)):
+    # The built-in administrator role is fixed (BE-ROLE-SPEC: admin is always full access and cannot be edited).
+    if role_id == "admin":
+        raise HTTPException(403, "admin role is fixed")
+    ref = db.client().collection("roles").document(role_id)
+    snap = ref.get()
+    if not snap.exists and role_id not in SYSTEM_ROLES:
+        raise HTTPException(404, "role not found")
+    changes = body.model_dump(exclude_none=True)
+    if changes:
+        ref.set({**changes, "id": role_id, "updated_at": db.now(), "updated_by": user.email}, merge=True)
+        db.audit(user.uid, "role.update", user.email, role_id=role_id, fields=sorted(changes))
+    stored = (ref.get().to_dict() or {})
+    return _out(role_id, {**SYSTEM_ROLES.get(role_id, {}), **stored}, _member_counts())
+
+
+@router.delete("/{role_id}", status_code=204)
+def delete_role(role_id: str, user: User = Depends(require_admin)):
+    ref = db.client().collection("roles").document(role_id)
+    snap = ref.get()
+    if not snap.exists and role_id not in SYSTEM_ROLES:
+        raise HTTPException(404, "role not found")
+    data = {**SYSTEM_ROLES.get(role_id, {}), **(snap.to_dict() or {})}
+    if not _out(role_id, data, {}).custom:
+        raise HTTPException(403, "built-in role cannot be deleted")
+    # Groups keep role links as ids; drop the deleted id so no group points at a missing role.
+    for g in db.client().collection("groups").stream():
+        ids = list((g.to_dict() or {}).get("role_ids") or [])
+        if role_id in ids:
+            g.reference.update({"role_ids": [x for x in ids if x != role_id]})
+    # Users' assigned role ids are cleaned up the same way.
+    for u in db.client().collection("users").stream():
+        ids = list((u.to_dict() or {}).get("roles") or [])
+        if role_id in ids:
+            u.reference.update({"roles": [x for x in ids if x != role_id]})
+    ref.delete()
+    db.audit(user.uid, "role.delete", user.email, role_id=role_id, name=data.get("name", ""))
