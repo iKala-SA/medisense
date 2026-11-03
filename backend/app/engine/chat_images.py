@@ -6,6 +6,7 @@ import base64
 import logging
 import uuid
 
+from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
 from ..config import settings
@@ -40,8 +41,15 @@ def save(uid: str, session_id: str, data: bytes, mime: str) -> tuple[str, str]:
     return aid, path
 
 
+class Gone(Exception):
+    """The stored copy no longer exists (removed, or expired by the bucket lifecycle rule)."""
+
+
 def load(path: str) -> bytes:
-    return _bucket().blob(path).download_as_bytes()
+    try:
+        return _bucket().blob(path).download_as_bytes()
+    except NotFound as exc:
+        raise Gone(path) from exc
 
 
 def delete(paths: list[str]) -> None:
@@ -60,4 +68,38 @@ def parts_for(attachments: list[dict]) -> list[dict]:
             continue
         b64 = base64.b64encode(load(a["blob"])).decode()
         out.append({"type": "image_url", "image_url": {"url": f"data:{a.get('mime', 'image/png')};base64,{b64}"}})
+    return out
+
+
+def _images(sess: dict) -> list[dict]:
+    return [a for a in sess.get("attachments") or [] if a.get("kind") == "image" and a.get("id")]
+
+
+def _referenced(sess: dict) -> set[str]:
+    return {i for m in sess.get("messages") or [] if m.get("role") == "user" for i in m.get("images") or []}
+
+
+def unsent_ids(sess: dict) -> list[str]:
+    """Images uploaded since the last message was sent: they belong to the user message about to be saved.
+    Images from before message references existed (no `msg_at`) are left to message_images' fallback."""
+    seen = _referenced(sess)
+    return [a["id"] for a in _images(sess) if a.get("msg_at") is not None and a["id"] not in seen]
+
+
+def message_images(sess: dict) -> dict[int, list[dict]]:
+    """message index -> [{id, name, mime, available}] for the user messages that had images. `available` is False once
+    the attachment was removed from the conversation (the thumbnail becomes an "expired" tile). Conversations saved
+    before images were recorded on the message: their images are shown on the first user message."""
+    by_id = {a["id"]: a for a in _images(sess)}
+    msgs = sess.get("messages") or []
+    out: dict[int, list[dict]] = {}
+    for i, m in enumerate(msgs):
+        if m.get("role") == "user" and m.get("images"):
+            out[i] = [{"id": x, "name": (by_id.get(x) or {}).get("name", ""), "mime": (by_id.get(x) or {}).get("mime", ""),
+                       "available": x in by_id} for x in m["images"]]
+    seen = _referenced(sess)
+    legacy = [a for a in by_id.values() if a.get("msg_at") is None and a["id"] not in seen]
+    first = next((i for i, m in enumerate(msgs) if m.get("role") == "user"), None)
+    if legacy and first is not None:
+        out[first] = [*out.get(first, []), *({"id": a["id"], "name": a.get("name", ""), "mime": a.get("mime", ""), "available": True} for a in legacy)]
     return out

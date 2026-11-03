@@ -60,7 +60,7 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
                 session_extra: dict | None = None, pin_model: str | None = None, emit=None,
-                web_search: bool = False, images: list[dict] | None = None) -> RunResponse:
+                web_search: bool = False, images: list[dict] | None = None, message_images: list[str] | None = None) -> RunResponse:
     """The shared pipeline behind /run, /api/chat and schedules: de-identify -> flow -> save session -> audit."""
     session_id = session_id or uuid.uuid4().hex
     sess_ref = db.client().collection("sessions").document(session_id)
@@ -85,8 +85,10 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
 
     if not sess.get("title"):  # auto title on the first run
         sess["title"] = title or make_title(safe_message)
-    sess["messages"] = [*sess["messages"], {"role": "user", "content": safe_message},
-                        {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
+    user_msg = {"role": "user", "content": safe_message}
+    if message_images:  # ids of the (redacted) images sent with this message, so a reopened chat shows them again
+        user_msg["images"] = list(message_images)
+    sess["messages"] = [*sess["messages"], user_msg, {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
     # A run that stopped at an approval node parks its state on the session; a new message discards it.
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None

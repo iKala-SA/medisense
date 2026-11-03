@@ -140,7 +140,8 @@ def _prepare(body: ChatRequest, user: User) -> dict:
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
-                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
+                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None,
+                message_images=chat_images.unsent_ids(existing))
 
 
 @router.get("/agents/{agent_id}")
@@ -269,7 +270,8 @@ async def _add_image(file: UploadFile, session_id: str | None, user: User) -> At
     except Exception as exc:  # noqa: BLE001 - redaction failed: nothing is stored and nothing reaches a model
         log.exception("image redaction failed")
         raise HTTPException(502, "圖片的個資遮蔽失敗，未上傳；請稍後再試") from exc
-    sess["attachments"] = [*atts, {"id": aid, "name": name, "chars": 0, "kind": "image", "mime": mime, "blob": path, "text": "", "at": db.now()}]
+    sess["attachments"] = [*atts, {"id": aid, "name": name, "chars": 0, "kind": "image", "mime": mime, "blob": path, "text": "", "at": db.now(),
+                                "msg_at": len(sess.get("messages") or [])}]  # sent with the next user message
     sess["updated_at"] = db.now()
     sess["expire_at"] = db.expiry(settings().session_retention_days)
     ref.set(sess)
@@ -279,12 +281,22 @@ async def _add_image(file: UploadFile, session_id: str | None, user: User) -> At
 
 @router.get("/attachments/{session_id}/{att_id}/image")
 def attachment_image(session_id: str, att_id: str, user: User = Depends(current_user)):
-    """The stored (redacted) copy of one of the caller's own images, for the thumbnail."""
+    """The stored (redacted) copy of one of the caller's own images, for the thumbnail (also in a reopened conversation).
+    Same rule as GET /api/sessions/{id}: owner only, 404 otherwise. 410 when the image was removed or has expired.
+    There is no unredacted original to return: only the redacted copy was ever stored."""
     sess = db.client().collection("sessions").document(session_id).get().to_dict() or {}
-    att = next((a for a in sess.get("attachments") or [] if a.get("id") == att_id and a.get("kind") == "image"), None)
-    if not att or sess.get("uid") != user.uid:
+    if not sess or sess.get("uid") != user.uid:
         raise HTTPException(404, "image not found")
-    return Response(chat_images.load(att["blob"]), media_type=att.get("mime", "image/png"), headers={"Cache-Control": "private, max-age=300"})
+    att = next((a for a in sess.get("attachments") or [] if a.get("id") == att_id and a.get("kind") == "image"), None)
+    if not att:
+        if any(att_id in (m.get("images") or []) for m in sess.get("messages") or []):
+            raise HTTPException(410, "image expired")
+        raise HTTPException(404, "image not found")
+    try:
+        data = chat_images.load(att["blob"])
+    except chat_images.Gone as exc:
+        raise HTTPException(410, "image expired") from exc
+    return Response(data, media_type=att.get("mime", "image/png"), headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.delete("/attachments/{session_id}/{att_id}", status_code=204)

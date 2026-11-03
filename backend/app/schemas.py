@@ -1060,6 +1060,7 @@ class SessionMessage(BaseModel):
     role: str
     content: str
     meta: dict[str, Any] | None = None  # assistant turns: {trace, citations, model} so a reopened chat shows its steps and sources
+    images: list[dict[str, Any]] = Field(default_factory=list)  # user turns: [{id, name, mime, available}] -> GET /api/chat/attachments/{sid}/{id}/image
 
 
 class SessionDetail(SessionSummary):

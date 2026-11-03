@@ -23,6 +23,9 @@ class Store:
                 store.blobs[path] = data
 
             def download_as_bytes(self):
+                from google.api_core.exceptions import NotFound
+                if path not in store.blobs:
+                    raise NotFound(path)
                 return store.blobs[path]
 
             def delete(self):
@@ -120,3 +123,70 @@ def test_image_redaction_uses_the_image_location_not_the_taiwan_region(monkeypat
     assert deid.redact_image(PNG, "image/png") == b"out"
     assert seen["parent"].endswith("/locations/global") and "asia-east1" not in seen["parent"]
     assert seen["image_redaction_configs"] == [{"redact_all_text": True}]
+
+
+def _chat_ok(monkeypatch):
+    from app.engine import llm
+
+    monkeypatch.setattr(deid, "deidentify", lambda t: t)
+    monkeypatch.setattr(llm, "complete", lambda **kw: llm.Completion("好", "gemini-3-flash", 1, 1, 0.0, 1))
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+
+
+def test_reopened_chat_lists_each_messages_images_and_serves_the_redacted_copy(fs, as_user, monkeypatch):
+    st = Store(monkeypatch)
+    _chat_ok(monkeypatch)
+    c = as_user(BUILDER)
+    a1 = c.post("/api/chat/attachments", files={"file": ("one.png", PNG)}).json()
+    sid = a1["session_id"]
+    assert c.post("/api/chat", json={"message": "第一張", "session_id": sid}).status_code == 200
+    assert c.post("/api/chat", json={"message": "沒有圖", "session_id": sid}).status_code == 200
+    a2 = c.post("/api/chat/attachments", data={"session_id": sid}, files={"file": ("two.jpg", JPG)}).json()
+    assert c.post("/api/chat", json={"message": "第二張", "session_id": sid}).status_code == 200
+
+    msgs = c.get(f"/api/sessions/{sid}").json()["messages"]
+    users = [m for m in msgs if m["role"] == "user"]
+    assert [[i["id"] for i in m["images"]] for m in users] == [[a1["attachment_id"]], [], [a2["attachment_id"]]]
+    assert users[2]["images"][0] == {"id": a2["attachment_id"], "name": "two.jpg", "mime": "image/jpeg", "available": True}
+    assert all(m["images"] == [] for m in msgs if m["role"] == "assistant")
+    assert fs.store[f"sessions/{sid}"]["messages"][0]["images"] == [a1["attachment_id"]]  # persisted on the message
+
+    img = c.get(f"/api/chat/attachments/{sid}/{a2['attachment_id']}/image")
+    assert img.status_code == 200 and img.content.startswith(b"REDACTED-") and JPG not in img.content
+    assert img.headers["content-type"] == "image/jpeg"
+    assert as_user(BUILDER2).get(f"/api/chat/attachments/{sid}/{a2['attachment_id']}/image").status_code == 404
+    assert as_user(BUILDER2).get(f"/api/sessions/{sid}").status_code == 404
+
+    # expired by the bucket lifecycle rule -> 410 (the UI shows a grey "圖片已過期" tile)
+    st.blobs.clear()
+    assert c.get(f"/api/chat/attachments/{sid}/{a1['attachment_id']}/image").status_code == 410
+    # removed from the conversation -> still listed on its message, as unavailable, and 410
+    assert c.delete(f"/api/chat/attachments/{sid}/{a1['attachment_id']}").status_code == 204
+    first = c.get(f"/api/sessions/{sid}").json()["messages"][0]
+    assert first["images"] == [{"id": a1["attachment_id"], "name": "", "mime": "", "available": False}]
+    assert c.get(f"/api/chat/attachments/{sid}/{a1['attachment_id']}/image").status_code == 410
+    assert c.get(f"/api/chat/attachments/{sid}/nope/image").status_code == 404
+
+
+def test_image_waiting_in_the_composer_is_not_shown_on_a_sent_message(fs, as_user, monkeypatch):
+    Store(monkeypatch)
+    _chat_ok(monkeypatch)
+    c = as_user(BUILDER)
+    sid = c.post("/api/chat", json={"message": "hi"}).json()["session_id"]
+    c.post("/api/chat/attachments", data={"session_id": sid}, files={"file": ("later.png", PNG)})
+    assert all(m["images"] == [] for m in c.get(f"/api/sessions/{sid}").json()["messages"])
+
+
+def test_conversations_saved_before_message_image_refs_show_images_on_the_first_message(fs, as_user):
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    fs.store["sessions/old"] = {"uid": BUILDER.uid, "agent_id": "general-chat", "created_at": now, "updated_at": now,
+                                "messages": [{"role": "user", "content": "看圖"}, {"role": "assistant", "content": "好"},
+                                             {"role": "user", "content": "再問"}, {"role": "assistant", "content": "好"}],
+                                "attachments": [{"id": "img1", "name": "a.png", "kind": "image", "mime": "image/png",
+                                                 "blob": "chat-images/u-b1/old/img1", "text": "", "chars": 0},
+                                                {"id": "doc1", "name": "a.txt", "chars": 3, "text": "abc"}]}
+    msgs = as_user(BUILDER).get("/api/sessions/old").json()["messages"]
+    assert msgs[0]["images"] == [{"id": "img1", "name": "a.png", "mime": "image/png", "available": True}]
+    assert [m["images"] for m in msgs[1:]] == [[], [], []]

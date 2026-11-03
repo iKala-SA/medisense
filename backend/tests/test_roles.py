@@ -219,14 +219,14 @@ def test_admin_role_can_be_assigned_to_users_and_groups(fs, as_user):
 def test_permission_resources_are_unique_and_match_design():
     from app.permissions import RESOURCES
     ids = [r[0] for r in RESOURCES]
-    assert len(ids) == 11 and len(set(ids)) == 11
+    assert len(ids) == 12 and len(set(ids)) == 12
     assert ids[0] == "chat" and ids[-1] == "settings"
 
 
 def test_permissions_list_is_admin_only_and_ordered(fs, as_user):
     assert as_user(PLAIN).get("/api/permissions").status_code == 403
     rows = as_user(ADMIN).get("/api/permissions").json()
-    assert [r["id"] for r in rows][:2] == ["chat", "workbench"] and len(rows) == 11
+    assert [r["id"] for r in rows][:2] == ["chat", "workbench"] and len(rows) == 12
     assert rows[0] == {"id": "chat", "name": "對話", "desc": "AI 對話與聊天紀錄", "order": 1}
 
 
