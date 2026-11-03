@@ -110,3 +110,7 @@ main.card-page,.card-page{padding-top:0!important}
 .trig-empty{padding:10px 12px;color:#8a919c;font-size:13px;margin:0}
 .flow-row{width:100%;text-align:left}
 .flow-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:760px;margin:6px auto -2px;font-size:13px;color:#44524b}
+/* BigQuery authorise chip (composer tools row) */
+.quick-composer-wrap .bq-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid #d5e6dd;border-radius:999px;padding:3px 9px;font-size:12px;color:#17623f;background:#fff;cursor:pointer;white-space:nowrap}
+.quick-composer-wrap button.bq-chip:hover{background:#f3fcf8}
+.quick-composer-wrap .bq-chip.ok{border-color:transparent;color:#7b828d;cursor:default;padding:3px 4px}

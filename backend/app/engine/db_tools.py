@@ -9,7 +9,7 @@ import logging
 
 from .. import db, sharing
 from ..config import settings
-from . import db_access, db_sql, deid, toolbox_config
+from . import bigquery, db_access, db_sql, deid, toolbox_config
 
 log = logging.getLogger(__name__)
 MAX_VIEWS_IN_PROMPT = 12
@@ -104,8 +104,7 @@ def execute(meta: dict, args: dict, *, user_id: str, email: str, agent_id: str) 
         if not g:
             raise DbError("你沒有使用這個資料庫的權限")
         sid, ctype = g["source_id"], c["kind"]
-        if ctype == "bigquery":
-            raise DbError("BigQuery 查詢需要使用者的 Google 授權，尚未開放")
+        max_rows = int(c.get("max_rows") or 100)
         if kind == "query":
             q = next((x for x in g["queries"] if x["id"] == meta["qid"]), None)
             if not q:
@@ -115,18 +114,28 @@ def execute(meta: dict, args: dict, *, user_id: str, email: str, agent_id: str) 
             if missing:
                 raise DbError(f"缺少參數：{'、'.join(missing)}")
             detail = q["name"]
-            text = _toolbox_call(toolbox_config.query_tool(cid, sid, q["id"]), call)
+            if ctype == "bigquery":  # as the signed-in user, straight to the BigQuery API (no shared login, no Toolbox)
+                text = bigquery.run(c.get("connection") or {}, q["statement"], max_rows=max_rows, param_defs=q.get("parameters") or [], values=call)
+            else:
+                text = _toolbox_call(toolbox_config.query_tool(cid, sid, q["id"]), call)
         else:
             try:
-                checked = db_sql.guard_select(str(args.get("sql", "")), ctype, g["views"], int(c.get("max_rows") or 100))
+                checked = db_sql.guard_select(str(args.get("sql", "")), ctype, g["views"], max_rows)
             except db_sql.SqlRejected as e:
                 raise DbError(f"SQL 未通過檢查：{e}") from e
             detail = checked["sql"]
-            text = _toolbox_call(toolbox_config.sql_tool(cid, sid), {"sql": checked["sql"]})
-        text = _cut(text, int(c.get("max_rows") or 100))
+            if ctype == "bigquery":
+                text = bigquery.run(c.get("connection") or {}, checked["sql"], max_rows=max_rows)
+            else:
+                text = _toolbox_call(toolbox_config.sql_tool(cid, sid), {"sql": checked["sql"]})
+        text = _cut(text, max_rows)
         rows = len([ln for ln in text.splitlines() if ln.strip().startswith("{")])
         ok = True
         return deid.deidentify(text), f"{c.get('name', '')} · {meta.get('qid') or '自然語言查詢'} · {rows} 筆"
+    except bigquery.BqError as e:
+        err = str(e)
+        tag = "需要 BigQuery 授權" if e.needs_auth else "失敗"
+        return f"[資料庫] {e}", f"{c.get('name', 'BigQuery')} · {tag}"
     except DbError as e:
         err = str(e)
         return f"[資料庫] {e}", f"{c.get('name', '資料庫')} · 未執行：{str(e)[:40]}"

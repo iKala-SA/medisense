@@ -16,7 +16,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from google.cloud import firestore
@@ -24,7 +24,7 @@ from google.cloud import firestore
 from .. import db
 from ..auth import User, current_user, require_builder
 from ..config import settings
-from ..engine import chat_images, deid, llm, routing
+from ..engine import bigquery, chat_images, deid, llm, routing
 from ..engine import connectors as connectors_engine
 from ..engine import db_tools
 from ..engine.extract import NoTextError, extract_text
@@ -180,8 +180,9 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
 
 
 @router.post("", response_model=RunResponse)
-def chat(body: ChatRequest, user: User = Depends(current_user)):
-    return execute_run(**_prepare(body, user))
+def chat(body: ChatRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
+    with bigquery.user_token(x_bigquery_auth):  # the user's own short-lived Google token, never stored
+        return execute_run(**_prepare(body, user))
 
 
 def _sse(event: dict) -> bytes:
@@ -189,13 +190,14 @@ def _sse(event: dict) -> bytes:
 
 
 @router.post("/stream")
-async def chat_stream(body: ChatRequest, user: User = Depends(current_user)):
+async def chat_stream(body: ChatRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
     kwargs = await run_in_threadpool(_prepare, body, user)  # validation errors are plain HTTP errors, before the stream opens
     events: queue.Queue = queue.Queue()
 
     def work():
         try:
-            r = execute_run(**kwargs, emit=events.put)
+            with bigquery.user_token(x_bigquery_auth):
+                r = execute_run(**kwargs, emit=events.put)
             events.put({"event": "done", "result": r.model_dump()})
         except HTTPException as exc:
             events.put({"event": "error", "status": exc.status_code, "detail": str(exc.detail)})

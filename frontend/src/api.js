@@ -1,4 +1,7 @@
-import {idToken} from './firebase';
+import {bigqueryToken,idToken} from './firebase';
+
+// The user's BigQuery token rides along on requests that may run database tools (it is never stored server-side).
+const bqh=()=>{const t=bigqueryToken();return t?{'X-BigQuery-Auth':`Bearer ${t}`}:{}};
 
 // Same-origin in production (Firebase Hosting rewrites /api/** to Cloud Run); Vite proxies it in dev.
 async function call(path,init={},json=true){
@@ -49,8 +52,8 @@ export const api={
   sandboxActivity:()=>call('/api/agents/activity'),
   unpublishAgent:id=>call(`/api/agents/${id}/unpublish`,{method:'POST'}),
   deleteAgent:id=>call(`/api/agents/${id}`,{method:'DELETE'}),
-  run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',body:body({message,session_id,use_published,version})}),
-  approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',body:body({session_id,approve})}),
+  run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',headers:bqh(),body:body({message,session_id,use_published,version})}),
+  approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',headers:bqh(),body:body({session_id,approve})}),
   draftAgent:(message,current,history,kind='flow')=>call('/api/agents/draft',{method:'POST',body:body({message,current,history,kind})}),
   improveInstructions:b=>call('/api/agents/improve',{method:'POST',body:body(b)}),
   validateSteps:steps=>call('/api/agents/validate-steps',{method:'POST',body:body({steps})}),
@@ -160,7 +163,7 @@ export const api={
   createProject:name=>call('/api/projects',{method:'POST',body:body({name})}),
   renameProject:(id,name)=>call(`/api/projects/${id}`,{method:'PATCH',body:body({name})}),
   deleteProject:id=>call(`/api/projects/${id}`,{method:'DELETE'}),
-  chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
+  chat:m=>call('/api/chat',{method:'POST',headers:bqh(),body:body(m)}),
   sendFeedback:f=>call('/api/chat/feedback',{method:'POST',body:body(f)}),
   saveToSpace:b=>call('/api/chat/save-to-space',{method:'POST',body:body(b)}),
   citedDocument:id=>call(`/api/chat/documents/${id}`),
@@ -168,7 +171,7 @@ export const api={
   fetchOriginal:(url,download=false)=>blob(download?`${url}&download=true`:url),
   /* Server-Sent Events from POST /api/chat/stream; onEvent gets each parsed event, resolves with the final RunResponse. */
   chatStream:async(m,onEvent,signal)=>{
-    const res=await fetch('/api/chat/stream',{method:'POST',signal,headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body(m)});
+    const res=await fetch('/api/chat/stream',{method:'POST',signal,headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json',...bqh()},body:body(m)});
     if(!res.ok){let d=await res.text();try{d=JSON.parse(d).detail??d}catch{/* plain text */}throw new Error(`${res.status} ${typeof d==='string'?d:JSON.stringify(d)}`)}
     const reader=res.body.getReader(),dec=new TextDecoder();let buf='',result=null;
     for(;;){

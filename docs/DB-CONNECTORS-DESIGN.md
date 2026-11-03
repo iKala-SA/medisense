@@ -58,8 +58,9 @@ Agent / 流程 / 對話 ─► 後端（授權、SQL 檢查、去識別化、稽
 - 第一階段要確認的 Toolbox 欄位（我只讀到部分頁面）：SQL Server、Cloud SQL MySQL / SQL Server 的完整 source 欄位，以及 toolsets 宣告語法。實作時逐頁驗證，不憑印象。
 
 ## 6. BigQuery：用使用者本人的身分（方案 A）
-- 設 `useClientOAuth: X-BigQuery-Auth`（自訂標頭，避免跟 Cloud Run 的 `Authorization` 衝突）、`writeMode: blocked`、`allowedDatasets`。
-- 使用者第一次查詢時，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`），隨請求送到後端，後端轉給 Toolbox。**我們不保存任何使用者憑證**。
+- **不經過 Toolbox**（2026-11-03 起）：後端用使用者的 token 直接呼叫 BigQuery REST API（`backend/app/engine/bigquery.py`）。理由：沒有共用帳號就不需要 Toolbox 的連線池；少一層也不用為 BigQuery 重新部署 Toolbox，「套用」只影響其他資料庫。
+- 使用者在對話框點「授權 BigQuery」，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`，只能用目前登入的同一個帳號），只存在瀏覽器記憶體，隨對話請求以 `X-BigQuery-Auth` 標頭送到後端，後端只在這次執行中使用。**我們不保存任何使用者憑證**，稽核記錄也不含 token。
+- 每次查詢：唯讀檢查（A 在儲存時；B 經 sqlglot 守門並強制 LIMIT）、`maximumBytesBilled`（預設 10 GiB，可用連線欄位 `max_bytes_billed` 改）、30 秒逾時、`maxResults` = 筆數上限；結果去識別化後才給模型。
 - 權限由 Google IAM 決定：使用者需有專案的「BigQuery 工作使用者」與資料集／視圖的「資料檢視者」。
 - 限制：**排程與背景執行無法使用 BigQuery**（沒有使用者在場）；token 過期時請使用者重新授權。
 - 你要做的：啟用 BigQuery API；OAuth 同意畫面設為「內部」並加入 `https://www.googleapis.com/auth/bigquery` 範圍；確認 Web OAuth 用戶端的授權來源包含平台網址；用 Google 群組授權使用者。
@@ -87,7 +88,7 @@ Toolbox 的資料來源與工具來自 `tools.yaml`；它支援動態重新載�
 4. Toolbox 部署腳本、DBA 清單、套用流程。
 5. 預先定義查詢（A）端到端，接上 Agent／流程。
 6. 範圍內自然語言查詢（B）端到端。
-7. BigQuery 使用者憑證流程。
+7. BigQuery 使用者憑證流程。（2026-11-03 完成：直接呼叫 BigQuery API，見 §6）
 
 ## 11. 未決與風險
 - §7 的設定更新方式（做法 1 或 2）。

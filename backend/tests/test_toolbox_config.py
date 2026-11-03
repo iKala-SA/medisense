@@ -55,14 +55,12 @@ def test_engine_specific_types():
     assert s["type"] == "cloud-sql-mssql" and s["instance"] == "i" and s["ipType"] == "private" and cs[("tool", "c1__ro__stock")]["type"] == "mssql-sql"
 
 
-def test_bigquery_runs_as_the_user_and_is_read_only():
+def test_bigquery_is_not_rendered_for_toolbox():
+    """BigQuery runs as the signed-in user against the BigQuery API, so Toolbox gets no source, tool or secret for it."""
     bq = conn("bigquery", connection={"project": "p1", "location": "asia-east1", "datasets": "a, b"}, sources=[], max_rows=50,
               queries=[], rules=[{"group_id": "g", "source_id": "", "queries": [], "views": ["v1"]}])
-    s, t = docs([bq])
-    assert s["type"] == "bigquery" and s["writeMode"] == "blocked" and s["useClientOAuth"] == "X-BigQuery-Auth"
-    assert s["allowedDatasets"] == ["a", "b"] and s["maxQueryResultRows"] == 50 and "password" not in s and "user" not in s
-    assert t["name"] == "c1__bq__sql" and t["type"] == "bigquery-execute-sql"
-    assert tc.required_secrets([bq]) == [] and tc.problems([bq]) == []
+    assert tc.render([bq]) == "" and tc.required_secrets([bq]) == [] and tc.used_logins([bq]) == []
+    assert "c1__" not in tc.render([bq, conn("postgres", id="c2")])
 
 
 def test_missing_password_is_reported():

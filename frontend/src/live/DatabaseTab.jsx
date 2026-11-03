@@ -21,7 +21,7 @@ export const DB_KINDS={
   cloud_sql_postgres:{label:'Cloud SQL · PostgreSQL',fields:[['project','專案 ID'],['region','區域','asia-east1'],['instance','執行個體'],['database','資料庫'],['ip_type','IP 類型（public / private / psc）','private']]},
   cloud_sql_mysql:{label:'Cloud SQL · MySQL',fields:[['project','專案 ID'],['region','區域','asia-east1'],['instance','執行個體'],['database','資料庫'],['ip_type','IP 類型（public / private / psc）','private']]},
   cloud_sql_mssql:{label:'Cloud SQL · SQL Server',fields:[['project','專案 ID'],['region','區域','asia-east1'],['instance','執行個體'],['database','資料庫'],['ip_type','IP 類型（public / private / psc）','private']]},
-  bigquery:{label:'BigQuery',fields:[['project','專案 ID'],['location','位置','asia-east1'],['datasets','允許的資料集（逗號分隔，留空＝不限制）']]},
+  bigquery:{label:'BigQuery',fields:[['project','專案 ID（計費與執行查詢的專案）'],['location','區域（region）','asia-east1'],['datasets','資料集（逗號分隔；第一個為預設資料集）']]},
 };
 const SSL_KINDS=new Set(['postgres','mysql','mssql']);
 const OPTIONAL=new Set(['ip_type','datasets']);

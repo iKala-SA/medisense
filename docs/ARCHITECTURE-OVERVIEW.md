@@ -28,8 +28,8 @@
   ├ AWS Bedrock（keyless）                                    │  SQL Server, private IP)│
   ├ Ollama VM（院內模型，sovereign）                          │ 院內自建 PG/MySQL/MSSQL │
   └ Model Armor                                               └────────────────────────┘
-                                                              BigQuery：不經 Toolbox 共用帳號，
-                                                              ⚠ 用使用者自己的 Google token（第 7 步）
+                                                              BigQuery：不經 Toolbox，後端用使用者
+                                                              自己的 Google token 直接呼叫 BigQuery API
 ```
 
 ## 2. 元件與職責
@@ -87,5 +87,5 @@
 - ⚠ Toolbox 實機：`/mcp` 路徑、`execute-sql` 參數名 `sql`、SSL 值、空設定是否能啟動、映像版本（目前 `:latest`）。
 - ⚠ 部署腳本與 GitHub 工作流程只做過語法檢查。
 - SQL Server 無查詢逾時（上游限制），靠資料庫端 Resource Governor。
-- BigQuery 使用者授權流程（第 7 步）、「流程」多步驟接資料庫、範例問答的管理畫面（第 6 步）。
+- 「流程」多步驟接資料庫、範例問答的管理畫面（第 6 步）。
 - Oracle HIS 刻意暫緩。

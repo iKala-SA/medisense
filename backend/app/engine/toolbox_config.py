@@ -11,7 +11,6 @@ SOURCE_TYPE = {"postgres": "postgres", "mysql": "mysql", "mssql": "mssql", "clou
                "cloud_sql_mysql": "cloud-sql-mysql", "cloud_sql_mssql": "cloud-sql-mssql", "bigquery": "bigquery"}
 FAMILY = {"postgres": "postgres", "cloud_sql_postgres": "postgres", "mysql": "mysql", "cloud_sql_mysql": "mysql",
           "mssql": "mssql", "cloud_sql_mssql": "mssql", "bigquery": "bigquery"}  # tool type = f"{family}-sql" / f"{family}-execute-sql"
-BQ_AUTH_HEADER = "X-BigQuery-Auth"  # BigQuery runs as the signed-in user: the backend forwards their short-lived token in this header
 QUERY_TIMEOUT = "30s"  # mysql / cloud-sql-mysql only; the other engines rely on the database role (see the DBA checklist)
 
 _SRC_FIELDS = {"postgres": ("host", "port", "database"), "mysql": ("host", "port", "database"), "mssql": ("host", "port", "database"),
@@ -32,8 +31,11 @@ def sql_tool(cid: str, sid: str) -> str:
 
 
 def _used(connectors: list[dict]):
-    """Yield (connector, source_id, query_ids, wants_views) for each login a rule uses (BigQuery: source_id '')."""
+    """Yield (connector, source_id, query_ids, wants_views) for each login a rule uses.
+    BigQuery is never rendered: it runs as the signed-in user straight against the BigQuery API (engine/bigquery.py)."""
     for c in connectors:
+        if c["kind"] == "bigquery":
+            continue
         seen: dict[str, dict] = {}
         for r in c.get("rules") or []:
             if not (r.get("queries") or r.get("views")):
@@ -55,8 +57,6 @@ def _plan(connectors: list[dict]):
     used = list(_used(connectors))
     envs = {}
     for c, sid, _, _ in used:
-        if c["kind"] == "bigquery":
-            continue
         src = next((s for s in c.get("sources") or [] if s["id"] == sid), None)
         if src and src.get("password_secret"):
             envs[(c["id"], sid)] = (f"DBPW_{len(envs) + 1}", src["password_secret"].rsplit("/", 1)[-1])
@@ -71,12 +71,6 @@ def required_secrets(connectors: list[dict]) -> list[dict]:
 def _source(c: dict, sid: str, env: str | None) -> dict:
     kind, conn = c["kind"], c.get("connection") or {}
     out: dict = {"kind": "source", "name": source_name(c["id"], sid), "type": SOURCE_TYPE[kind]}
-    if kind == "bigquery":
-        out.update(project=conn["project"], location=conn.get("location") or "asia-east1", writeMode="blocked", useClientOAuth=BQ_AUTH_HEADER,
-                   maxQueryResultRows=int(c.get("max_rows") or 100))
-        if conn.get("datasets"):
-            out["allowedDatasets"] = [d.strip() for d in conn["datasets"].split(",") if d.strip()]
-        return out
     src = next(s for s in c["sources"] if s["id"] == sid)
     for k in _SRC_FIELDS[kind]:
         out[k] = str(conn[k])
@@ -128,6 +122,6 @@ def problems(connectors: list[dict]) -> list[str]:
     if not used:
         out.append("沒有任何規則開放查詢或檢視表：沒有可套用的內容")
     for c, sid, qids, _ in used:
-        if c["kind"] != "bigquery" and (c["id"], sid) not in envs:
+        if (c["id"], sid) not in envs:
             out.append(f"「{c['name']}」的帳號 {sid} 尚未設定密碼")
     return out

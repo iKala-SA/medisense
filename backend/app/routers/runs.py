@@ -3,14 +3,14 @@ BEFORE it touches Firestore or LiteLLM (option B), so sessions never hold identi
 import time
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from openai import APIStatusError
 
 from .. import db, sharing
 from ..auth import User, current_user
 from ..config import settings
 from ..engine import agent as agent_runtime
-from ..engine import deid, llm, runenv, skills
+from ..engine import bigquery, deid, llm, runenv, skills
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -111,12 +111,13 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
 
 
 @router.post("/run", response_model=RunResponse)
-def run_agent(agent_id: str, body: RunRequest, user: User = Depends(current_user)):
+def run_agent(agent_id: str, body: RunRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
     agent, rag_files = _agent_def(agent_id, user, body.use_published, body.version)
     from ..engine.capabilities import rag_files_for
     rag_files = rag_files_for(agent, user, rag_files)  # knowledge spaces, by the runner's own rights (same as chat)
-    return execute_run(agent, rag_files, agent_id, user, body.message, body.session_id,
-                       use_published=body.use_published, version=body.version, web_search=agent.capabilities.web_search)
+    with bigquery.user_token(x_bigquery_auth):
+        return execute_run(agent, rag_files, agent_id, user, body.message, body.session_id,
+                           use_published=body.use_published, version=body.version, web_search=agent.capabilities.web_search)
 
 
 def _public_pending(p: dict | None) -> dict | None:
@@ -125,7 +126,7 @@ def _public_pending(p: dict | None) -> dict | None:
 
 
 @router.post("/approve", response_model=RunResponse)
-def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(current_user)):
+def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
     """Agent owner (or admin) approves / rejects the step a run paused on, in the same conversation.
     Approve resumes the flow from the node after the approval node with the saved context."""
     snap = db.client().collection("agents").document(agent_id).get()
@@ -153,7 +154,7 @@ def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(curren
                            trace=[StepTrace(node_id=pending["node_id"], type="approval", summary="負責人拒絕，流程停止")])
 
     agent, rag_files = _agent_def(agent_id, user, bool(pending.get("use_published")), pending.get("version"))
-    with runenv.use(runenv.of(bool(pending.get("use_published")))):
+    with runenv.use(runenv.of(bool(pending.get("use_published")))), bigquery.user_token(x_bigquery_auth):
         history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
         t0 = time.perf_counter()
         try:
