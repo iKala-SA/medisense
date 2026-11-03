@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube} from '@phosphor-icons/react';
 import {api} from '../api';
+import {fitMenu} from '../fitMenu';
 import {ShareDialog} from '../live/ShareLive';
 import {canEditAgent,errText,isMine} from '../live/kit';
 import {agentToIn,blankAgent} from './stepkit';
@@ -20,7 +21,7 @@ function Row({flow,a,me,onOpen,onChat,onDup,onShare,onDelete}){
     <span className="own">{mine?'我':(a.owner_email||'').split('@')[0]}</span><span className="when">{ago(a.updated_at)}</span>
     <span className="act">{pub&&!flow&&<button className="ag-btn primary" onClick={onChat}><Chat size={15}/>對話</button>}{edit?<button className="ag-btn" onClick={onOpen}>編輯</button>:flow&&<button className="ag-btn primary" onClick={onOpen}>執行</button>}
       <span className="ag-menuwrap"><button className="ag-icon" aria-label={`「${a.name}」的更多選項`} aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={20} weight="bold"/></button>
-        {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
+        {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" ref={el=>fitMenu(el)} role="menu" onClick={()=>setMenu(false)}>
           {edit&&<button role="menuitem" onClick={onOpen}><PencilSimple size={16}/>編輯</button>}
           {pub&&!flow&&<button role="menuitem" onClick={onChat}><Chat size={16}/>開始對話</button>}
           <button role="menuitem" onClick={onDup}><Copy size={16}/>複製為新草稿</button>
@@ -52,7 +53,7 @@ export default function AgentList({kind='agent',me,notify,onOpen,onCreateChat,on
   return <div className="ag-catalog">
     <header className="ag-lhead"><div><h1>{noun}</h1><p>{flow?'把固定的工作做成流程：輸入、查資料、產出、寄送，一次設定，反覆執行。':'探索專科助理，或建立你自己的 Agent。'}</p></div>
       {builder&&<div className="ag-menuwrap"><button className="ag-btn primary" disabled={busy} onClick={()=>setCreate(c=>!c)}><Plus size={16}/>建立{flow?'':' '}{noun}</button>
-        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" role="menu" onClick={()=>setCreate(false)}>
+        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" ref={el=>fitMenu(el)} role="menu" onClick={()=>setCreate(false)}>
           <button role="menuitem" onClick={onCreateChat}><Sparkle size={17}/><span><b>用對話建立</b><small>{flow?'描述你要的流程，系統產生步驟草稿':'描述你要的助理，系統產生設定草稿'}</small></span></button>
           <button role="menuitem" onClick={blank}><FilePlus size={17}/><span><b>空白建立</b><small>從空白表單開始</small></span></button>
           <button role="menuitem" onClick={()=>file.current?.click()}><FileArrowUp size={17}/><span><b>匯入 JSON</b><small>匯入匯出的定義檔</small></span></button></div></>}

@@ -6,16 +6,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: { DEFAULT: "#ffffff", dim: "#e4eae7", bright: "#ffffff", variant: "#e9efec" },
-        "surface-container": { lowest: "#ffffff", low: "#f7faf9", DEFAULT: "#f1f5f3", high: "#ecf1ef", highest: "#e5ebe8" },
-        "on-surface": { DEFAULT: "#1c1c20", variant: "#4a4a54" },
-        outline: { DEFAULT: "#74747e", variant: "#c9c9d2" },
-        hairline: "#eaf0ed",
-        primary: { DEFAULT: "#23945f", dark: "#1e6242", hover: "#216a48", container: "#23945f", fixed: "#d6f5e7", "fixed-dim": "#b9eed5", tint: "#f1fcf7" },
+        surface: { DEFAULT: "#ffffff", dim: "#e8e9ec", bright: "#ffffff", variant: "#eceef1" },
+        "surface-container": { lowest: "#ffffff", low: "#fafafa", DEFAULT: "#f4f5f6", high: "#f0f1f3", highest: "#e8e9ec" },
+        "on-surface": { DEFAULT: "#1c1c20", variant: "#5d6068" },
+        outline: { DEFAULT: "#7b828d", variant: "#d3d6db" },
+        hairline: "#e6e8eb",
+        primary: { DEFAULT: "#239660", dark: "#1e6242", hover: "#216a48", container: "#239660", fixed: "#d6f5e7", "fixed-dim": "#b9eed5", tint: "#f3fcf8" },
         "on-primary": { DEFAULT: "#ffffff", container: "#f0fcf6", fixed: "#05150d" },
         secondary: { DEFAULT: "#267b53", container: "#e0f8ed" },
         "on-secondary": { DEFAULT: "#ffffff", container: "#1c593d" },
-        tertiary: { DEFAULT: "#6b6b78", container: "#8a8a98", fixed: "#e8eeeb" },
+        tertiary: { DEFAULT: "#7b828d", container: "#9a9ca3", fixed: "#eceef1" },
         "on-tertiary": { DEFAULT: "#ffffff", container: "#f4f8f6" },
         error: { DEFAULT: "#ba1a1a", container: "#ffdad6" },
         "on-error": { DEFAULT: "#ffffff", container: "#93000a" },

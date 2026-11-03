@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Play,PencilSimple,DotsThree,Check,CircleNotch,Warning,Copy,DownloadSimple,Trash,Eye,CaretDown,ClockCounterClockwise} from '@phosphor-icons/react';
 import {api} from '../api';
+import {fitMenu} from '../fitMenu';
 import {ShareDialog} from '../live/ShareLive';
 import {PublishTab,VersionsTab} from '../live/PublishTab';
 import {canEditAgent,statusBadges,errText} from '../live/kit';
@@ -56,7 +57,7 @@ export default function AgentEditor({id,me,notify,onBack,onChat,onDeleted,onChan
     <button className="ag-btn big" onClick={()=>setShare(true)} disabled={!canEdit}>分享</button>
     <button className="ag-btn big primary" onClick={async()=>{await flush();setPub(true)}}>發布</button>
     <div className="ag-menuwrap"><button className="ag-icon" aria-label="更多" aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={22} weight="bold"/></button>
-      {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
+      {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" ref={el=>fitMenu(el)} role="menu" onClick={()=>setMenu(false)}>
         {a.original_prompt&&<button role="menuitem" onClick={()=>setPrompt(true)}><Eye size={16}/>查看原始提示詞</button>}
         <button role="menuitem" onClick={()=>download((a.name||'agent')+'.json',agentToIn(a))}><DownloadSimple size={16}/>匯出 JSON</button>
         <button role="menuitem" onClick={duplicate}><Copy size={16}/>複製為新草稿</button>
