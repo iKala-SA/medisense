@@ -104,4 +104,6 @@ def delete_session(session_id: str, user: User = Depends(current_user)):
     from ..engine import chat_images
     chat_images.delete([a["blob"] for a in (snap.to_dict() or {}).get("attachments") or [] if a.get("blob")])
     snap.reference.delete()
+    from .shares import delete_for_session
+    delete_for_session(session_id)  # its share link goes with it
     db.audit(user.uid, "session.delete", user.email, session_id=session_id)
