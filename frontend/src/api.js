@@ -163,6 +163,11 @@ export const api={
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
   updateSession:(id,patch)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body(patch)}),
   moveSession:(id,project_id)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({project_id})}),
+  // 分享: de-identified snapshot link (routers/shares.py)
+  getShare:id=>call(`/api/sessions/${id}/share`),
+  createShare:id=>call(`/api/sessions/${id}/share`,{method:'POST'}),
+  revokeShare:id=>call(`/api/sessions/${id}/share`,{method:'DELETE'}),
+  viewShare:id=>call(`/api/shares/${encodeURIComponent(id)}`),
   listProjects:()=>call('/api/projects'),
   createProject:name=>call('/api/projects',{method:'POST',body:body({name})}),
   renameProject:(id,name)=>call(`/api/projects/${id}`,{method:'PATCH',body:body({name})}),

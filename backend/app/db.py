@@ -6,6 +6,7 @@ agents/{agentId}/knowledge/{id}  LEGACY per-agent files (before the library; see
 documents/{docId}                hospital knowledge library: name, category, department, gcs_uri, deid_uri, rag_file, version, pii(none|found|unknown), pii_types[]
 config/knowledge                 {rag_corpus}: the single hospital RAG corpus
 sessions/{sessionId}             test-chat / channel conversations, pseudonymized content only; expire_at = TTL (180 d after the last message)
+shares/{shareId}                 conversation share link: de-identified snapshot, owner, expire_at = TTL (30 d); see routers/shares.py
 audit/{autoId}                   who did what, when (append-only)
 usage/{autoId}                   one row per LLM call: tokens, cost, served model (no prompt text)
 usage_daily/{day}_{agentId}      per-agent daily rollup read by the admin monitoring dashboard

@@ -33,6 +33,7 @@ from .routers import (
     runs,
     schedules,
     sessions,
+    shares,
     step_runs,
     skills,
     spaces,
@@ -66,6 +67,7 @@ app.include_router(features.router)
 app.include_router(model_registry.router)
 app.include_router(projects.router)
 app.include_router(sessions.router)
+app.include_router(shares.router)
 app.include_router(step_runs.router)
 app.include_router(chat.router)
 app.include_router(feedback.router)
