@@ -139,3 +139,10 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - 使用者管理 (`Users`, permission `users`) and 角色管理 (`Roles`, permission `roles`) follow the same rule as 群組管理: the menu item and AdminHome tile appear, and the page renders, only when `me.permissions` contains the id. `adminNavPerm` in `App.jsx` maps each page key to its permission; items without an entry (e.g. `Monitoring`) are not gated.
 - Still UI only: the backend guards (`require_admin`) are unchanged. `UsersPage` keeps its own 系統管理員-only notice for non-admin users.
+
+## Non-chat pages follow the 新對話 page (2026-11-03)
+
+- Every page other than 新對話 is restyled to `docs/UI-DESIGN-2026-10-28.md` §2. Shared rules live in `src/page-style.css`, scoped to `main.card-page` and loaded after `radius.css`: 22px page titles, 12px grey subtitle, 32px pill buttons, 34px search and selects with 10px corners, underline tabs in brand green, 14px cards with a neutral hairline (hover darkens the edge, never a green wash), 46px table rows with grey 12px headers, grey role and status labels, neutral notices, 20px dialogs.
+- The lavender greys and green-tinted neutrals left in `src/live/*.css` were mapped to the neutral palette (text #5d6068 / #7b828d / #9a9ca3, lines #e6e8eb / #f0f1f3); stray greens are now #239660. The bk Tailwind palette in `tailwind.config.js` uses the same values.
+- 用量與成本 (bk Monitoring) has a plain page heading instead of a header card, compact KPI cards without mono or uppercase labels, and segmented filters with a white thumb.
+- Agent and 流程 row menus and the 建立 menu go through `fitMenu`.

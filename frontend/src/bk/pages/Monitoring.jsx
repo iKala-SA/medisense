@@ -18,7 +18,7 @@ const SORTS = [
   { id: "cost_per_call", label: "\u6027\u50F9\u6BD4\u6700\u9AD8 (Cost / Call)" },
   { id: "fallbacks", label: "\u964D\u7D1A\u6700\u591A (Fallbacks)" }
 ];
-const SERIES = ["#1e6242", "#5cd99f", "#239660", "#c3f1dc", "#7de0b2", "#c9c9d2"];
+const SERIES = ["#1e6242", "#8fd1b0", "#239660", "#cdeadb", "#5d6068", "#c9ced6"];
 const PAGE = 10;
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const shift = (d, days) => {
@@ -93,22 +93,22 @@ function Monitoring() {
   const budgetTone = budgetPct >= 100 ? "error" : budgetPct >= 85 ? "warning" : "primary";
   const successPct = summary && summary.requests > 0 ? (summary.requests - summary.failed) / summary.requests * 100 : null;
   return <div>
-      <section className="card flex flex-wrap items-start justify-between gap-4 px-6 py-5">
+      <section className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">Agent 監控與模型成本儀表板 <span className="chip">GCP Vertex AI · LiteLLM</span></h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+          <h1 className="flex items-center gap-2 text-[22px] font-semibold leading-snug">Agent 監控與模型成本儀表板 <span className="chip">GCP Vertex AI · LiteLLM</span></h1>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-outline">
             全院自建 Agent 的推論呼叫、Token 消耗、模型成本與月度預算總覽。資料來自平台後端的每次模型呼叫紀錄（不含對話內容），成本依院內價格表估算。
           </p>
         </div>
-        <div className="flex flex-col gap-2">
-          <button className="btn-primary" onClick={exportCsv} disabled={exporting || !summary}>{exporting ? <Spinner className="h-4 w-4" /> : <Icon name="download" className="text-[18px]" />}匯出成本報表 (CSV)</button>
-          <button className="btn-secondary" onClick={load} disabled={busy}><Icon name="refresh" className={`text-[18px] ${busy ? "animate-spin" : ""}`} />重新整理</button>
+        <div className="flex flex-wrap gap-1.5">
+          <button className="btn-secondary" onClick={load} disabled={busy}><Icon name="refresh" className={`text-[16px] ${busy ? "animate-spin" : ""}`} />重新整理</button>
+          <button className="btn-primary" onClick={exportCsv} disabled={exporting || !summary}>{exporting ? <Spinner className="h-4 w-4" /> : <Icon name="download" className="text-[16px]" />}匯出成本報表 (CSV)</button>
         </div>
       </section>
 
-      <section className="card mt-4 flex flex-wrap items-center gap-3 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-surface-container-low p-1">
-          {RANGES.map((r) => <button key={r.id} onClick={() => setRange(r.id)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${range === r.id ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{r.label}</button>)}
+      <section className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-0.5 rounded-[10px] bg-surface-container p-[3px]">
+          {RANGES.map((r) => <button key={r.id} onClick={() => setRange(r.id)} className={`rounded-lg px-3 py-1 text-xs transition-colors ${range === r.id ? "bg-white font-medium text-primary shadow-card" : "text-on-surface-variant hover:text-on-surface"}`}>{r.label}</button>)}
           {range === "custom" && <span className="ml-1 flex items-center gap-1 font-mono text-xs">
               <input type="date" className="w-auto py-1 text-xs" value={custom.from} max={custom.to} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} />
               <span className="text-outline">→</span>
@@ -120,7 +120,7 @@ function Monitoring() {
         </div>
         <span className="hidden flex-1 md:block" />
         <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">臨床部門過濾：
-          <button onClick={() => setDepartment("")} className={`pill px-3 py-1 ${!department ? "bg-primary-dark text-white" : "bg-surface-container-low hover:bg-surface-container-high"}`}>全部科別 (全院)</button>
+          <button onClick={() => setDepartment("")} className={`pill px-3 py-1 ${!department ? "bg-primary-tint font-medium text-primary-dark" : "bg-surface-container hover:bg-surface-container-high"}`}>全部科別 (全院)</button>
           <select className="w-auto py-1 text-xs" value={department} onChange={(e) => setDepartment(e.target.value)}>
             <option value="">選擇科別…</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
@@ -131,7 +131,7 @@ function Monitoring() {
       <ErrorBox msg={err} />
 
       {summary === null && !err ? <div className="grid place-items-center py-20"><Spinner /></div> : summary && <>
-          <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
             <Kpi
     label="Total Tokens Used"
     title="總 Token 消耗量"
@@ -179,7 +179,7 @@ function Monitoring() {
             </Kpi>
           </section>
 
-          <section className="card mt-5 px-6 py-5">
+          <section className="card mt-3 px-5 py-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="section-title"><Icon name="stacked_bar_chart" className="text-primary" />每日 Token 消耗與推論費用趨勢 (Daily Token &amp; Cost Trend)</h2>
                 <p className="mt-1 text-xs text-on-surface-variant">{summary.range_from} ～ {summary.range_to}：依實際服務模型堆疊的 Token 用量，滑鼠移至長條查看當日費用 (USD)</p></div>
@@ -198,36 +198,36 @@ function Monitoring() {
               </div>}
           </section>
 
-          <section className="card mt-5 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5">
+          <section className="card mt-3 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
               <h2 className="section-title">全院自建 Agent 用量排行榜 <span className="chip">{shown.length} Agents</span></h2>
-              <div className="flex flex-wrap gap-1 rounded-lg bg-surface-container-low p-1">
-                {SORTS.map((s) => <button key={s.id} onClick={() => setSort(s.id)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${sort === s.id ? "bg-white text-primary shadow-card" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{s.label}</button>)}
+              <div className="flex flex-wrap gap-0.5 rounded-[10px] bg-surface-container p-[3px]">
+                {SORTS.map((s) => <button key={s.id} onClick={() => setSort(s.id)} className={`rounded-lg px-3 py-1 text-xs transition-colors ${sort === s.id ? "bg-white font-medium text-primary shadow-card" : "text-on-surface-variant hover:text-on-surface"}`}>{s.label}</button>)}
               </div>
             </div>
-            <div className="relative mx-6 mt-3">
+            <div className="relative mx-5 mt-3">
               <Icon name="search" className="absolute left-3 top-2 text-[20px] text-outline" />
               <input className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋 Agent 名稱、建立者、所屬科別或服務模型…" />
             </div>
             {rows === null ? <div className="grid place-items-center py-16"><Spinner /></div> : shown.length === 0 ? <div className="py-6"><Empty icon="smart_toy" title="沒有符合條件的 Agent" /></div> : <table className="mt-4 w-full text-sm">
-                <thead className="bg-surface-container-low font-mono text-[10px] uppercase tracking-wider text-outline">
+                <thead className="bg-surface-container-low text-xs text-outline-variant">
                   <tr><Th>排名</Th><Th>Agent 資訊 / 科別</Th><Th>建立者</Th><Th>主要模型</Th><Th right>請求次數</Th><Th right>Token 用量</Th><Th right>累積花費 (USD)</Th><Th right>平均響應</Th><Th right>失敗 / 降級</Th><Th>操作</Th></tr>
                 </thead>
                 <tbody>
                   {pageRows.map((r, i) => {
     const rank = (page - 1) * PAGE + i + 1;
     const maxReq = rows[0]?.requests || 1;
-    return <tr key={r.agent_id} className="border-t border-hairline align-middle hover:bg-primary-tint/40">
-                        <td className="px-4 py-3"><span className={`pill ${rank <= 3 ? "bg-primary-tint text-primary" : "bg-surface-container-low text-on-surface-variant"}`}>#{rank}</span></td>
-                        <td className="px-4 py-3"><p className="font-semibold">{r.name}</p><p className="mt-0.5 text-xs text-on-surface-variant">{r.department || "\u672A\u6307\u5B9A\u79D1\u5225"}{r.status && r.status !== "published" && <span className="ml-1 font-mono text-[10px] text-outline">· {r.status === "deleted" ? "\u5DF2\u522A\u9664" : "\u8349\u7A3F"}</span>}</p></td>
+    return <tr key={r.agent_id} className="border-t border-surface-container-high align-middle">
+                        <td className="px-4 py-2"><span className={`pill ${rank <= 3 ? "bg-primary-tint text-primary" : "bg-surface-container-low text-on-surface-variant"}`}>#{rank}</span></td>
+                        <td className="px-4 py-2"><p className="font-semibold">{r.name}</p><p className="mt-0.5 text-xs text-on-surface-variant">{r.department || "\u672A\u6307\u5B9A\u79D1\u5225"}{r.status && r.status !== "published" && <span className="ml-1 font-mono text-[10px] text-outline">· {r.status === "deleted" ? "\u5DF2\u522A\u9664" : "\u8349\u7A3F"}</span>}</p></td>
                         <td className="px-4 py-3 text-xs text-on-surface-variant">{r.owner_email || "\u2014"}</td>
-                        <td className="px-4 py-3"><span className="chip">{r.main_model || "\u2014"}</span>{r.main_group && <p className="mt-1 font-mono text-[10px] text-outline">group: {r.main_group}</p>}</td>
+                        <td className="px-4 py-2"><span className="chip">{r.main_model || "\u2014"}</span>{r.main_group && <p className="mt-1 font-mono text-[10px] text-outline">group: {r.main_group}</p>}</td>
                         <td className="px-4 py-3 text-right"><p className="font-mono text-sm font-semibold">{fmtInt(r.requests)} 次</p><div className="ml-auto mt-1 h-1 w-20 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full bg-primary" style={{ width: `${Math.min(100, r.requests / maxReq * 100)}%` }} /></div></td>
                         <td className="px-4 py-3 text-right font-mono text-sm">{fmtTokens(r.tokens)}</td>
                         <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-primary-dark">{fmtUsd(r.cost_usd)}<p className="font-mono text-[10px] font-normal text-outline">{r.requests ? `${fmtUsd(r.cost_usd / r.requests, 4)} / \u6B21` : ""}</p></td>
                         <td className="px-4 py-3 text-right font-mono text-sm">{fmtInt(r.avg_latency_ms)} ms</td>
                         <td className="px-4 py-3 text-right font-mono text-sm"><span className={r.failed ? "text-error" : ""}>{r.failed}</span> / <span className={r.fallbacks ? "text-warning" : ""}>{r.fallbacks}</span></td>
-                        <td className="px-4 py-3"><div className="flex gap-1">
+                        <td className="px-4 py-2"><div className="flex gap-1">
                           <button className="btn-ghost px-2" title="在沙盒開啟" onClick={() => nav(`/sandbox/${r.agent_id}`)} disabled={r.status === "deleted"}><Icon name="query_stats" className="text-[18px]" /></button>
                           <button className="btn-ghost px-2" title="在 Studio 開啟" onClick={() => nav(`/studio/${r.agent_id}`)} disabled={r.status === "deleted"}><Icon name="tune" className="text-[18px]" /></button>
                         </div></td>

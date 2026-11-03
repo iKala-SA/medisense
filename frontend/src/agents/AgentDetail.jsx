@@ -3,6 +3,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft,CaretDown,CaretRight,Check,CircleNotch,Warning,DotsThree,Info,X,TextB,TextItalic,TextStrikethrough,ListBullets,ListNumbers,Code,Quotes,ArrowCounterClockwise,ArrowClockwise,
   Sparkle,UploadSimple,FileText,Plus,Trash,Copy,DownloadSimple,Eye,PaperPlaneRight,BookOpen,Plugs,Database,Sliders,SlidersHorizontal,ArrowsClockwise,Globe,Lock} from '@phosphor-icons/react';
 import {api} from '../api';
+import {fitMenu} from '../fitMenu';
 import {ShareDialog} from '../live/ShareLive';
 import {PublishTab,VersionsTab} from '../live/PublishTab';
 import {statusBadges,errText} from '../live/kit';
@@ -103,7 +104,7 @@ export default function AgentDetail({id,me,notify,onBack,onChat,onDeleted}){
           <button className="ag-btn big" disabled={dis} onClick={()=>setShare(true)}>分享</button>
           {a.status==='published'?<button className="ag-btn big primary" onClick={()=>onChat(a)}>啟動聊天</button>:<button className="ag-btn big primary" onClick={async()=>{await flush();setPub(true)}}>發布</button>}
           <div className="ag-menuwrap"><button className="ag-icon" aria-label="更多" aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={22} weight="bold"/></button>
-            {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
+            {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" ref={el=>fitMenu(el)} role="menu" onClick={()=>setMenu(false)}>
               {a.original_prompt&&<button role="menuitem" onClick={()=>setPrompt(true)}><Eye size={16}/>查看原始提示詞</button>}
               <button role="menuitem" onClick={()=>download((a.name||'agent')+'.json',agentToIn(a))}><DownloadSimple size={16}/>匯出 JSON</button>
               <button role="menuitem" onClick={async()=>{try{const n=await api.createAgent({...agentToIn(a),name:(a.name+' (複本)').slice(0,50),share:undefined});notify('已複製為新草稿');onBack(n.id)}catch(e){notify(errText(e))}}}><Copy size={16}/>複製為新草稿</button>

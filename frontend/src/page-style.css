@@ -1,0 +1,229 @@
+/* Every page except 新對話, aligned with the chat page (docs/UI-DESIGN-2026-10-28.md §2):
+   #FCFCFC canvas, system font, 14px body / 11–12px grey helper text, pill buttons, 10px controls, 14px cards, 16–24px dialogs,
+   one brand green #239660, neutral hairlines, no green wash on cards or rows, compact rows.
+   Scoped to `main.card-page` (the chat page is `main.chat-page`), loaded after radius.css; the specificity also beats the
+   per-page sheets that load later with their lazy chunks. */
+main.card-page{--pg-ink:#1f2024;--pg-text:#35383e;--pg-sub:#7b828d;--pg-faint:#9a9ca3;--pg-line:#e6e8eb;--pg-div:#f0f1f3;--pg-ctl:#d9dce1;--pg-head:#fafafa;--brand:#239660;--purple:#239660;--muted:#7b828d}
+/* a page component that is itself a .card-page (稽核 / 角色 / 用量) must not add a second inset */
+main.card-page .card-page{padding:0!important;max-width:none}
+
+/* ---- page title + one grey line under it; section titles 15px ---- */
+main.card-page h2{font-size:15px;font-weight:600;letter-spacing:0;line-height:1.4}
+main.card-page h2.lv-gc-group{font-size:13px;font-weight:500;color:#8e9097}
+main.card-page .page-heading{min-height:32px;margin:0 0 4px;gap:12px}
+main.card-page .page-heading h1,main.card-page .ag-lhead h1{font-size:22px!important;font-weight:600;letter-spacing:-.01em;line-height:1.3;color:var(--pg-ink);gap:10px}
+main.card-page .page-heading h1>svg{width:22px;height:22px;color:#5d6068}
+main.card-page .subtitle,main.card-page .ag-lhead p{margin:0 0 16px;font-size:12px;line-height:1.55;color:var(--pg-sub)}
+main.card-page .ag-lhead{margin-bottom:14px}
+main.card-page .ag-lhead h1{margin:0 0 4px}
+main.card-page .ag-lhead p{margin:0}
+main.card-page .page-heading .lv-actions,main.card-page .page-heading .inline{gap:6px}
+main.card-page .page-heading>:not(h1):not(button){display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+
+/* ---- buttons: pill, 32px, 13px ---- */
+main.card-page .btn,main.card-page .lv-page .btn,main.card-page .lv-p .btn{height:32px;min-height:0;width:auto;margin:0;padding:0 14px;gap:6px;border:1px solid var(--pg-ctl);border-radius:999px!important;background:#fff;color:var(--pg-ink);font-size:13px;font-weight:500;box-shadow:none}
+main.card-page .btn svg{width:15px;height:15px;flex:none}
+main.card-page .btn.sm,main.card-page .lv-p .btn.sm{height:28px;padding:0 11px;font-size:12px}
+main.card-page .btn.primary,main.card-page .lv-page .btn.primary,main.card-page .lv-p .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+main.card-page .btn.primary:hover:not(:disabled){background:#1f8656!important;border-color:#1f8656}
+main.card-page .btn.danger,main.card-page .lv-page .btn.danger,main.card-page .lv-p .btn.danger{color:#d93a3a;border-color:#f1cfcf;background:#fff}
+main.card-page .btn.danger.fill,main.card-page .lv-page .btn.danger.fill{background:#d93a3a;border-color:#d93a3a;color:#fff}
+main.card-page .btn:disabled{opacity:.45;cursor:default}
+main.card-page .text-button{font-size:13px;color:var(--brand);gap:4px}
+main.card-page .text-button.muted{color:var(--pg-sub)}
+main.card-page .icon-btn{width:30px;height:30px;padding:0;display:inline-grid;place-items:center;border-radius:10px!important;color:#5d6068}
+main.card-page .icon-btn svg{width:17px;height:17px}
+main.card-page .lt .icon-btn{color:#7b828d}
+
+/* ---- search + filters: 34px controls, 10px corners, neutral edge ---- */
+main.card-page .search,main.card-page .ag-search{height:34px;min-width:220px;padding:0 11px;border:1px solid var(--pg-ctl);border-radius:10px!important;background:#fff;box-shadow:none;color:var(--pg-faint);gap:2px}
+main.card-page .search input,main.card-page .ag-search input{height:32px;padding:0 6px;font-size:13px;color:var(--pg-ink);border-radius:0!important}
+main.card-page .search:focus-within,main.card-page .ag-search:focus-within{border-color:var(--brand)}
+main.card-page .lt-toolbar{margin:0 0 12px;gap:10px}
+main.card-page .lt-toolbar .search{height:34px;min-width:240px}
+main.card-page select,main.card-page .lv-filters select,main.card-page .lv-filters input,main.card-page .lv-page .lv-select{height:34px;padding:0 30px 0 11px;font-size:13px;border:1px solid var(--pg-ctl);border-radius:10px!important;background-color:#fff;color:var(--pg-ink)}
+main.card-page .lv-filters{gap:8px;margin:0 0 12px}
+
+/* ---- underline tabs (ListToolbar, 我的工作台, 連接器) ---- */
+main.card-page .tabs{gap:2px}
+main.card-page .tabs button{padding:7px 10px;font-size:13px;font-weight:400;color:#5d6068;border-radius:0!important;background:transparent!important;border-bottom:2px solid transparent}
+main.card-page .tabs button:hover{color:var(--pg-ink)}
+main.card-page .tabs button.selected{color:var(--brand);font-weight:500;border-bottom-color:var(--brand)}
+main.card-page .tabline{margin-bottom:14px;border-bottom:1px solid var(--pg-line)}
+main.card-page .tabline .tabs button{margin-bottom:-1px}
+main.card-page .tabs .count{font-size:10.5px;background:#f0f1f3;color:#5d6068}
+/* the 模型 page view switch reads as the same underline tabs */
+main.card-page .lv-o-viewtabs{gap:2px;margin:0 0 14px;border-bottom:1px solid var(--pg-line)}
+main.card-page .lv-o-viewtabs button{padding:7px 10px;margin-bottom:-1px;font-size:13px;color:#5d6068;border-radius:0!important;background:transparent!important;border-bottom:2px solid transparent}
+main.card-page .lv-o-viewtabs button.selected{color:var(--brand);font-weight:500;border-bottom-color:var(--brand)}
+/* segmented controls (稽核 categories, 連接器 sub-views, Agent tabs): neutral track, white thumb, green label */
+main.card-page .lv-seg,main.card-page .lv-gc-switch,main.card-page .ag-tabs2,main.card-page .ag-seg{background:#f1f2f4!important;border-radius:10px;padding:3px;gap:2px}
+main.card-page .lv-seg button,main.card-page .lv-gc-switch button{height:28px;padding:0 11px;border-radius:8px!important;font-size:12.5px;font-weight:400;color:#5d6068}
+main.card-page .lv-seg button.on,main.card-page .lv-gc-switch button.on{background:#fff;color:var(--brand);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+main.card-page .lv-gc-switch{margin:0 0 12px}
+
+/* ---- list tables (技能 / 排程 / 模型 / 使用者 / 角色 / 群組 ...) ---- */
+main.card-page .lt{border:1px solid var(--pg-line);border-radius:14px!important;background:#fff}
+main.card-page .lt-head,main.card-page .lt-row{padding:8px 16px;gap:14px}
+main.card-page .lt-head{min-height:36px;background:var(--pg-head);color:var(--pg-faint);font-size:12px;font-weight:400}
+main.card-page .lt-row{min-height:46px;border-top:1px solid var(--pg-div);font-size:13px;color:var(--pg-text)}
+main.card-page .lt-row:hover{background:transparent}
+main.card-page .lt-row.clickable:hover,main.card-page .lt-row[role=button]:hover{background:#fafafa}
+main.card-page .lt-row b{font-weight:500;color:var(--pg-ink)}
+main.card-page .lt-row .muted,main.card-page .lt-row .small{color:var(--pg-sub)}
+main.card-page .lt-row .text-button b{color:var(--pg-ink)}
+main.card-page .lt-row .text-button:hover b{color:var(--brand)}
+main.card-page .lt-empty{padding:28px;font-size:13px;color:var(--pg-faint);border-top:1px solid var(--pg-div)}
+main.card-page .lt>.lt-empty:first-child{border-top:0}
+main.card-page .lv-table{font-size:13px}
+main.card-page .lv-table th{padding:9px 14px;background:var(--pg-head);color:var(--pg-faint);font-size:12px;font-weight:400}
+main.card-page .lv-table td{padding:9px 14px;border-top:1px solid var(--pg-div)}
+main.card-page .lv-table tr.clickable:hover{background:#fafafa}
+main.card-page .lv-pager{font-size:12px;color:var(--pg-sub)}
+/* small grey role / permission labels */
+main.card-page .lv-w-role{background:#f0f1f3;color:#5d6068;border-radius:6px;font-size:11px;padding:1px 7px}
+main.card-page .badge{background:#f0f1f3;color:#4a4d54;border-radius:6px;font-size:11px;font-weight:400;padding:2px 8px}
+main.card-page .lv-pill,main.card-page .lv-pill.brand,main.card-page .lv-chip{display:inline-flex;align-items:center;gap:5px;height:auto;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:400;letter-spacing:0;line-height:1.5}
+main.card-page .lv-pill{background:#f0f1f3;color:#5d6068}
+main.card-page .lv-pill.brand{background:#e7f4ee;color:#17623f}
+main.card-page .lv-pill.soft,main.card-page .lv-chip{background:#f0f1f3;color:#4a4d54}
+main.card-page .lv-pill.ok{background:#e7f4ee;color:#17623f}
+main.card-page .rl-tag{background:#e7f4ee;color:#17623f;border-radius:6px;font-size:11px;padding:2px 8px}
+main.card-page .rl-tag.custom{background:#f0f1f3;color:#4a4d54}
+main.card-page .rl-icon,main.card-page .lv-avatar{background:#f2f4f5;color:#35383e}
+main.card-page .rl-icon.custom{background:#f2f4f5;color:#5d6068}
+main.card-page .lv-avatar.off{background:#f4f5f6;color:#9a9ca3}
+main.card-page .rl-role small,main.card-page .lv-name small{color:var(--pg-faint);font-size:11.5px}
+
+/* ---- toggles: brand green on, neutral grey off ---- */
+main.card-page .switch{background:#d3d6db}
+main.card-page .switch.on{background:var(--brand)}
+main.card-page .switch:disabled{opacity:.45}
+
+/* ---- cards: white, hairline, 14px; hover only darkens the edge (never a green wash) ---- */
+main.card-page .panel,main.card-page .lv-card,main.card-page .lv-p-card,main.card-page .lv-gc-card,main.card-page .mc-card,main.card-page .rl-stat,main.card-page .lv-kpi,main.card-page .lv-w-form,main.card-page .space-card,main.card-page .agent-card{border:1px solid var(--pg-line)!important;border-radius:14px!important;background:#fff;box-shadow:none}
+main.card-page .lv-gc-card:hover,main.card-page button.lv-kpi:hover,main.card-page .lv-p-card[role=button]:hover{border-color:#cfd3d8!important;box-shadow:0 2px 10px rgba(20,24,32,.06)}
+main.card-page .lv-p-cards,main.card-page .lv-gc-grid{gap:10px}
+main.card-page .lv-p-card{padding:14px 16px;gap:10px}
+main.card-page .lv-p-card h3,main.card-page .lv-gc-head h3{font-size:14px;font-weight:600;color:var(--pg-ink)}
+main.card-page .lv-p-card p,main.card-page .lv-gc-card p{font-size:12px;line-height:1.5;color:var(--pg-sub)}
+main.card-page .lv-gc-card{padding:14px 16px;gap:8px}
+main.card-page .lv-gc-ico{width:36px;height:36px;border-color:var(--pg-line)}
+main.card-page .lv-card{padding:14px 16px;margin-bottom:12px}
+main.card-page .lv-card h2,main.card-page .lv-p-section h2,main.card-page .lv-mc h2,main.card-page .lv-p-form h2{font-size:14px;font-weight:600;color:var(--pg-ink)}
+main.card-page .lv-card .lv-sub,main.card-page .lv-mc>p{font-size:12px;color:var(--pg-sub)}
+main.card-page .panel:not(.brief):not(.feed){padding:16px 18px}
+main.card-page .panel.brief{padding:0;overflow:hidden}
+main.card-page .panel.feed{padding:0;border:0!important;background:transparent;gap:10px}
+main.card-page .panel h2{font-size:14px;font-weight:600}
+main.card-page .panel h3{font-size:13.5px;font-weight:600}
+/* stat cards (使用者 / 角色 / 稽核): label 12px grey, figure 20px */
+main.card-page .lv-stats,main.card-page .rl-stats{gap:10px;margin:0 0 14px}
+main.card-page .lv-stats .lv-card,main.card-page .rl-stat{padding:12px 14px}
+main.card-page .lv-stats b,main.card-page .rl-stat-value{font-size:20px;font-weight:600;color:var(--pg-ink)}
+main.card-page .rl-stat-label,main.card-page .lv-kpi-label,main.card-page .lv-kpi-foot{font-size:12px;color:var(--pg-sub)}
+main.card-page .rl-stat-value{margin-top:4px}
+main.card-page .lv-stats-toggle{margin:-6px 0 4px}
+main.card-page .lv-kpis{gap:10px;margin:0 0 14px}
+main.card-page .lv-kpi{padding:12px 14px;min-height:0;gap:3px}
+main.card-page .lv-kpi-value{font-size:22px;font-weight:600;color:var(--pg-ink)}
+main.card-page .lv-kpi-rows{border-top-color:var(--pg-div)}
+main.card-page .lv-kpi-row{color:#5d6068}
+
+/* ---- notices / banners: one quiet neutral strip, amber only for warnings ---- */
+main.card-page .lv-notice,main.card-page .lv-p-banner.info,main.card-page .lv-o-banner.info,main.card-page .lv-mc-note{background:#f4f5f6;color:#4a4d54;border:0;border-radius:10px;font-size:12px}
+main.card-page .lv-o-banner,main.card-page .lv-p-banner{border-radius:10px;font-size:12px;padding:10px 14px}
+main.card-page .notice{font-size:11.5px;color:var(--pg-faint)}
+
+/* ---- status dots ---- */
+main.card-page .lv-p-status{border-radius:6px;font-size:11px;padding:2px 8px}
+main.card-page .lv-p-status.ok,main.card-page .lv-pill.ok{background:#e7f4ee;color:#17623f}
+main.card-page .lv-p-status{background:#f0f1f3;color:#5d6068}
+
+/* ---- forms ---- */
+main.card-page .field{gap:6px;margin-bottom:14px}
+main.card-page .field label{font-size:12.5px;font-weight:500;color:#4a4d54}
+main.card-page .field input:not([type=checkbox]):not([type=radio]),main.card-page .field select,main.card-page .field textarea,main.card-page .lv-page textarea{border:1px solid var(--pg-ctl);font-size:13px;background:#fff}
+main.card-page .field input:not([type=checkbox]):not([type=radio]):focus,main.card-page .field textarea:focus,main.card-page .field select:focus{border-color:var(--brand);outline:0;box-shadow:none}
+main.card-page .lv-back,main.card-page .lv-p-back,main.card-page .lv-w-back{font-size:13px;color:#5d6068}
+main.card-page .lv-back:hover,main.card-page .lv-p-back:hover,main.card-page .lv-w-back:hover{color:var(--pg-ink)}
+main.card-page .lv-savebar{border-top-color:var(--pg-line);background:rgba(252,252,252,.96)}
+
+/* ---- dialogs: white, no border, 20px corners, soft shadow ---- */
+main.card-page .modal-backdrop{background:rgba(20,24,32,.38)}
+main.card-page .modal{border:0;border-radius:20px!important;box-shadow:0 20px 60px rgba(20,24,32,.25);padding:22px 24px 20px}
+main.card-page .modal h2{font-size:17px;font-weight:600;margin:0 0 8px}
+main.card-page .modal p{font-size:13px;line-height:1.55;color:#5d6068}
+main.card-page .modal-actions{gap:8px}
+main.card-page .modal-actions .btn{height:34px;padding:0 16px}
+
+/* ---- 模型: 可選模型 cards follow the admin home cards ---- */
+main.card-page .mc-grid{gap:10px}
+main.card-page .mc-card{padding:12px 14px;gap:12px}
+main.card-page .mc-card.on{background:#fff}
+main.card-page .mc-txt b{font-size:14px}
+main.card-page .mc-txt small{font-size:12px;color:var(--pg-sub)}
+main.card-page .mc-btn{height:30px;padding:0 14px}
+main.card-page .mc-done{font-size:12.5px}
+main.card-page .lv-o-sovereign{border:1px solid var(--pg-line)}
+main.card-page .lv-o-sovereign.on{border-color:var(--brand);background:#fff}
+
+/* ---- 空間 / 我的工作台 cards ---- */
+main.card-page .space-grid{gap:10px}
+main.card-page .priority{border-color:var(--pg-div);padding:10px 18px;min-height:48px}
+main.card-page .brief-copy{background:#fff;padding:16px 18px 12px}
+main.card-page .brief .eyebrow{font-size:12px;color:var(--brand)}
+main.card-page .brief h2{font-size:16px;font-weight:600;letter-spacing:0;margin:6px 0 2px}
+main.card-page .brief p{font-size:12px;color:var(--pg-sub);margin:0}
+main.card-page .section-heading{margin:20px 0 10px}
+main.card-page .section-heading h2{font-size:13px;font-weight:500;color:#8e9097}
+main.card-page .feed-row{padding:14px 16px;min-height:0;gap:12px;border:1px solid var(--pg-line)!important;border-radius:14px}
+main.card-page .feed-row:hover,main.card-page .space-card:hover,main.card-page .agent-card:hover{border-color:#cfd3d8!important;box-shadow:0 2px 10px rgba(20,24,32,.06)}
+main.card-page .feed-row h3{font-size:14px}
+main.card-page .feed-row p{font-size:12px;color:var(--pg-sub);line-height:1.55;margin:4px 0}
+main.card-page .feed-row .small{color:var(--pg-faint)}
+main.card-page .feed-row .tile,main.card-page .priority .tile{width:32px;height:32px;border-radius:10px}
+main.card-page .tile{background:#f2f4f5;color:#35383e}
+main.card-page .panel.brief{background:#fff}
+main.card-page .space-card{padding:14px 16px;gap:6px}
+main.card-page .space-card .tile.large,main.card-page .agent-card .tile.large{width:36px;height:36px;border-radius:10px}
+main.card-page .space-card h3{margin:6px 0 0;font-size:14px;font-weight:600;color:var(--pg-ink)}
+main.card-page .space-card p{margin:0;font-size:12px;line-height:1.5;color:var(--pg-sub)}
+main.card-page .card-bottom{border-top-color:var(--pg-div);padding-top:10px;margin-top:6px}
+main.card-page .lv-state{font-size:13px;color:var(--pg-faint)}
+
+/* ---- Agent / 流程 list ---- */
+main.card-page .ag-catalog .ag-lhead{margin:0 0 14px}
+main.card-page .ag-catalog .ag-toolbar{margin-bottom:12px}
+main.card-page .ag-catalog .ag-seg{background:transparent!important;padding:0;gap:2px;border-radius:0}
+main.card-page .ag-catalog .ag-seg button{height:34px;padding:0 10px;border-radius:0!important;background:transparent!important;box-shadow:none;color:#5d6068;border-bottom:2px solid transparent}
+main.card-page .ag-catalog .ag-seg button.on{color:var(--brand);font-weight:500;border-bottom-color:var(--brand)}
+main.card-page .ag-rows{border-color:var(--pg-line);border-radius:14px}
+main.card-page .ag-rowh{height:36px;background:var(--pg-head);color:var(--pg-faint);font-size:12px;font-weight:400}
+main.card-page .ag-row2{min-height:52px;font-size:13px}
+main.card-page .ag-row2:hover{background:transparent}
+main.card-page .ag-row2 .nm{gap:12px}
+main.card-page .ag-row2 .nm b{font-size:14px;font-weight:500}
+main.card-page .ag-row2 .nm small{font-size:12px;color:var(--pg-sub)}
+main.card-page .ag-row2 .own,main.card-page .ag-row2 .when{font-size:12.5px;color:var(--pg-sub)}
+main.card-page .ag-badge{height:20px;padding:0 8px;border-radius:6px;font-size:11px}
+main.card-page .ag-btn{height:30px;padding:0 13px;font-size:13px}
+main.card-page .ag-lhead .ag-btn{height:32px;padding:0 14px}
+main.card-page .ag-icon-tile{width:36px;height:36px;border-radius:10px}
+
+/* ---- 用量與成本 (bk): one quiet look with the other admin pages ---- */
+main.card-page .bk .font-mono{font-family:inherit!important;letter-spacing:0!important}
+main.card-page .bk .card{border:1px solid var(--pg-line);border-radius:14px;box-shadow:none}
+main.card-page .bk .btn-primary,main.card-page .bk .btn-secondary,main.card-page .bk .btn-ghost,main.card-page .bk .btn-soft{height:32px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:500}
+main.card-page .bk .btn-ghost{width:30px;padding:0;border-radius:10px;color:#5d6068}
+main.card-page .bk .btn-secondary{border:1px solid var(--pg-ctl);background:#fff;color:var(--pg-ink)}
+main.card-page .bk .btn-primary:hover:not(:disabled){background:#1f8656}
+main.card-page .bk .chip{border:0;background:#f0f1f3;color:#4a4d54;border-radius:6px;font-size:11px;font-weight:400}
+main.card-page .bk .pill{font-weight:500}
+main.card-page .bk .chip,main.card-page .bk .pill{font-family:inherit;letter-spacing:0}
+main.card-page .bk table th,main.card-page .bk table td{padding-left:10px;padding-right:10px}
+main.card-page .bk thead{color:var(--pg-faint)}
+main.card-page .bk .section-title{font-size:14px;font-weight:600}
+main.card-page .bk input:not([type=checkbox]):not([type=radio]):not([type=range]),main.card-page .bk select{height:34px;border-radius:10px;border-color:var(--pg-ctl);font-size:13px}
+main.card-page .bk table td{color:var(--pg-text)}
+main.card-page .bk .font-mono{font-variant-numeric:tabular-nums}

@@ -1,7 +1,7 @@
 import '../bk/bk.css';
 import DocUploader from '../bk/components/DocUploader';
 import React,{useEffect,useState} from 'react';
-import {Plus,Trash,ArrowLeft,FolderSimple,FileText,PencilSimple} from '@phosphor-icons/react';
+import {Plus,Trash,ArrowLeft,FolderSimple,FileText,PencilSimple,MagnifyingGlass} from '@phosphor-icons/react';
 import {api} from '../api';
 import {AddModal,Field,Empty} from '../ListKit';
 import {ShareDialog,ShareChip} from './ShareLive';
@@ -78,7 +78,7 @@ export default function SpacesPage({me,notify}){
   return <>
     <div className="page-heading"><h1>空間</h1><button className="btn primary" onClick={()=>setCreating(true)}><Plus/>建立空間</button></div>
     <p className="subtitle">與同仁共享的文件集合：個人、團隊或全院。</p>
-    <div className="toolbar"><label className="search"><input aria-label="搜尋" placeholder="搜尋空間" value={q} onChange={e=>setQ(e.target.value)}/></label></div>
+    <div className="toolbar"><label className="search"><MagnifyingGlass size={16}/><input aria-label="搜尋" placeholder="搜尋空間" value={q} onChange={e=>setQ(e.target.value)}/></label></div>
     {items===null?<State/>:err&&!items.length?<State err={err} onRetry={reload}/>:!items.length?<div className="lv-state">還沒有空間。按「建立空間」開始。</div>:!rows.length?<div className="lv-state">找不到符合「{q}」的空間</div>:
     <div className="space-grid">{rows.map(s=><section className="panel space-card" key={s.id}>
       <span className="tile large"><FolderSimple/></span><h3>{s.name}</h3><p>{s.description||'（無說明）'}</p>

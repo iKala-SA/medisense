@@ -7,6 +7,7 @@ import "./styles.css";
 import "./chat-type.css";
 import "./welcome.css";
 import "./radius.css";
+import "./page-style.css";
 
 // A lazy chunk that fails to load is either gone (a deploy removed it) or, more often, a bad copy sitting in the browser cache:
 // /assets/** is cached for a year, so an HTML page that a CDN edge answered with during a deploy sticks. Re-fetch the file bypassing

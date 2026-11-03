@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {fitMenu} from '../fitMenu';
 import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube,TreeStructure} from '@phosphor-icons/react';
 import {api} from '../api';
+import {fitMenu} from '../fitMenu';
 import {ShareDialog} from '../live/ShareLive';
 import {canEditAgent,errText,isMine} from '../live/kit';
 import {agentToIn,blankAgent} from './stepkit';
@@ -78,7 +79,7 @@ export default function AgentList({kind='agent',me,notify,onOpen,onCreateChat,on
   return <div className="ag-catalog">
     <header className="ag-lhead"><div><h1>{noun}</h1><p>{flow?'把固定的工作做成流程：輸入、查資料、產出、寄送，一次設定，反覆執行。':'探索專科助理，或建立你自己的 Agent。'}</p></div>
       {builder&&<div className="ag-menuwrap"><button className="ag-btn primary" disabled={busy} onClick={()=>setCreate(c=>!c)}><Plus size={16}/>建立{flow?'':' '}{noun}</button>
-        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" role="menu" onClick={()=>setCreate(false)}>
+        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" ref={el=>fitMenu(el)} role="menu" onClick={()=>setCreate(false)}>
           <button role="menuitem" onClick={onCreateChat}><Sparkle size={17}/><span><b>用對話建立</b><small>{flow?'描述你要的流程，系統產生步驟草稿':'描述你要的助理，系統產生設定草稿'}</small></span></button>
           <button role="menuitem" onClick={blank}><FilePlus size={17}/><span><b>空白建立</b><small>從空白表單開始</small></span></button>
           <button role="menuitem" onClick={()=>file.current?.click()}><FileArrowUp size={17}/><span><b>匯入 JSON</b><small>匯入匯出的定義檔</small></span></button></div></>}
