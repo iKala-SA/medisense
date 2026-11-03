@@ -23,6 +23,7 @@ from google.api_core.exceptions import AlreadyExists
 
 from . import db
 from .config import settings
+from .permissions import RESOURCES
 
 if not firebase_admin._apps:  # documented firebase-admin idiom
     firebase_admin.initialize_app(options={"projectId": settings().google_cloud_project})
@@ -152,3 +153,32 @@ def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(403, "admin role required")
     return user
+
+
+def granted_permissions(user: User) -> list[str]:
+    """Permission ids from the user's assigned roles (users.roles) and from the roles of each group the user belongs
+    to (users.groups -> groups.role_ids), in the order of app/permissions.py. The account role (users.role) is not
+    considered; a missing role or group document contributes nothing."""
+    role_ids = set(user.roles)
+    for gid in user.groups:
+        snap = db.client().collection("groups").document(gid).get()
+        role_ids.update(r for r in (snap.to_dict() or {}).get("role_ids") or [] if isinstance(r, str))
+    granted: set[str] = set()
+    for rid in role_ids:
+        snap = db.client().collection("roles").document(rid).get()
+        granted.update(p for p in (snap.to_dict() or {}).get("permissions") or [] if isinstance(p, str))
+    return [rid for rid, _name, _desc in RESOURCES if rid in granted]
+
+
+def require_permission(resource: str, *, write: bool = False):
+    """Route guard for one resource id from app/permissions.py. Holding `resource` allows reads and writes;
+    holding `resource-viewer` allows reads only, so write routes use `write=True`. The admin account role always passes
+    (as in the other admin guards), so admins are never locked out of the permission-managed routes."""
+    def guard(user: User = Depends(current_user)) -> User:
+        if user.role == "admin":
+            return user
+        held = set(granted_permissions(user))
+        if resource in held or (not write and f"{resource}-viewer" in held):
+            return user
+        raise HTTPException(403, "permission required")
+    return guard

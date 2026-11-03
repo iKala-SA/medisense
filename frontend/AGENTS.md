@@ -139,3 +139,21 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - 使用者管理 (`Users`, permission `users`) and 角色管理 (`Roles`, permission `roles`) follow the same rule as 群組管理: the menu item and AdminHome tile appear, and the page renders, only when `me.permissions` contains the id. `adminNavPerm` in `App.jsx` maps each page key to its permission; items without an entry (e.g. `Monitoring`) are not gated.
 - Still UI only: the backend guards (`require_admin`) are unchanged. `UsersPage` keeps its own 系統管理員-only notice for non-admin users.
+
+## Read-only permission for groups (2026-11-03)
+
+- The `-viewer` ids in `app/permissions.py` now have an effect, starting with 群組管理 only. `groups-viewer` opens the page read-only: the list, group detail, base info and member list are visible; create, edit, delete, member add/remove and the role picker are hidden or disabled. `groups` allows editing.
+- The menu item shows for either id (`canGroups` in `App.jsx`). `GroupsPage` derives `canEdit` (`groups`) and `canView` (`groups` or `groups-viewer`) from `me.permissions`. Non-viewers see a 沒有群組管理權限 notice.
+- Still UI only: the API enforces the same rule (`require_permission("groups")` for writes, `groups` or `groups-viewer` for reads). Other pages keep their existing checks until they are migrated.
+
+## Read-only permission for roles (2026-11-03)
+
+- 角色管理 follows the same rule as 群組管理: `roles-viewer` opens the page read-only (list, role detail, base info, permissions and linked users/groups are visible; create, edit, status, delete, permission and link changes are hidden or disabled). `roles` allows editing. The menu shows for either id (`canRoles` in `App.jsx`); `RolesPage` derives `canEdit` and `canView` from `me.permissions`.
+- Backend: `/api/roles` reads need `roles` or `roles-viewer`, writes need `roles`; `/api/permissions` (read-only catalog) needs `roles` or `roles-viewer`.
+- Known gap: the linked users and groups in 角色細節 still come from `/api/users` (admin-only) and `/api/groups`, and assigning users goes through `PATCH /api/users/{email}`. A non-admin with `roles` can edit the role itself, but user-link loading and assignment fail until those routes are migrated.
+
+## Read-only permission for users (2026-11-03)
+
+- 使用者管理 follows the same rule as 群組管理 and 角色管理: `users-viewer` opens the page read-only (directory, account detail, and the status, role, department and original-view controls are disabled). `users` allows editing, pre-registration, cancelling a pre-registration and CSV export (export carries personal data, so it stays write-level). The menu shows for either id (`canUsers` in `App.jsx`); `UsersPage` derives `canEdit` and `canView` from `me.permissions`.
+- Backend: `/api/users` reads need `users` or `users-viewer`; writes and export need `users`. The admin account role always passes.
+- Still open: 角色細節 assigns users through `PATCH /api/users/{email}` (now `users`), so a user with `roles` but without `users` can edit the role itself but not its user links.

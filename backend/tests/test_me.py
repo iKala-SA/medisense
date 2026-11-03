@@ -46,3 +46,16 @@ def test_group_roles_alone_grant_permissions(fs, as_user):
     fs.put("groups/g-ward", {"name": "病房", "role_ids": ["ops"]})
     user = User(uid="u-x", email="x@example.com", name="X", role="user", groups=("g-ward",))
     assert as_user(user).get("/api/me").json()["permissions"] == ["connectors"]
+
+
+def test_admin_account_role_does_not_grant_permissions(fs, as_user):
+    # users.role is not a source of permissions: an admin with no assigned roles or groups holds none
+    admin = User(uid="u-a", email="a@example.com", name="A", role="admin")
+    assert as_user(admin).get("/api/me").json()["permissions"] == []
+
+
+def test_admin_account_gets_only_what_its_roles_and_groups_grant(fs, as_user):
+    fs.put("roles/user", {"id": "user", "name": "一般使用者", "custom": False, "permissions": ["chat", "settings"]})
+    fs.put("groups/g-it", {"name": "資訊中心", "role_ids": ["user"]})
+    admin = User(uid="u-a", email="a@example.com", name="A", role="admin", roles=("user",), groups=("g-it",))
+    assert as_user(admin).get("/api/me").json()["permissions"] == ["chat", "settings"]

@@ -1,12 +1,13 @@
-"""Groups (groups/{id}: name, description, role_ids[]): admin-only CRUD and member management
-(specifications/BE-GROUP-SPEC.md). Membership is stored on the user (users/{email}.groups, a list of group ids);
+"""Groups (groups/{id}: name, description, role_ids[]): CRUD and member management
+(specifications/BE-GROUP-SPEC.md). Guarded by `require_permission("groups")`: reads need `groups` or `groups-viewer`,
+writes need `groups`; the admin account role always passes. Membership is stored on the user (users/{email}.groups, a list of group ids);
 `member_emails` in responses is derived from it. Membership does not affect access; sharing still reads it.
 `/api/directory` is the search used by the share dialog (any signed-in, non-suspended user)."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from google.cloud import firestore
 
 from .. import db
-from ..auth import User, current_user, require_admin
+from ..auth import User, current_user, require_permission
 from ..config import settings
 from ..schemas import (
     DirectoryGroup,
@@ -22,7 +23,9 @@ from ..schemas import (
 )
 from .roles import SYSTEM_ROLES
 
-router = APIRouter(prefix="/api/groups", tags=["groups"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/groups", tags=["groups"])
+view = require_permission("groups")
+manage = require_permission("groups", write=True)
 directory_router = APIRouter(prefix="/api/directory", tags=["groups"])
 DIRECTORY_LIMIT = 20
 MEMBER_LIMIT = 1000
@@ -105,14 +108,14 @@ def _domain_allowed(email: str) -> bool:
     return not allowed or email.rsplit("@", 1)[-1] in allowed
 
 
-@router.get("", response_model=list[GroupOut])
+@router.get("", response_model=list[GroupOut], dependencies=[Depends(view)])
 def list_groups():
     members = _member_map()
     return sorted((_out(d, members.get(d.id, [])) for d in _col().stream()), key=lambda g: g.name.lower())
 
 
 @router.post("", response_model=GroupOut, status_code=201)
-def create_group(body: GroupIn, user: User = Depends(require_admin)):
+def create_group(body: GroupIn, user: User = Depends(manage)):
     ref = _col().document()
     data = {**body.model_dump(exclude={"member_emails"}), "role_ids": _check_role_ids(body.role_ids),
             "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
@@ -122,13 +125,13 @@ def create_group(body: GroupIn, user: User = Depends(require_admin)):
     return _out(ref.get(), _member_emails(ref.id))
 
 
-@router.get("/{group_id}", response_model=GroupOut)
+@router.get("/{group_id}", response_model=GroupOut, dependencies=[Depends(view)])
 def get_group(group_id: str):
     return _out(_load(group_id), _member_emails(group_id))
 
 
 @router.patch("/{group_id}", response_model=GroupOut)
-def patch_group(group_id: str, body: GroupPatch, user: User = Depends(require_admin)):
+def patch_group(group_id: str, body: GroupPatch, user: User = Depends(manage)):
     snap = _load(group_id)
     changes = body.model_dump(exclude_none=True)
     audit_extra: dict = {}
@@ -143,7 +146,7 @@ def patch_group(group_id: str, body: GroupPatch, user: User = Depends(require_ad
 
 
 @router.put("/{group_id}", response_model=GroupOut)
-def update_group(group_id: str, body: GroupIn, user: User = Depends(require_admin)):
+def update_group(group_id: str, body: GroupIn, user: User = Depends(manage)):
     snap = _load(group_id)
     snap.reference.update({**body.model_dump(exclude={"member_emails"}), "role_ids": _check_role_ids(body.role_ids),
                            "updated_at": db.now(), "updated_by": user.email})
@@ -153,14 +156,14 @@ def update_group(group_id: str, body: GroupIn, user: User = Depends(require_admi
 
 
 @router.delete("/{group_id}", status_code=204)
-def delete_group(group_id: str, user: User = Depends(require_admin)):
+def delete_group(group_id: str, user: User = Depends(manage)):
     snap = _load(group_id)
     _set_membership(group_id, [], user.email)  # drop the group id from every member's `groups`
     snap.reference.delete()
     db.audit(user.uid, "group.delete", user.email, group_id=group_id, name=(snap.to_dict() or {}).get("name", ""))
 
 
-@router.get("/{group_id}/members", response_model=list[GroupMemberOut])
+@router.get("/{group_id}/members", response_model=list[GroupMemberOut], dependencies=[Depends(view)])
 def list_members(group_id: str):
     emails = _member_emails(_load(group_id).id)
     refs = [db.client().collection("users").document(e) for e in emails]
@@ -178,7 +181,7 @@ def list_members(group_id: str):
 
 
 @router.post("/{group_id}/members", response_model=MemberAddResult)
-def add_members(group_id: str, body: MemberAddIn, user: User = Depends(require_admin)):
+def add_members(group_id: str, body: MemberAddIn, user: User = Depends(manage)):
     _load(group_id)
     current = _member_emails(group_id)
     result = MemberAddResult()
@@ -207,7 +210,7 @@ def add_members(group_id: str, body: MemberAddIn, user: User = Depends(require_a
 
 
 @router.delete("/{group_id}/members/{email}", status_code=204)
-def remove_member(group_id: str, email: str, user: User = Depends(require_admin)):
+def remove_member(group_id: str, email: str, user: User = Depends(manage)):
     _load(group_id)
     target = _normalize(email)
     if target not in _member_emails(group_id):

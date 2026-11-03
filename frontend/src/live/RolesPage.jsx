@@ -21,25 +21,26 @@ export default function RolesPage({me,notify}){
   const [busy,setBusy]=useState(false);
   const [opened,setOpened]=useState(null);
   const [creating,setCreating]=useState(false);
-  const admin=me?.role==='admin';
+  // UI only: the API enforces `roles` (write) and `roles`/`roles-viewer` (read).
+  const perms=me?.permissions||[],canEdit=perms.includes('roles'),canView=canEdit||perms.includes('roles-viewer');
 
   const load=useCallback(()=>{
     setBusy(true);
     return api.listRoles().then(setData).catch(e=>{notify?.('載入角色失敗：'+errText(e));setData(d=>d||{roles:[],stats:null})}).finally(()=>setBusy(false));
   },[notify]);
   // mount only: `notify` changes identity on every App render (see UsersPage)
-  useEffect(()=>{if(admin)load()},[admin]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(canView)load()},[canView]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const roles=data?.roles;
   const stats=data?.stats;
   const needle=search.trim().toLowerCase();
   const shown=useMemo(()=>(roles||[]).filter(r=>(tab==='全部'||!r.custom)&&(!needle||[r.name,r.en,r.desc].some(s=>(s||'').toLowerCase().includes(needle)))),[roles,tab,needle]);
 
-  if(!admin)return <div className="card-page lv-page"><Empty text="此頁面僅限系統管理員。"/></div>;
-  if(opened)return <RoleDetail role={opened} notify={notify} onBack={()=>{setOpened(null)}} onSaved={r=>setData(d=>({...d,roles:d.roles.map(x=>x.id===r.id?{...x,...r}:x)}))} onDeleted={id=>{setOpened(null);setData(d=>({...d,roles:d.roles.filter(x=>x.id!==id)}));load()}}/>;
+  if(!canView)return <div className="card-page lv-page"><Empty text="沒有角色管理權限，請聯絡系統管理員。"/></div>;
+  if(opened)return <RoleDetail role={opened} notify={notify} readOnly={!canEdit} onBack={()=>{setOpened(null)}} onSaved={r=>setData(d=>({...d,roles:d.roles.map(x=>x.id===r.id?{...x,...r}:x)}))} onDeleted={id=>{setOpened(null);setData(d=>({...d,roles:d.roles.filter(x=>x.id!==id)}));load()}}/>;
 
   return <div className="card-page lv-page rl-page">
-    <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button><button className="btn primary" onClick={()=>setCreating(true)}><Plus/>新增角色</button></div></div>
+    <div className="page-heading"><h1><IdentificationBadge/>角色管理</h1><div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button>{canEdit&&<button className="btn primary" onClick={()=>setCreating(true)}><Plus/>新增角色</button>}</div></div>
     <p className="subtitle">檢視平台角色的權限範圍與目前指派人數。角色變更請至「使用者管理」進行。</p>
 
     <div className="rl-stats">
@@ -111,7 +112,7 @@ const LINK_KIND={
     desc:'關聯此角色的群組。僅記錄關聯，不影響任何存取權限。'},
 };
 
-function RoleLinks({kind,role,notify}){
+function RoleLinks({kind,role,notify,readOnly}){
   const K=LINK_KIND[kind];
   const isUser=kind==='user';
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[adding,setAdding]=useState(false),[busy,setBusy]=useState(false);
@@ -157,18 +158,18 @@ function RoleLinks({kind,role,notify}){
     {rows===null?<span className="muted small">載入中…</span>:<>
       <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:8}}>
         <ListToolbar search={q} onSearch={setQ} placeholder={K.search} tabs={[]} tab="" onTab={()=>{}}/>
-        <button type="button" className="btn primary" disabled={busy||!candidates.length} onClick={()=>setAdding(true)}><Plus/>{K.add}</button>
+        {!readOnly&&<button type="button" className="btn primary" disabled={busy||!candidates.length} onClick={()=>setAdding(true)}><Plus/>{K.add}</button>}
       </div>
       <div className="lt" style={{'--cols':K.cols}}>
         <div className="lt-head">{K.head.map(h=><span key={h}>{h}</span>)}<span/></div>
         <div className="rl-scroll">{shown.map(x=><div className="lt-row" key={idOf(x)}>
           {K.text(x).map((v,i)=><span key={i} className={i===0?'':'muted'}>{v}</span>)}
-          <span><button type="button" className="icon-btn" aria-label={'移除 '+K.label(x)} disabled={busy} onClick={()=>unlink(x)}><X size={14}/></button></span>
+          <span>{!readOnly&&<button type="button" className="icon-btn" aria-label={'移除 '+K.label(x)} disabled={busy} onClick={()=>unlink(x)}><X size={14}/></button>}</span>
         </div>)}
         {!shown.length&&<Empty text={linked.length?'沒有符合條件的資料。':K.empty}/>}</div>
       </div>
     </>}
-    {adding&&<AddLinksModal kind={kind} title={K.title} candidates={candidates} label={K.label} text={K.text} keys={K.keys} busy={busy}
+    {adding&&!readOnly&&<AddLinksModal kind={kind} title={K.title} candidates={candidates} label={K.label} text={K.text} keys={K.keys} busy={busy}
       onClose={()=>setAdding(false)} onSubmit={async picked=>{const ok=await linkMany(picked);if(ok)setAdding(false);return ok}}/>}
   </div>;
 }
@@ -238,13 +239,14 @@ function RolePermissions({role,notify,disabled,onSaved}){
 }
 
 // 角色細節：名稱、英文名稱（非必填）、說明與狀態可編輯；權限見 RolePermissions。系統管理員為固定角色，整頁唯讀。
-function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
+function RoleDetail({role:initial,notify,readOnly,onBack,onSaved,onDeleted}){
   const [role,setRole]=useState(initial);
   const [delOpen,setDelOpen]=useState(false),[delBusy,setDelBusy]=useState(false);
   const [name,setName]=useState(initial.name||''),[en,setEn]=useState(initial.en||''),[desc,setDesc]=useState(initial.desc||'');
   const [status,setStatus]=useState(!!initial.status);
   const [busy,setBusy]=useState(false),[err,setErr]=useState('');
   const fixed=role.id==='admin';
+  const locked=fixed||readOnly;  // form, status and permissions cannot be edited
   const dirty=name.trim()!==(role.name||'')||en.trim()!==(role.en||'')||desc.trim()!==(role.desc||'')||status!==!!role.status;
   const back=()=>{if(dirty&&!window.confirm('放棄未儲存的變更？'))return;onBack()};
   // 內建角色（含 admin）後端一律回 403，這裡同步停用按鈕並說明原因
@@ -268,29 +270,29 @@ function RoleDetail({role:initial,notify,onBack,onSaved,onDeleted}){
 
   return <div className="card-page lv-page rl-page">
     <button className="lv-back" onClick={back}><ArrowLeft/>返回角色列表</button>
-    <div className="page-heading"><h1>{role.name}</h1><div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} disabled={!deletable||busy} title={fixed?'管理員不可刪除':!role.custom?'內建角色無法刪除':undefined} onClick={()=>setDelOpen(true)}><Trash/>刪除角色</button></div></div>
-    <p className="subtitle">{fixed?'系統管理員為固定角色，不可編輯。':'編輯角色的名稱、說明與狀態，並設定權限。'}</p>
+    <div className="page-heading"><h1>{role.name}</h1>{!readOnly&&<div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} disabled={!deletable||busy} title={fixed?'管理員不可刪除':!role.custom?'內建角色無法刪除':undefined} onClick={()=>setDelOpen(true)}><Trash/>刪除角色</button></div>}</div>
+    <p className="subtitle">{fixed?'系統管理員為固定角色，不可編輯。':readOnly?'唯讀檢視，您沒有編輯角色的權限。':'編輯角色的名稱、說明與狀態，並設定權限。'}</p>
 
     <form className="lv-card" onSubmit={save} style={{maxWidth:560,display:'grid',gap:12}}>
       <h2>基本資料</h2>
-      <div className="field"><label>角色名稱</label><input maxLength={40} value={name} disabled={fixed||busy} onChange={e=>{setName(e.target.value);setErr('')}}/></div>
-      <div className="field"><label>英文名稱（非必填）</label><input maxLength={40} value={en} disabled={fixed||busy} onChange={e=>setEn(e.target.value)}/></div>
-      <div className="field"><label>說明</label><textarea rows={3} maxLength={300} value={desc} disabled={fixed||busy} onChange={e=>setDesc(e.target.value)}/></div>
+      <div className="field"><label>角色名稱</label><input maxLength={40} value={name} disabled={locked||busy} onChange={e=>{setName(e.target.value);setErr('')}}/></div>
+      <div className="field"><label>英文名稱（非必填）</label><input maxLength={40} value={en} disabled={locked||busy} onChange={e=>setEn(e.target.value)}/></div>
+      <div className="field"><label>說明</label><textarea rows={3} maxLength={300} value={desc} disabled={locked||busy} onChange={e=>setDesc(e.target.value)}/></div>
       <div className="field"><label>狀態</label>
-        <div className="lv-actions"><Toggle on={status} onChange={setStatus} label="角色狀態" disabled={fixed||busy}/><span className="small muted">{status?'啟用':'停用'}</span></div>
+        <div className="lv-actions"><Toggle on={status} onChange={setStatus} label="角色狀態" disabled={locked||busy}/><span className="small muted">{status?'啟用':'停用'}</span></div>
       </div>
 
 
       {err&&<p className="lv-o-err" role="alert">{err}</p>}
-      <div className="lv-actions"><button className="btn primary" disabled={fixed||busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>
+      {!readOnly&&<div className="lv-actions"><button className="btn primary" disabled={fixed||busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>}
     </form>
 
-    <RolePermissions role={role} notify={notify} disabled={fixed} onSaved={r=>{setRole(x=>({...x,...r}));onSaved(r)}}/>
-    <RoleLinks kind="user" role={role} notify={notify}/>
-    <RoleLinks kind="group" role={role} notify={notify}/>
+    <RolePermissions role={role} notify={notify} disabled={locked} onSaved={r=>{setRole(x=>({...x,...r}));onSaved(r)}}/>
+    <RoleLinks kind="user" role={role} notify={notify} readOnly={readOnly}/>
+    <RoleLinks kind="group" role={role} notify={notify} readOnly={readOnly}/>
 
     {fixed&&<Notice icon={<Info size={16}/>}>管理員為系統預設角色，權限固定為全部允許，不可在此修改。</Notice>}
-    {delOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
+    {delOpen&&!readOnly&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
       <h2>刪除角色</h2><p>確定要刪除「{role.name}」？刪除後，群組中的此角色關聯也會一併移除。</p>
       <div className="modal-actions"><button type="button" className="btn" disabled={delBusy} onClick={()=>setDelOpen(false)}>取消</button><button type="button" className="btn primary" disabled={delBusy} onClick={remove}>{delBusy?'刪除中…':'刪除'}</button></div>
     </div></div>}
