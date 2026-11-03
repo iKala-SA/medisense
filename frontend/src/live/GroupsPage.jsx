@@ -87,7 +87,7 @@ function AddMembersModal({group,members,notify,onClose,onDone}){
   </div></div>;
 }
 
-function MembersTab({group,notify,onCountChange}){
+function MembersTab({group,notify,onCountChange,readOnly}){
   const [members,setMembers]=useState(null),[q,setQ]=useState(''),[page,setPage]=useState(1),[adding,setAdding]=useState(false),[removing,setRemoving]=useState(null),[busy,setBusy]=useState(false);
   // picked: e-mails selected for batch removal; kept across pages, cleared when the search changes
   const [picked,setPicked]=useState(()=>new Set()),[batchOpen,setBatchOpen]=useState(false),[failed,setFailed]=useState([]);
@@ -129,18 +129,18 @@ function MembersTab({group,notify,onCountChange}){
   return <div>
     <div className="lt-toolbar" style={{marginBottom:12}}>
       <div className="lt-filters"><label className="search"><input aria-label="搜尋成員" placeholder="搜尋姓名、電子郵件或科別" value={q} onChange={e=>setQ(e.target.value)}/></label></div>
-      <div className="lv-actions">
+      {!readOnly&&<div className="lv-actions">
         {pickedList.length>0&&<><span className="muted small">已選 {pickedList.length} 人</span><button className="btn" style={{color:'#b91c1c'}} disabled={busy} onClick={()=>{setFailed([]);setBatchOpen(true)}}><Trash/>移出所選</button></>}
         <button className="btn primary" onClick={()=>setAdding(true)}><UserPlus/>加入成員</button>
-      </div>
+      </div>}
     </div>
     {members===null?<div className="lv-o-loading">載入中…</div>:<div className="lt" style={{'--cols':'36px minmax(220px,2fr) 110px 56px'}}>
-      <div className="lt-head"><span><input type="checkbox" aria-label="選取本頁所有成員" checked={allOnPage} disabled={!rows.length} onChange={togglePage}/></span><span>姓名與電子郵件</span><span>帳號狀態</span><span/></div>
+      <div className="lt-head"><span>{!readOnly&&<input type="checkbox" aria-label="選取本頁所有成員" checked={allOnPage} disabled={!rows.length} onChange={togglePage}/>}</span><span>姓名與電子郵件</span><span>帳號狀態</span><span/></div>
       {rows.map(m=><div className="lt-row" key={m.email}>
-        <span><input type="checkbox" aria-label={'選取 '+m.email} checked={picked.has(m.email)} onChange={()=>togglePick(m.email)}/></span>
+        <span>{!readOnly&&<input type="checkbox" aria-label={'選取 '+m.email} checked={picked.has(m.email)} onChange={()=>togglePick(m.email)}/>}</span>
         <span><b>{m.name||'（尚未登入）'}</b><br/><span className="muted small">{m.email}</span></span>
         <span>{!m.has_account?<span className="lv-pill" style={{color:'#b45309'}}>帳號不存在</span>:m.status==='suspended'?<span className="lv-pill" style={{color:'#b91c1c'}}>停用</span>:<span className="lv-pill" style={{color:'#15803d'}}>啟用</span>}</span>
-        <span className="lt-actions"><button className="icon-btn" aria-label={'移除 '+m.email} onClick={()=>setRemoving(m)}><Trash/></button></span>
+        <span className="lt-actions">{!readOnly&&<button className="icon-btn" aria-label={'移除 '+m.email} onClick={()=>setRemoving(m)}><Trash/></button>}</span>
       </div>)}
       {!shown.length&&<Empty text={members.length?'沒有符合條件的成員。':'尚未加入成員。'}/>}
     </div>}
@@ -161,7 +161,7 @@ function MembersTab({group,notify,onCountChange}){
 const ROLE_PICK_LIMIT=10;
 const sameIds=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
 
-function InfoTab({group,notify,onDirtyChange,onSaved}){
+function InfoTab({group,notify,onDirtyChange,onSaved,readOnly}){
   const [name,setName]=useState(group.name||''),[desc,setDesc]=useState(group.description||''),[roleIds,setRoleIds]=useState(group.role_ids||[]),[roleList,setRoleList]=useState([]),[roleQ,setRoleQ]=useState(''),[roleFocus,setRoleFocus]=useState(false),[err,setErr]=useState(''),[busy,setBusy]=useState(false);
   const dirty=name.trim()!==(group.name||'')||desc.trim()!==(group.description||'')||!sameIds(roleIds,group.role_ids||[]);
   useEffect(()=>{onDirtyChange(dirty)},[dirty]);// eslint-disable-line react-hooks/exhaustive-deps
@@ -186,11 +186,11 @@ function InfoTab({group,notify,onDirtyChange,onSaved}){
   }
 
   return <form onSubmit={save} style={{maxWidth:560,display:'grid',gap:12}}>
-    <div className="field"><label>群組名稱</label><input maxLength={80} value={name} onChange={e=>{setName(e.target.value);setErr('')}}/></div>
-    <div className="field"><label>說明</label><textarea rows={3} maxLength={500} value={desc} onChange={e=>setDesc(e.target.value)}/></div>
+    <div className="field"><label>群組名稱</label><input maxLength={80} value={name} disabled={readOnly} onChange={e=>{setName(e.target.value);setErr('')}}/></div>
+    <div className="field"><label>說明</label><textarea rows={3} maxLength={500} value={desc} disabled={readOnly} onChange={e=>setDesc(e.target.value)}/></div>
     <div className="field"><label>角色</label>
       {/* Selected roles are compact tags on the same row as the search box; the candidate list only shows while the box has focus. */}
-      <div className="role-picker" style={{position:'relative'}}>
+      {readOnly?<div className="lv-o-chips" style={{margin:0}}>{roleIds.map(id=><span className="lv-o-chip" key={id}>{roleName(id)}</span>)}{!roleIds.length&&<span className="muted small">尚未指派角色</span>}</div>:<div className="role-picker" style={{position:'relative'}}>
         <div className="lv-o-chips" style={{margin:0,alignItems:'center',border:'1px solid #dce9e3',borderRadius:9,padding:'4px 6px',background:'#fff'}}>
           {roleIds.map(id=><span className="lv-o-chip" key={id} style={{padding:'1px 4px 1px 8px',fontSize:11}}>{roleName(id)}<button type="button" aria-label={'移除角色 '+roleName(id)} onClick={()=>setRoleIds(a=>a.filter(x=>x!==id))}><X size={10}/></button></span>)}
           <input type="search" aria-label="搜尋角色" placeholder={roleIds.length?'':'搜尋角色名稱或代號'} value={roleQ} style={{border:0,outline:'none',flex:'1 1 120px',minWidth:120,padding:'3px 4px'}}
@@ -202,15 +202,15 @@ function InfoTab({group,notify,onDirtyChange,onSaved}){
           {!matches.length&&<div className="muted small" style={{padding:10}}>{roleList.length?'沒有符合的角色':'角色清單載入中…'}</div>}
           {matches.length>ROLE_PICK_LIMIT&&<div className="muted small" style={{padding:10}}>僅顯示前 {ROLE_PICK_LIMIT} 筆，請輸入更多條件縮小範圍</div>}
         </div>}
-      </div>
+      </div>}
       <span className="lv-o-help">角色目前只記錄關聯，不影響任何功能的存取權限。</span>
     </div>
     {err&&<p className="lv-o-err" role="alert">{err}</p>}
-    <div className="lv-actions"><button className="btn primary" disabled={busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>
+    {!readOnly&&<div className="lv-actions"><button className="btn primary" disabled={busy||!dirty}>{busy?'儲存中…':'儲存'}</button></div>}
   </form>;
 }
 
-function GroupDetail({group:initial,notify,onBack,onChanged}){
+function GroupDetail({group:initial,notify,onBack,onChanged,readOnly}){
   const [group,setGroup]=useState(initial),[dirty,setDirty]=useState(false),[delOpen,setDelOpen]=useState(false),[delBusy,setDelBusy]=useState(false),[infoOpen,setInfoOpen]=useState(true),[membersOpen,setMembersOpen]=useState(true);
   const [memberCount,setMemberCount]=useState(initial.member_count??initial.member_emails?.length??0);
   async function remove(){
@@ -220,20 +220,20 @@ function GroupDetail({group:initial,notify,onBack,onChanged}){
   }
   const back=()=>{if(dirty&&!window.confirm('放棄未儲存的變更？'))return;onBack()};
   return <div className="lv-o">
-    <div className="page-heading"><h1><button className="icon-btn" aria-label="返回群組列表" onClick={back}><ArrowLeft/></button>{group.name}</h1><div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} onClick={()=>setDelOpen(true)}><Trash/>刪除群組</button></div></div>
-    <p className="subtitle">成員 {memberCount} 人。群組目前不影響使用者的存取權限。</p>
+    <div className="page-heading"><h1><button className="icon-btn" aria-label="返回群組列表" onClick={back}><ArrowLeft/></button>{group.name}</h1>{!readOnly&&<div className="lv-actions"><button className="btn" style={{color:'#b91c1c'}} onClick={()=>setDelOpen(true)}><Trash/>刪除群組</button></div>}</div>
+    <p className="subtitle">成員 {memberCount} 人。群組目前不影響使用者的存取權限。{readOnly&&' 您為唯讀檢視，無法編輯。'}</p>
     {/* Sections stay mounted when collapsed (display only) so unsaved edits and loaded members are kept. */}
     <section style={{marginBottom:28}}>
       <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:12}}>
         <h2 style={{fontSize:16,margin:0}}>基本資料</h2><Toggle on={infoOpen} onChange={setInfoOpen} label="展開或收合基本資料"/>
       </div>
-      <div style={{display:infoOpen?undefined:'none'}}><InfoTab group={group} notify={notify} onDirtyChange={setDirty} onSaved={g=>{setGroup({...group,...g});setDirty(false);onChanged()}}/></div>
+      <div style={{display:infoOpen?undefined:'none'}}><InfoTab group={group} notify={notify} readOnly={readOnly} onDirtyChange={setDirty} onSaved={g=>{setGroup({...group,...g});setDirty(false);onChanged()}}/></div>
     </section>
     <section>
       <div className="lv-actions" style={{justifyContent:'space-between',marginBottom:12}}>
         <h2 style={{fontSize:16,margin:0}}>成員（{memberCount}）</h2><Toggle on={membersOpen} onChange={setMembersOpen} label="展開或收合成員名單"/>
       </div>
-      <div style={{display:membersOpen?undefined:'none'}}><MembersTab group={group} notify={notify} onCountChange={setMemberCount}/></div>
+      <div style={{display:membersOpen?undefined:'none'}}><MembersTab group={group} notify={notify} readOnly={readOnly} onCountChange={setMemberCount}/></div>
     </section>
     {delOpen&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!delBusy)setDelOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
       <h2>刪除群組</h2><p>確定要刪除「{group.name}」？群組的 {memberCount} 位成員名單將一併刪除。</p>
@@ -243,17 +243,18 @@ function GroupDetail({group:initial,notify,onBack,onChanged}){
 }
 
 export default function GroupsPage({me,notify}){
-  const admin=me?.role==='admin';
+  // UI only: the API enforces `groups` (write) and `groups`/`groups-viewer` (read); admin holds every permission.
+  const perms=me?.permissions||[],canEdit=perms.includes('groups'),canView=canEdit||perms.includes('groups-viewer');
   const [rows,setRows]=useState(null),[q,setQ]=useState(''),[creating,setCreating]=useState(false),[opened,setOpened]=useState(null),[busy,setBusy]=useState(false);
   async function load(){
     setBusy(true);
     try{const r=await api.listGroups();setRows(Array.isArray(r)?r:(r.groups||[]))}
     catch(e){setRows(d=>d||[]);notify('無法載入群組：'+errText(e))}finally{setBusy(false)}
   }
-  useOnce(async()=>{if(admin)load()});
-  const head=<div className="page-heading"><h1><UsersThree/>群組管理</h1>{admin&&!opened&&<div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button><button className="btn primary" onClick={()=>setCreating(true)}><Plus/>新增群組</button></div>}</div>;
-  if(!admin)return <div className="lv-o">{head}<div className="panel access"><Lock size={36}/><h2>僅限管理員</h2><p>群組僅管理員可建立與編輯。</p></div></div>;
-  if(opened)return <GroupDetail group={opened} notify={notify} onBack={()=>{setOpened(null);load()}} onChanged={()=>{}}/>;
+  useOnce(async()=>{if(canView)load()});
+  const head=<div className="page-heading"><h1><UsersThree/>群組管理</h1>{canView&&!opened&&<div className="lv-actions"><button className="btn" onClick={load} disabled={busy}><ArrowClockwise className={busy?'lv-spin':''}/>重新整理</button>{canEdit&&<button className="btn primary" onClick={()=>setCreating(true)}><Plus/>新增群組</button>}</div>}</div>;
+  if(!canView)return <div className="lv-o">{head}<div className="panel access"><Lock size={36}/><h2>沒有群組管理權限</h2><p>請聯絡系統管理員開通「群組管理」權限。</p></div></div>;
+  if(opened)return <GroupDetail group={opened} notify={notify} readOnly={!canEdit} onBack={()=>{setOpened(null);load()}} onChanged={()=>{}}/>;
 
   const needle=lc(q);
   const shown=(rows||[]).filter(g=>!needle||[g.name,g.description].some(s=>(s||'').toLowerCase().includes(needle)));

@@ -1,4 +1,4 @@
-"""Roles (specifications/BE-ROLE-SPEC.md). Admin-only; GET /api/roles, POST /api/roles and PATCH /api/roles/{id} (custom roles and system overrides), DELETE for custom roles.
+"""Roles (specifications/BE-ROLE-SPEC.md). GET /api/roles needs `roles` or `roles-viewer`; POST, PATCH /api/roles/{id} (custom roles and system overrides) and DELETE need `roles` (admin account role always passes).
 
 Contract follows the frontend as-built page (specifications/FE-ROLE-SPEC.md): `can` holds the capability labels
 shown on the page, `permission_count` is len(can), and custom roles have no English name and no permissions.
@@ -11,10 +11,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import db
-from ..auth import User, effective_role, require_admin
+from ..auth import User, effective_role, require_permission
 from ..schemas import RoleIn, RoleListOut, RoleOut, RolePatch, RoleStats
 
-router = APIRouter(prefix="/api/roles", tags=["roles"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/roles", tags=["roles"])
+view = require_permission("roles")
+manage = require_permission("roles", write=True)
 
 # Built-in values, used when no `roles/{id}` document exists for a system role.
 SYSTEM_ROLES = {
@@ -58,7 +60,7 @@ def _all() -> list[RoleOut]:
     return sorted(rows, key=lambda r: (r.custom, order.get(r.id, 0), r.name.lower()))
 
 
-@router.get("", response_model=RoleListOut)
+@router.get("", response_model=RoleListOut, dependencies=[Depends(view)])
 def list_roles(search: str = Query("", max_length=100),
                kind: Literal["all", "system", "custom"] = Query("all", alias="type")):
     """Stats count all roles; `search` and `type` only filter the returned list."""
@@ -74,7 +76,7 @@ def list_roles(search: str = Query("", max_length=100),
 
 
 @router.post("", response_model=RoleOut, status_code=201)
-def create_role(body: RoleIn, user: User = Depends(require_admin)):
+def create_role(body: RoleIn, user: User = Depends(manage)):
     ref = db.client().collection("roles").document()
     data = {"name": body.name, "en": "", "desc": body.desc, "custom": True, "status": True, "can": [],
             "created_by": user.email, "created_at": db.now(), "updated_at": db.now(), "updated_by": user.email}
@@ -84,7 +86,7 @@ def create_role(body: RoleIn, user: User = Depends(require_admin)):
 
 
 @router.patch("/{role_id}", response_model=RoleOut)
-def patch_role(role_id: str, body: RolePatch, user: User = Depends(require_admin)):
+def patch_role(role_id: str, body: RolePatch, user: User = Depends(manage)):
     # The built-in administrator role is fixed (BE-ROLE-SPEC: admin is always full access and cannot be edited).
     if role_id == "admin":
         raise HTTPException(403, "admin role is fixed")
@@ -101,7 +103,7 @@ def patch_role(role_id: str, body: RolePatch, user: User = Depends(require_admin
 
 
 @router.delete("/{role_id}", status_code=204)
-def delete_role(role_id: str, user: User = Depends(require_admin)):
+def delete_role(role_id: str, user: User = Depends(manage)):
     ref = db.client().collection("roles").document(role_id)
     snap = ref.get()
     if not snap.exists and role_id not in SYSTEM_ROLES:

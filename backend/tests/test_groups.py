@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.auth import User
 from app.routers import groups as groups_router
 
 from .conftest import ADMIN, PLAIN
@@ -204,3 +205,61 @@ def test_patch_role_ids_drops_empty_strings(fs, as_user):
     r = as_user(ADMIN).patch("/api/groups/g1", json={"role_ids": ["", " user ", "user", "  "]})
     assert r.status_code == 200
     assert r.json()["role_ids"] == ["user"]
+
+
+def seed_role(fs, rid, permissions):
+    fs.put(f"roles/{rid}", {"id": rid, "name": rid, "custom": True, "permissions": permissions})
+
+
+def staff(uid, roles=(), groups=()):
+    return User(uid=f"u-{uid}", email=f"{uid}@example.com", name=uid, role="user", roles=tuple(roles),
+                groups=tuple(groups))
+
+
+def test_viewer_can_read_groups_but_not_write(fs, as_user):
+    seed_group(fs, members=["staff-a@example.test"])
+    seed_role(fs, "ro", ["groups-viewer"])
+    client = as_user(staff("viewer", roles=["ro"]))
+    assert client.get("/api/groups").status_code == 200
+    assert client.get("/api/groups/g1").status_code == 200
+    assert client.get("/api/groups/g1/members").status_code == 200
+    assert client.post("/api/groups", json={"name": "x", "description": "", "member_emails": []}).status_code == 403
+    assert client.patch("/api/groups/g1", json={"name": "x"}).status_code == 403
+    assert client.put("/api/groups/g1", json={"name": "x", "description": "", "member_emails": []}).status_code == 403
+    assert client.delete("/api/groups/g1").status_code == 403
+    assert client.post("/api/groups/g1/members", json={"emails": ["a@example.test"]}).status_code == 403
+    assert client.delete("/api/groups/g1/members/staff-a@example.test").status_code == 403
+    assert fs.store["groups/g1"]["name"] == "護理部"
+    assert members_of(fs, "g1") == ["staff-a@example.test"]
+
+
+def test_groups_permission_allows_read_and_write(fs, as_user):
+    seed_group(fs)
+    seed_role(fs, "editor", ["groups"])
+    client = as_user(staff("editor", roles=["editor"]))
+    assert client.get("/api/groups").status_code == 200
+    assert client.patch("/api/groups/g1", json={"description": "夜班"}).status_code == 200
+    assert client.post("/api/groups", json={"name": "藥劑部", "description": "", "member_emails": []}).status_code == 201
+
+
+def test_group_role_grants_groups_permission(fs, as_user):
+    seed_group(fs)
+    seed_role(fs, "editor", ["groups"])
+    fs.put("groups/ops", {"name": "營運", "description": "", "role_ids": ["editor"]})
+    client = as_user(staff("member", groups=["ops"]))
+    assert client.patch("/api/groups/g1", json={"description": "夜班"}).status_code == 200
+
+
+def test_user_without_groups_permission_is_refused(fs, as_user):
+    seed_group(fs)
+    seed_role(fs, "other", ["chat", "spaces"])
+    client = as_user(staff("nobody", roles=["other"]))
+    assert client.get("/api/groups").status_code == 403
+    assert client.get("/api/groups/g1").status_code == 403
+    assert client.get("/api/groups/g1/members").status_code == 403
+    assert client.patch("/api/groups/g1", json={"name": "x"}).status_code == 403
+
+
+def test_plain_user_without_any_role_is_refused(fs, as_user):
+    seed_group(fs)
+    assert as_user(PLAIN).get("/api/groups").status_code == 403
