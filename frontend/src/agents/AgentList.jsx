@@ -3,7 +3,6 @@ import {createPortal} from 'react-dom';
 import {fitMenu} from '../fitMenu';
 import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube,TreeStructure} from '@phosphor-icons/react';
 import {api} from '../api';
-import {fitMenu} from '../fitMenu';
 import {ShareDialog} from '../live/ShareLive';
 import {canEditAgent,errText,isMine} from '../live/kit';
 import {agentToIn,blankAgent} from './stepkit';
