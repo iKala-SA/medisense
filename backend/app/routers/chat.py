@@ -114,6 +114,20 @@ def my_connector_caps(user: User) -> list[CapConnector]:
     return caps
 
 
+def general_agent(user: User) -> tuple[AgentIn, str, list[str]]:
+    """The agent a general chat turn runs (no agent picked): the default Medisense agent or the built-in assistant, widened
+    with every connector shared with this user (the + menu's 連接器 list), writes confirmed by the user. Deterministic, so the
+    approval step can rebuild the very same tools (same names) when the person confirms a paused write."""
+    agent, agent_id = _default_agent(user)
+    rag_files = resolve_rag_files(agent.knowledge_doc_ids) if agent_id != BUILTIN_ID else []
+    mine = my_connector_caps(user)
+    if mine:
+        known = {(c.connector_id, c.action) for c in agent.capabilities.connectors}
+        offered = [*agent.capabilities.connectors, *[c for c in mine if (c.connector_id, c.action) not in known]]
+        agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"connectors": offered})})  # no cap: every allowed action
+    return agent, agent_id, rag_files
+
+
 def _prepare(body: ChatRequest, user: User) -> dict:
     """Resolve agent, knowledge scope, model pin and session for one chat turn -> execute_run keyword arguments."""
     if body.model and body.model not in {m["id"] for m in llm.model_catalog()}:
@@ -123,19 +137,12 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         agent, rag_files = _agent_def(body.agent_id, user, use_published=True)
         agent_id = body.agent_id
     else:
-        agent, agent_id = _default_agent(user)
-        rag_files = resolve_rag_files(agent.knowledge_doc_ids) if agent_id != BUILTIN_ID else []
+        agent, agent_id, rag_files = general_agent(user)
     agent = agent.model_copy(update={"model_group": "fast" if body.voice and not body.model else body.model_group})
     if body.skill_ids:  # skills invoked with / : added to the agent's own; unknown, disabled or non-viewable ones are skipped by skills.build_prefix
         agent = agent.model_copy(update={"skill_ids": list(dict.fromkeys([*agent.skill_ids, *body.skill_ids]))})
     if not chosen and body.db_connectors:  # what each database returns is still decided by THIS user's group rules at call time
         agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"db_connectors": list(dict.fromkeys(body.db_connectors))})})
-    if not chosen:  # general chat: the connectors shared with this user (the + menu's 連接器 list) are offered as tools, writes confirmed by the user
-        mine = my_connector_caps(user)
-        if mine:
-            known = {(c.connector_id, c.action) for c in agent.capabilities.connectors}
-            offered = [*agent.capabilities.connectors, *[c for c in mine if (c.connector_id, c.action) not in known]]
-            agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"connectors": offered})})  # no cap: every allowed action
 
     doc_ids = []
     if chosen:  # a picked agent does exactly what it was built to do: its own knowledge (and spaces, by YOUR rights), its connectors, no wider scope
@@ -165,7 +172,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     images = chat_images.parts_for(existing.get("attachments") or [])
     if images and (agent.routing.sovereign_only or routing.sovereign_only()):
         raise HTTPException(409, "僅院內模型不支援圖片，請移除圖片或關閉「僅院內模型」")
-    extra = {"kind": "chat", "agent_id": agent_id}
+    extra = {"kind": "chat", "agent_id": agent_id, "general": not chosen}  # general: rebuilt by general_agent() on approval
     if body.project_id and not existing.get("project_id"):  # only a conversation without a project can be filed
         own_project(body.project_id, user)
         extra["project_id"] = body.project_id
@@ -230,12 +237,18 @@ def chat_approve(body: ApproveRequest, user: User = Depends(current_user), x_big
     if not pending:
         raise HTTPException(409, "nothing is waiting for approval in this session")
     agent_id = str(pending.get("agent_id") or sess.get("agent_id") or "")
-    snap = db.client().collection("agents").document(agent_id).get() if agent_id else None
-    if snap is None or not snap.exists:
-        raise HTTPException(404, "agent not found")
-    if not can_decide(snap.to_dict() or {}, sess, user):
+    agent_def = None
+    if sess.get("general") or agent_id == BUILTIN_ID:  # general chat: no stored definition to load; rebuild it the same way the turn did
+        agent, agent_id, rag_files = general_agent(user)
+        agent_def, agent_data = (agent, rag_files), {}
+    else:
+        snap = db.client().collection("agents").document(agent_id).get() if agent_id else None
+        if snap is None or not snap.exists:
+            raise HTTPException(404, "agent not found")
+        agent_data = snap.to_dict() or {}
+    if not can_decide(agent_data, sess, user):
         raise HTTPException(403, "此動作需要 Agent 負責人或管理員核准")
-    return decide_pending(agent_id, sess_ref, sess, user, body.approve, x_bigquery_auth)
+    return decide_pending(agent_id, sess_ref, sess, user, body.approve, x_bigquery_auth, agent_def=agent_def)
 
 
 def _sse(event: dict) -> bytes:

@@ -187,3 +187,33 @@ def test_every_allowed_action_of_every_connector_is_offered_in_chat(fs, as_user)
     fs.put("connectors/cal", {"type": "calendar", "label": "Google Calendar", "owner_uid": "admin", "share": share, "config": {"write_actions": ["create_event"]}})
     caps = chat_router.my_connector_caps(BUILDER)
     assert len(caps) == 90 + 2 + 6 and caps[0].connector_id == "gmail" and caps[1].connector_id == "cal" and caps[2].connector_id == "docs"
+
+
+def test_general_chat_approval_works_without_a_stored_agent(fs, as_user, monkeypatch):
+    """Regression: with no published Medisense agent the general chat runs the built-in assistant (agent_id "general-chat",
+    no Firestore document). Confirming its paused write used to 404; now the agent is rebuilt the same way the turn built it."""
+    from app.engine import agent as rt
+
+    share = {"access": "account", "role": "use", "members": []}
+    fs.put("connectors/docs", {"type": "gateway", "label": "Google Docs", "owner_uid": "admin", "share": share,
+                               "config": {"service": "googledocs", "auth_mode": "oauth2", "allowed_actions": ["googledocs.create_document"]}})
+    monkeypatch.setattr("app.engine.gateway_actions.describe", lambda cfg: [{"id": "googledocs.create_document", "label": "create_document", "description": "", "write": True, "operation": "write",
+                                                                             "args": [{"key": "title", "label": "Title", "kind": "text", "required": True}, {"key": "text", "label": "Text", "kind": "text", "required": False}]}])
+    turns = [[{"id": "c1", "name": "gateway_cap0", "arguments": '{"reason": "建立文件", "title": "test", "text": "test"}'}], "已建立"]
+
+    def fake(**kw):
+        t = turns.pop(0)
+        return llm.Completion("" if isinstance(t, list) else t, "gemini-3-flash", 1, 1, 0.0, 1, tool_calls=tuple(t) if isinstance(t, list) else ())
+
+    ran = []
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr(llm, "complete", fake)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr(rt, "invoke_connector", lambda cid, action, args, **k: ran.append((cid, action, args)) or ("documentId d1", "Google Docs · create_document · 成功"))
+    me = as_user(BUILDER)
+    r = me.post("/api/chat", json={"message": "create a google doc, title: test, content: test"}).json()
+    assert r["pending_approval"]["approver"] == "user" and not ran
+    assert fs.store[f"sessions/{r['session_id']}"]["agent_id"] == "general-chat"
+    r2 = me.post("/api/chat/approve", json={"session_id": r["session_id"], "approve": True})
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["reply"] == "已建立" and ran == [("docs", "googledocs.create_document", {"title": "test", "text": "test"})]
