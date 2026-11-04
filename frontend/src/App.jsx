@@ -90,7 +90,7 @@ useEffect(()=>{if(!MOCK&&(logged||PREVIEW)&&page==='新對話')loadAgents()},[pa
 const recents=useRecents({MOCK,chats:recentChats,setChats:setRecentChats,projects,setProjects,notify,onDeleted:id=>{if(id===liveSession||id===threadId)go('新對話')},onDeletedAll:()=>{setLiveSession(null);setMessages([]);setThreadId(crypto.randomUUID());go('新對話')},onProjectDeleted:id=>{if(projectId===id){setProjectId(null);if(page==='專案')go('新對話')}}});
 useEffect(()=>{
   if(MOCK||(!logged&&!PREVIEW))return;
-  api.listSessions(100).then(r=>setRecentChats(r.items.map(i=>({id:i.id,title:i.title||'對話',messages:null,agent:i.agent_name||'Medisense',model:'Auto',project_id:i.project_id||'',created_at:i.created_at,updated_at:i.updated_at,pinned:!!i.pinned,locked:!!i.locked,archived:!!i.archived})))).catch(()=>{});
+  api.listSessions(100).then(r=>setRecentChats(r.items.map(i=>({id:i.id,title:i.title||'對話',messages:null,agent:i.agent_name||'Medisense',context:i.context||null,model:i.context?.model||(i.context?.model_group&&i.context.model_group!=='auto'?i.context.model_group:'Auto'),project_id:i.project_id||'',created_at:i.created_at,updated_at:i.updated_at,pinned:!!i.pinned,locked:!!i.locked,archived:!!i.archived})))).catch(()=>{});
   api.listProjects().then(setProjects).catch(()=>{});
 },[logged]);
 function onRunDone(res,run){
@@ -116,7 +116,7 @@ async function sendLive(text,onDelta){
     const pending=res.pending_approval&&res.pending_approval.approver!=='user'?'\n\n此步驟需要核准，請由 Agent 的擁有者或管理員處理。':'';
     const entry={...toEntry(text,res.reply+pending,{trace:res.trace||[],citations:res.citations||[],ms:res.latency_ms,agent:activeAgent,msgIndex:res.message_index,pending:res.pending_approval}),attach:sent};
     const next=[...messages,entry];setLiveSession(res.session_id);setMessages(next);setSelMsg(next.length-1);setPanelTab(entry.citations.length&&!entry.trace.length?'refs':'steps');setCiteFocus(null);
-    setRecentChats(items=>{const old=items.find(c=>c.id===res.session_id);return [{id:res.session_id,title:old?.title||(messages[0]?.text||text).slice(0,26),messages:next,agent:activeAgent,model,project_id:old?old.project_id:(newChatProject||''),pinned:!!old?.pinned,locked:!!old?.locked,archived:!!old?.archived,created_at:old?.created_at||new Date().toISOString(),updated_at:new Date().toISOString()},...items.filter(c=>c.id!==res.session_id)].slice(0,100)});
+    setRecentChats(items=>{const old=items.find(c=>c.id===res.session_id);return [{id:res.session_id,title:old?.title||(messages[0]?.text||text).slice(0,26),messages:next,agent:activeAgent,model,context:{knowledge_scope:toScope(knowledge),picked,web_search:webSearch&&!!features?.web_search},project_id:old?old.project_id:(newChatProject||''),pinned:!!old?.pinned,locked:!!old?.locked,archived:!!old?.archived,created_at:old?.created_at||new Date().toISOString(),updated_at:new Date().toISOString()},...items.filter(c=>c.id!==res.session_id)].slice(0,100)});
     setSkills([]);setFlowProfile(null);return res.reply;
   }catch(e){
     if(ctl.signal.aborted){ // stopped: keep the partial answer in the thread, like ChatGPT
@@ -178,12 +178,24 @@ function removeAttachment(a){
   setAttachments(l=>l.filter(x=>x.key!==a.key));
   if(!MOCK&&a.id&&sidRef.current)api.chatRemoveAttachment(sidRef.current,a.id).catch(e=>notify(e.message));
 }
+/* Put the composer back the way this conversation was used: data scope, picked spaces / databases, web search. */
+const SCOPE_LABEL={general:'一般知識',selected:'具體資料',all:'所有資料'};
+function restoreContext(ctx){
+  if(!ctx)return;
+  if(SCOPE_LABEL[ctx.knowledge_scope])setKnowledge(ctx.knowledge_scope==='selected'&&!(ctx.picked||[]).length?'所有資料':SCOPE_LABEL[ctx.knowledge_scope]);
+  setPicked((ctx.picked||[]).map(p=>({t:p.t,id:p.id,name:p.name||p.id,...(p.kind?{kind:p.kind}:{})})));
+  if(typeof ctx.web_search==='boolean')setWebSearchRaw(ctx.web_search);  // this conversation only; the saved default stays
+}
 async function openRecent(chat){
-  setPage('新對話');setThreadId(chat.id);setLiveSession(MOCK?null:chat.id);setActiveAgent(chat.agent);setModel(chat.model);setPrompt('');setRouteOpen(false);setAccountMenu(false);
+  // the agent is set directly: setActiveAgent() starts a fresh conversation when the agent changes, which would drop this one
+  setPage('新對話');setThreadId(chat.id);setLiveSession(MOCK?null:chat.id);if(chat.agent!==activeAgent){setActiveAgentRaw(chat.agent);setAgentProfile(null)}
+  setModel(chat.model);setPrompt('');setRouteOpen(false);setAccountMenu(false);restoreContext(chat.context);
   if(chat.messages||MOCK){setMessages(chat.messages||[]);return}
   try{const s=await api.getSession(chat.id),out=[];
     for(let i=0;i<s.messages.length;i++){const m=s.messages[i];if(m.role==='user'){const n=s.messages[i+1];out.push({...toEntry(m.content,n?.role==='assistant'?n.content:'',{trace:n?.meta?.trace||[],citations:n?.meta?.citations||[],agent:chat.agent,msgIndex:i+1,fb:s.feedback?.[String(i+1)],stopped:!!n?.meta?.stopped}),...(m.images?.length?{attach:m.images.map(x=>({key:x.id,id:x.id,sid:chat.id,name:x.name,available:x.available}))}:{})})}}
     if(s.pending_approval&&out.length)out[out.length-1]={...out[out.length-1],pending:s.pending_approval};  // still waiting for a decision
+    if(s.context)restoreContext(s.context);
+    if(s.agent_name&&s.agent_name!==chat.agent){setActiveAgentRaw(s.agent_name);setAgentProfile(null);out.forEach(e=>{e.agent=s.agent_name})}
     setMessages(out)}catch(e){notify(e.message)}
 }
 function send(text=prompt){if(!MOCK)return sendLive(text);if(!text.trim()||busy)return;setPrompt('');setBusy(true);const sensitive=/DEMO-|病歷號|姓名/.test(text),complex=/比較|分析|複雜|完整|研究|策略/.test(text),rag=/指引|文件|知識庫/.test(text)&&knowledge!=='一般知識';const route=resolveRoute(routing,{sensitive,complex,manual:model});const used=route.group==='On-Premise'?'院內模型 · On-Premise':route.group==='Cloud'?'大型推理模型 · Cloud':route.group==='Fast'?'輕量模型 · Fast':route.group==='Budget'?'節費模型 · Budget':route.group+' · Cloud';const why=route.reason;const ans=sensitive?'已辨識示範姓名與病歷號，本次模擬切換至院內模型。以下使用遮罩資料整理交班格式。\n\n個案：[姓名已遮罩] · [病歷號已遮罩]\n狀況摘要：請填入經確認的合成個案摘要。\n待確認事項：核對交班文件與資料完整性。\n交班提醒：此內容僅展示流程，不提供臨床決策。':rag?'依據示範院內文件，臨床指引應確認適用科別、文件版本與核准日期，再由具權限的人員檢視原文。[1]\n\n文件更新需經科別維護者與管理員審核，保留歷史版本與變更原因。[2]\n\n這是固定的示範回覆，未檢索真實院內資料。':complex?'我會分成三個面向整理：\n\n1. 使用情境：先辨識任務目標與授權資料範圍。\n2. 執行方式：依任務複雜度與資料分級選擇模型。\n3. 治理要求：保留操作紀錄，將發布納入審核流程。\n\n此為模擬生成內容，可用來展示複雜任務路由。':'院內知識庫將經授權的文件集中整理，讓員工能以自然語言查詢並追溯來源。\n\n此為固定示範回覆，未呼叫實際模型。';setTimeout(()=>{const nextMessages=[...messages,{text,ans,used,why,sensitive,rag,agent:activeAgent}];setMessages(nextMessages);setRecentChats(items=>[{id:threadId,title:(messages[0]?.text||text).slice(0,26),messages:nextMessages,agent:activeAgent,model},...items.filter(c=>c.id!==threadId)].slice(0,20));setBusy(false);log('模型呼叫',used,sensitive?'敏感':'內部',why,sensitive?'[示範姓名與病歷號已遮罩]':text);if(sensitive)setRouteOpen(true)},3200)}

@@ -35,7 +35,8 @@ def _agent_names(docs: list[dict]) -> dict[str, str]:
 
 def _summary(doc_id: str, d: dict, names: dict[str, str] | None = None) -> SessionSummary:
     return SessionSummary(id=doc_id, title=_title(d), agent_id=d.get("agent_id", ""),
-                          agent_name=d.get("agent_name") or (names or {}).get(d.get("agent_id", ""), ""), updated_at=d.get("updated_at"),
+                          agent_name=d.get("agent_name") or (names or {}).get(d.get("agent_id", ""), ""), context=d.get("context") or {},
+                          updated_at=d.get("updated_at"),
                           created_at=d.get("created_at"), project_id=d.get("project_id", ""),
                           pinned=bool(d.get("pinned")), locked=bool(d.get("locked")), archived=bool(d.get("archived")), message_count=len(d.get("messages") or []))
 
