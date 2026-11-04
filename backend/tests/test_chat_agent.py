@@ -65,6 +65,7 @@ def test_capabilities_drive_web_search_connectors_and_spaces(fs, as_user, monkey
     assert r.status_code == 200, r.text
     names = [t["function"]["name"] for t in seen["tools"]]
     assert "web_search" in names and "search_knowledge" in names and any(n.startswith("webhook_") for n in names)
+    assert "一定要先呼叫 search_knowledge" in seen["system"]  # an agent built on its spaces searches them first, not only "when needed"
 
 
 def test_the_person_chatting_confirms_a_connector_write_in_place(fs, as_user, monkeypatch, audit_log):

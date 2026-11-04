@@ -57,6 +57,9 @@ FORMAT_GUIDE = ("輸出格式：任何程式碼（含 HTML、CSS、SQL 等網頁
                 "只有當你產出的是使用者要拿去使用的完整『文字文件』（報告、信件、衛教單張、表單、會議紀錄、SOP 等純文字內容，不是程式碼）時，"
                 "才用波浪線區塊包起來：第一行寫 ~~~document 加上文件標題，最後一行寫 ~~~，區塊內用 Markdown 排版。"
                 "一般對話、說明與簡短回答不要放進區塊。")
+KNOWLEDGE_FIRST_GUIDE = ("這個 Agent 連結了院內知識來源（知識空間或附加文件），它的用途就是依據這些文件回答。凡是與其主題相關的問題，"
+                         "回答前一定要先呼叫 search_knowledge（可換不同關鍵字多搜一次），以檢索結果為準並附上來源編號；"
+                         "只有寒暄或明顯與主題無關的問題才直接回答。")
 WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
              "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
 WEB_SYSTEM = "You are a web research assistant. Summarise the facts found briefly, in the language of the search query, keeping numbers, dates and units; add no opinion or guesswork."
@@ -242,7 +245,9 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     specs = [t.spec for t in tools.values()]
     system = f"{system}\n\n{LANG_GUIDE}\n{FORMAT_GUIDE}"
     if specs:
-        system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
+        own_knowledge = bool(rag_files) and bool(agent.capabilities.spaces or agent.knowledge_doc_ids)  # a picked agent built around its documents
+        system = (f"{system}\n\n{GUIDE}" + (f"\n{KNOWLEDGE_FIRST_GUIDE}" if own_knowledge else "") + (f"\n{NO_DOCS_GUIDE}" if rag_files else "")
+                  + (f"\n{WEB_GUIDE}" if web_on else ""))
     approval = next((n for n in flow.nodes if n.type == "approval"), None)
     structured_node = next((n for n in flow.nodes if n.type == "structured_output"), None)
 
