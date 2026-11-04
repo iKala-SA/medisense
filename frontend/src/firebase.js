@@ -1,5 +1,5 @@
 import {initializeApp} from 'firebase/app';
-import {getAuth,GoogleAuthProvider,reauthenticateWithPopup,signInWithPopup,signOut as fbSignOut} from 'firebase/auth';
+import {getAuth,GoogleAuthProvider,OAuthProvider,linkWithCredential,reauthenticateWithPopup,signInWithPopup,signOut as fbSignOut} from 'firebase/auth';
 
 // Mock mode (the default) keeps the prototype self-contained: no Firebase config, no backend.
 // Set VITE_MOCK_API=0 together with the VITE_FIREBASE_* values to use the real platform.
@@ -15,12 +15,45 @@ const app=(MOCK||PREVIEW)?null:initializeApp({
 });
 export const auth=app?getAuth(app):null;
 
-export function signInWithGoogle(){
+export function signInWithGoogle(hdHint){
   const provider=new GoogleAuthProvider();
   // `hd` only pre-selects the Workspace domain in the popup; the backend is the real gate.
-  const hd=import.meta.env.VITE_ALLOWED_DOMAIN;
+  const hd=hdHint||import.meta.env.VITE_ALLOWED_DOMAIN;
   if(hd)provider.setCustomParameters({hd,prompt:'select_account'});
   return signInWithPopup(auth,provider);
+}
+
+// Enterprise SSO: Microsoft Entra ID and LDAP sign in through Keycloak, which Identity Platform trusts as one OIDC provider
+// (GET /api/auth/providers names it). `hint` = Keycloak's kc_idp_hint ("entra" jumps straight to Microsoft; "" shows the
+// Keycloak username / password page that checks the hospital directory).
+// Every user's data is keyed by the Firebase uid, so an e-mail that already signs in with Google must LINK the new method
+// to that same user: Firebase refuses with account-exists-with-different-credential, we keep the pending credential and
+// the login page asks the person to sign in with Google once (a second click: a popup needs a user gesture) to link it.
+let pendingLink=null; // {credential, email}
+export const pendingSsoLink=()=>pendingLink;
+export async function signInWithSSO(providerId,hint){
+  const provider=new OAuthProvider(providerId);
+  provider.addScope('email');provider.addScope('profile');
+  provider.setCustomParameters(hint?{kc_idp_hint:hint}:{});
+  try{const r=await signInWithPopup(auth,provider);pendingLink=null;return r}
+  catch(e){
+    if(e?.code==='auth/account-exists-with-different-credential'){
+      const credential=OAuthProvider.credentialFromError(e);
+      pendingLink=credential?{credential,email:e.customData?.email||''}:null;
+      const err=new Error(pendingLink?`${pendingLink.email||'這個 email'} 已用 Google 登入過。請按「用 Google 登入並連結」，之後兩種方式都能登入同一個帳號。`:'這個 email 已用其他方式登入過，請先用原本的方式登入。');
+      err.code='link-required';throw err;
+    }
+    throw e;
+  }
+}
+export async function linkPendingWithGoogle(){
+  if(!pendingLink)throw new Error('沒有待連結的登入方式');
+  const provider=new GoogleAuthProvider();
+  provider.setCustomParameters({login_hint:pendingLink.email,prompt:'select_account'});
+  const r=await signInWithPopup(auth,provider);
+  await linkWithCredential(r.user,pendingLink.credential); // same uid: sessions, files and connectors stay
+  pendingLink=null;
+  return r;
 }
 export const signOut=()=>{bq=null;storeBq(null);bqSubs.forEach(f=>f());return auth?fbSignOut(auth):Promise.resolve()};
 export async function idToken(){

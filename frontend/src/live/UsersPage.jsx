@@ -7,6 +7,9 @@ import {useOrgGroups,groupName} from './orgGroups';
 import {Loading,Notice} from './shared';
 import './admin.css';
 
+// users.login_provider = Firebase sign_in_provider of the last sign-in (登入與 SSO)
+const LOGIN_METHOD={'google.com':'Google Workspace','oidc.medisense-sso':'企業 SSO（Microsoft / LDAP）'};
+
 const TABS=['全部','啟用','停用'];
 const inTab=(u,t)=>t==='全部'||(t==='啟用'&&u.status!=='suspended')||(t==='停用'&&u.status==='suspended');
 const PAGE=30;
@@ -176,7 +179,7 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
       <div className="ue-who">
         <h1>{u.name||'（尚未登入）'}<RoleBadge role={u.role}/><StatusBadge u={u}/></h1>
         <p>{u.email}{u.bootstrap_admin&&<span className="ue-tag">固定管理員</span>}{self&&<span className="ue-tag">您自己的帳號</span>}</p>
-        <div className="ue-facts"><span>帳號建立 {fmtDateTime(u.created_at)}</span><span>最後活動 {fmtDateTime(u.last_seen_at)}</span>
+        <div className="ue-facts"><span>帳號建立 {fmtDateTime(u.created_at)}</span><span>最後活動 {fmtDateTime(u.last_seen_at)}</span>{u.login_provider&&<span>登入方式 {LOGIN_METHOD[u.login_provider]||u.login_provider}</span>}
           <span>{owned.agents} 個 Agent · {owned.connectors} 個連接器 · {owned.documents} 份文件</span></div>
       </div>
       {goAudit&&<button className="btn" onClick={()=>goAudit(u.email)}><ClockCounterClockwise/>個人稽核記錄</button>}

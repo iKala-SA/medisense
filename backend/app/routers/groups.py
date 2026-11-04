@@ -8,7 +8,7 @@ from google.cloud import firestore
 
 from .. import db
 from ..auth import User, current_user, require_permission
-from ..config import settings
+from ..engine import sso
 from ..schemas import (
     DirectoryGroup,
     DirectoryOut,
@@ -116,7 +116,7 @@ def _valid_email(email: str) -> bool:
 
 
 def _domain_allowed(email: str) -> bool:
-    allowed = settings().allowed_domain_list
+    allowed = sso.allowed_domains()
     return not allowed or email.rsplit("@", 1)[-1] in allowed
 
 

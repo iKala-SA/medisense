@@ -2,8 +2,9 @@ import React,{useEffect,useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkCjk from 'remark-cjk-friendly';
-import {ArrowRight,ShieldCheck,ImageSquare,LinkBreak} from '@phosphor-icons/react';
-import {MOCK,signInWithGoogle} from './firebase';
+import {ShieldCheck,ImageSquare,LinkBreak} from '@phosphor-icons/react';
+import {MOCK} from './firebase';
+import {SignInButtons} from './SignIn';
 import {useAuth} from './useAuth';
 import {Who} from './live/ChatAnswer';
 import {shareApi,fmtDate} from './ChatShare';
@@ -16,7 +17,7 @@ export default function SharePage({id}){
   useEffect(()=>{if(!logged)return;let live=true;shareApi(MOCK).view(id).then(d=>live&&setData(d)).catch(e=>live&&setErr(e.message));return()=>{live=false}},[logged,id]);
   useEffect(()=>{document.title=data?.title?`${data.title} · Medisense`:'分享的對話 · Medisense'},[data]);
   if(!logged)return <div className="lg-screen"><div className="lg-center"><div className="lg-brand"><img className="lg-mark" src="/brand/logo-mark.png" alt=""/><b>Medisense</b></div>
-    {checking?<p className="lg-note">正在確認身分…</p>:<><p className="sv-login-note">登入後即可檢視分享給你的對話</p><button type="button" className="btn primary" onClick={()=>{setAuthError('');signInWithGoogle().catch(e=>setAuthError(e.message))}}>登入<ArrowRight/></button></>}
+    {checking?<p className="lg-note">正在確認身分…</p>:<><p className="sv-login-note">登入後即可檢視分享給你的對話</p><SignInButtons onError={setAuthError}/></>}
     {authError&&<p className="login-error" role="alert">{authError}</p>}</div></div>;
   return <div className="sv-page">
     <header className="sv-top"><a className="sv-brand" href="/"><img src="/brand/logo-mark.png" alt=""/><b>Medisense</b></a><a className="sv-home" href="/">開啟 Medisense</a></header>

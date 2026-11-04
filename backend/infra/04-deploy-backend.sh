@@ -14,6 +14,14 @@ OC_URL="$(gcloud run services describe medisense-open-connector --region "$REGIO
 OC_ENV=""; OC_SECRET=""
 if [ -n "$OC_URL" ]; then OC_ENV="|OPEN_CONNECTOR_URL=${OC_URL}/api/oc|OPEN_CONNECTOR_IAM_AUDIENCE=${OC_URL}"; OC_SECRET=",OPEN_CONNECTOR_TOKEN=oc-admin-token:latest"; fi
 
+# Keycloak (infra/15-keycloak.sh): Microsoft Entra ID / LDAP sign-in, configured from 登入與 SSO. Skipped until deployed.
+if gcloud run services describe medisense-keycloak --region "$REGION" >/dev/null 2>&1 && \
+   gcloud secrets describe kc-backend-client-secret --project "$PROJECT_ID" >/dev/null 2>&1; then
+  KC_URL="https://medisense-keycloak-${PROJECT_NUMBER}.${REGION}.run.app"  # the same deterministic URL Keycloak's KC_HOSTNAME uses
+  OC_ENV="${OC_ENV}|KEYCLOAK_URL=${KC_URL}|KEYCLOAK_REALM=medisense|KEYCLOAK_CLIENT_ID=medisense-backend"
+  OC_SECRET="${OC_SECRET},KEYCLOAK_CLIENT_SECRET=kc-backend-client-secret:latest"
+fi
+
 # SCHEDULER_TOKEN: shared secret for POST /api/schedules/tick (infra/08-scheduler.sh uses the same value).
 # Export it before deploying (e.g. export SCHEDULER_TOKEN="$(openssl rand -hex 24)"); empty disables the tick endpoint.
 if [ -z "${SCHEDULER_TOKEN:-}" ]; then echo "warning: SCHEDULER_TOKEN is empty; schedules will not run automatically" >&2; fi

@@ -21,6 +21,7 @@ from google.cloud import firestore
 from .. import db
 from ..auth import User, effective_role, forget, is_bootstrap_admin, require_permission, users
 from ..config import settings
+from ..engine import sso
 from ..schemas import (
     DEPARTMENTS,
     DomainCount,
@@ -93,7 +94,7 @@ def list_users():
     for u in rows:
         dom = u.email.rsplit("@", 1)[-1]
         counts[dom] = counts.get(dom, 0) + 1
-    return UserDirectory(users=rows, domains=[DomainCount(domain=d, users=counts.get(d, 0)) for d in settings().allowed_domain_list])
+    return UserDirectory(users=rows, domains=[DomainCount(domain=d, users=counts.get(d, 0)) for d in sso.allowed_domains()])
 
 
 @router.get("/export.csv")
@@ -123,7 +124,7 @@ def preregister(body: UserCreate, user: User = Depends(manage)):
     email = body.email.strip().lower()
     if not EMAIL.match(email):
         raise HTTPException(422, "invalid e-mail")
-    allowed = settings().allowed_domain_list
+    allowed = sso.allowed_domains()
     if allowed and email.rsplit("@", 1)[-1] not in allowed:
         raise HTTPException(422, f"{email.rsplit('@', 1)[-1]} is not an allowed sign-in domain")
     if body.department and body.department not in DEPARTMENTS:

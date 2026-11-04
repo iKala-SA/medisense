@@ -197,6 +197,28 @@ Prices in the registry are used for cost when a served model is not in the built
   `GET /api/my-connectors`) as tools: all allowed read actions plus the admin-opened write actions, every write confirmed by the user. A picked agent
   keeps exactly its own capabilities. A connector the user has not connected yet answers "請先到「連接器」頁按「連線我的帳號」".
 
+## 登入與 SSO (2026-11-04)
+Google Workspace stays Firebase's own Google sign-in. Microsoft Entra ID and LDAP / AD sign in through Keycloak (realm
+`medisense`, `infra/15-keycloak.sh`), which Identity Platform trusts as the OIDC provider `oidc.medisense-sso`; the browser
+still gets a Firebase ID token and every route verifies it as before. Entra client secrets and LDAP bind passwords go to
+Keycloak only: no endpoint returns them, and an empty value on update keeps the stored one.
+
+| Method | Path | Who | Body / answer |
+|---|---|---|---|
+| GET | `/api/auth/providers` | anyone (no token) | `{google: {enabled, hd}, entra: {enabled, label, provider_id, hint: "entra"}, ldap: {enabled, label, provider_id, hint: ""}}` |
+| GET | `/api/sso` | admin | `{google: {enabled, allowed_domains, hd, env_domains, effective_domains}, entra: {enabled, tenant_id, client_id, display_name, in_keycloak, has_secret, redirect_uri}, ldap: {enabled, vendor, connection_url, start_tls, bind_dn, users_dn, username_attr, email_attr, user_filter, display_name, in_keycloak, has_password}, keycloak: {configured, url, realm, ok, error}, identity_platform: {provider_id, ok, issuer, error}, updated_at, updated_by}` |
+| PUT | `/api/sso/google` | admin | `{enabled, allowed_domains: [..], hd}` (domains are added to `ALLOWED_DOMAINS`) |
+| PUT / DELETE | `/api/sso/entra` | admin | `{enabled, tenant_id, client_id, client_secret, display_name}`; secret required the first time; answer adds `redirect_uri` |
+| PUT / DELETE | `/api/sso/ldap` | admin | `{enabled, vendor: ad\|other, connection_url: ldap(s)://.., start_tls, bind_dn, bind_password, users_dn, username_attr, email_attr, user_filter, display_name}`; read-only federation |
+| POST | `/api/sso/ldap/test` | admin | `{action: connection\|auth, connection_url, start_tls, bind_dn, bind_password}` -> `{ok, message}` (a failed test is 200 with ok=false) |
+
+Keycloak not deployed or unreachable: Entra / LDAP writes answer 503. Sign-in rules in `auth.current_user`: allowed domains =
+`ALLOWED_DOMAINS` ∪ `config/sso.google.allowed_domains` (all methods); a switched-off method answers 403 (bootstrap admins
+excepted); `users/{email}.login_provider` records `google.com` or `oidc.medisense-sso` (shown on 編輯使用者). An e-mail whose
+Firebase user still exists cannot sign in as a different uid through SSO (409): the login page links the new method to the
+existing Firebase user instead (`linkWithCredential`), so sessions, files and connectors stay with the same uid.
+Audit: `sso.google.update`, `sso.entra.update`, `sso.entra.delete`, `sso.ldap.update`, `sso.ldap.delete`, `sso.ldap.test`.
+
 ## New audit actions (admin audit page)
 access: `agent.share, group.create|update|delete, skill.share, schedule.share, space.share`; build: `skill.create|update|delete|enable|disable, schedule.create|update|delete|enable|disable, space.create|update|delete|documents, routing.update, model.create|update|delete|apply`; inference: `schedule.run, chat.run, chat.attach, session.update|delete`.
 

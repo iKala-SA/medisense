@@ -36,6 +36,15 @@ export const api={
   enableService:b=>call('/api/gateway-connectors',{method:'POST',body:body(b)}),
   updateEnabledService:(id,b)=>call(`/api/gateway-connectors/${id}`,{method:'PUT',body:body(b)}),
   me:()=>call('/api/me'),
+  // 登入與 SSO. authProviders needs no sign-in (the login page asks it which buttons to show).
+  authProviders:()=>fetch('/api/auth/providers').then(r=>r.ok?r.json():null).catch(()=>null),
+  sso:()=>call('/api/sso'),
+  saveSsoGoogle:b=>call('/api/sso/google',{method:'PUT',body:body(b)}),
+  saveSsoEntra:b=>call('/api/sso/entra',{method:'PUT',body:body(b)}),
+  deleteSsoEntra:()=>call('/api/sso/entra',{method:'DELETE'}),
+  saveSsoLdap:b=>call('/api/sso/ldap',{method:'PUT',body:body(b)}),
+  deleteSsoLdap:()=>call('/api/sso/ldap',{method:'DELETE'}),
+  testSsoLdap:b=>call('/api/sso/ldap/test',{method:'POST',body:body(b)}),
   modelGroups:()=>call('/api/models'),
   // agents
   stats:()=>call('/api/agents/stats'),

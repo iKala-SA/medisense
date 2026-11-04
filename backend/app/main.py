@@ -35,6 +35,7 @@ from .routers import (
     step_runs,
     skills,
     spaces,
+    sso,
     users,
 )
 
@@ -75,6 +76,8 @@ app.include_router(my_connectors.router)
 app.include_router(gateway_catalog.router)
 app.include_router(gateway_connectors.router)
 app.include_router(oauth_proxy.router)
+app.include_router(sso.router)
+app.include_router(sso.public_router)
 
 
 @app.get("/api/health")

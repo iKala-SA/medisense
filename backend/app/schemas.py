@@ -569,6 +569,7 @@ class UserOut(BaseModel):
     created_by: str = ""  # admin who pre-registered the account; "" when created by signing in
     first_login_at: Any = None
     last_seen_at: Any = None  # last API call, written at most every 10 minutes
+    login_provider: str = ""  # Firebase sign_in_provider of the last sign-in: google.com | oidc.medisense-sso (Entra / LDAP)
     status_reason: str = ""
     status_changed_at: Any = None
     status_changed_by: str = ""
@@ -1264,3 +1265,73 @@ class DbConnectorOut(BaseModel):
     created_by: str = ""
     created_at: Any = None
     updated_at: Any = None
+
+
+# --- 登入與 SSO (routers/sso.py) ------------------------------------------------------------------------------------
+_DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+class SsoGoogleIn(BaseModel):
+    enabled: bool = True
+    allowed_domains: list[str] = Field(default_factory=list, max_length=50)  # added to ALLOWED_DOMAINS; empty + no env = any
+    hd: str = Field("", max_length=253)  # Workspace domain hint for the Google account chooser ("" = none)
+
+    @field_validator("allowed_domains", mode="before")
+    @classmethod
+    def _domains(cls, v: object) -> list[str]:
+        out: list[str] = []
+        for d in v or []:
+            d = str(d).strip().lower().lstrip("@")
+            if not d:
+                continue
+            if not _DOMAIN.match(d):
+                raise ValueError(f"不是有效的網域：{d}")
+            if d not in out:
+                out.append(d)
+        return out
+
+    @field_validator("hd")
+    @classmethod
+    def _hd(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v and not _DOMAIN.match(v):
+            raise ValueError("hd 必須是網域，例如 hospital.org.tw")
+        return v
+
+
+class SsoEntraIn(BaseModel):
+    enabled: bool = True
+    tenant_id: str = Field(min_length=3, max_length=100, pattern=r"^[A-Za-z0-9.-]+$")  # directory (tenant) id or primary domain
+    client_id: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9-]+$")  # application (client) id
+    client_secret: str = Field("", max_length=500)  # "" = keep the one Keycloak holds; never returned
+    display_name: str = Field("Microsoft", max_length=40)
+
+
+class SsoLdapIn(BaseModel):
+    enabled: bool = True
+    vendor: Literal["ad", "other"] = "ad"
+    connection_url: str = Field(min_length=8, max_length=500, pattern=r"^ldaps?://\S+$")  # ldap://host:389 or ldaps://host:636
+    start_tls: bool = False
+    bind_dn: str = Field(min_length=3, max_length=500)  # read-only service account
+    bind_password: str = Field("", max_length=500)  # "" = keep the one Keycloak holds; never returned
+    users_dn: str = Field(min_length=3, max_length=500)  # where people are, e.g. OU=Staff,DC=hospital,DC=local
+    username_attr: str = Field("", max_length=60, pattern=r"^[A-Za-z0-9;-]*$")  # "" = sAMAccountName (AD) / uid
+    email_attr: str = Field("mail", max_length=60, pattern=r"^[A-Za-z0-9;-]+$")
+    user_filter: str = Field("", max_length=1000)  # optional LDAP filter, e.g. (memberOf=CN=Medisense,OU=Groups,DC=...)
+    display_name: str = Field("院內帳號", max_length=40)
+
+    @field_validator("user_filter")
+    @classmethod
+    def _filter(cls, v: str) -> str:
+        v = v.strip()
+        if v and not (v.startswith("(") and v.endswith(")")):
+            raise ValueError("LDAP 篩選條件需以括號包住，例如 (memberOf=...)")
+        return v
+
+
+class SsoLdapTestIn(BaseModel):
+    action: Literal["connection", "auth"] = "connection"
+    connection_url: str = Field(min_length=8, max_length=500, pattern=r"^ldaps?://\S+$")
+    start_tls: bool = False
+    bind_dn: str = Field("", max_length=500)
+    bind_password: str = Field("", max_length=500)  # "" = test the stored password
