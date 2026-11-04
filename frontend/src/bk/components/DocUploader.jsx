@@ -10,6 +10,7 @@ function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded,
   const [category, setCategory] = useState(defaultCategory);
   const [department, setDepartment] = useState(defaultDepartment);
   const [busy, setBusy] = useState("");
+  const [prog, setProg] = useState(null); // {pct: 0-100 while uploading, stage: "upload" | "index", done, total}
   const [over, setOver] = useState(false);
   const [err, setErr] = useState("");
   const [needCategory, setNeedCategory] = useState(false);
@@ -48,7 +49,16 @@ function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded,
   }} />;
   const messages = <>
     {needCategory && !category && <p className="mt-2 flex items-center gap-1 text-xs text-error"><Icon name="error" className="text-[14px]" />請先選擇文件類別，再選擇檔案。</p>}
-    {busy && <p className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant"><Spinner />去識別化並建立索引中：{busy}（大型檔案約需 30 秒以上）</p>}
+    {busy && <div className="mt-2 w-full min-w-[280px] max-w-xl">
+      <p className="flex items-center gap-2 text-xs text-on-surface-variant"><Spinner />
+        {prog?.stage === "upload" ? `上傳中 ${prog.pct}%：${busy}` : `去識別化並建立索引中：${busy}（大型檔案約需 30 秒以上）`}
+        {prog && prog.total > 1 && <span className="ml-auto">{prog.done + 1} / {prog.total}</span>}</p>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high" role="progressbar" aria-label="上傳進度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog?.stage === "upload" ? prog.pct : undefined}>
+        {prog?.stage === "upload"
+          ? <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${prog.pct}%` }} />
+          : <div className="bar-indeterminate h-full rounded-full bg-primary" />}
+      </div>
+    </div>}
     {err && <div className="mt-2"><ErrorBox msg={err} /></div>}
   </>;
   if (bare) {
@@ -69,15 +79,21 @@ function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded,
       return;
     }
     setErr("");
-    for (const f of Array.from(list)) {
+    const files = Array.from(list);
+    for (const [i, f] of files.entries()) {
       setBusy(f.name);
+      setProg({ pct: 0, stage: "upload", done: i, total: files.length });
       try {
-        onUploaded(await api.uploadDoc(f, category, department));
+        onUploaded(await api.uploadDocProgress(f, category, department, (sent, size) => {
+          const pct = size ? Math.round((sent / size) * 100) : 100;
+          setProg({ pct, stage: pct >= 100 ? "index" : "upload", done: i, total: files.length });
+        }));
       } catch (e) {
         setErr(`${f.name}: ${String(e)}`);
       }
     }
     setBusy("");
+    setProg(null);
   };
   return <div
     onDragOver={(e) => {

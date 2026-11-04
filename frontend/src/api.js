@@ -66,6 +66,24 @@ export const api={
   uploadRunFile:(agentId,file)=>{const fd=new FormData();fd.append('file',file);return call(`/api/agents/${agentId}/run-files`,{method:'POST',body:fd},false)},
   // knowledge
   listDocs:()=>call('/api/knowledge'),
+  // Same upload with progress events for the UI: onProgress(sentBytes, totalBytes) while the file goes up; the request then
+  // stays open while the server de-identifies and indexes, so the caller shows an indeterminate stage after 100%.
+  uploadDocProgress:async(file,category,department,onProgress)=>{
+    const fd=new FormData();fd.append('file',file);fd.append('category',category);fd.append('department',department);
+    const token=await idToken();
+    return new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST','/api/knowledge');xhr.setRequestHeader('Authorization',`Bearer ${token}`);
+      xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress?.(e.loaded,e.total)};
+      xhr.onerror=()=>reject(new Error('網路錯誤，上傳中斷'));
+      xhr.onload=()=>{
+        if(xhr.status>=200&&xhr.status<300){try{resolve(JSON.parse(xhr.responseText))}catch{resolve(undefined)}return}
+        let detail=xhr.responseText;try{detail=JSON.parse(detail).detail??detail}catch{/* plain text */}
+        reject(new Error(`${xhr.status} ${typeof detail==='string'?detail:JSON.stringify(detail)}`));
+      };
+      xhr.send(fd);
+    });
+  },
   uploadDoc:(file,category,department)=>{const fd=new FormData();fd.append('file',file);fd.append('category',category);fd.append('department',department);return call('/api/knowledge',{method:'POST',body:fd},false)},
   replaceDoc:(id,file)=>{const fd=new FormData();fd.append('file',file);return call(`/api/knowledge/${id}/version`,{method:'POST',body:fd},false)},
   updateDoc:(id,category,department)=>call(`/api/knowledge/${id}`,{method:'PATCH',body:body({category,department})}),
