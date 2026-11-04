@@ -237,6 +237,7 @@ export const api={
   chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
   chatImage:(sid,aid)=>blob(`/api/chat/attachments/${sid}/${aid}/image`), // the stored (redacted) copy; 410 once expired
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
+  meSummary:()=>call('/api/me/summary'),
   calendarStatus:()=>call('/api/calendar/status'),
   workbenchBrief:now=>call('/api/workbench/brief',{method:'POST',body:body({now})}),
   workbenchSources:()=>call('/api/workbench/sources'),

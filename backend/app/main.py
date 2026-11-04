@@ -6,6 +6,7 @@ from .auth import User, current_user, granted_permissions
 from .config import settings
 from .engine import llm
 from .routers import (
+    account,
     tts,
     agents,
     audit,
@@ -80,6 +81,7 @@ app.include_router(oauth_proxy.router)
 app.include_router(sso.router)
 app.include_router(sso.public_router)
 app.include_router(workbench.router)
+app.include_router(account.router)
 
 
 @app.get("/api/health")
@@ -101,5 +103,8 @@ def me(user: User = Depends(current_user)):
     """Profile for the frontend. `roles` are the assigned role ids; `permissions` the resource ids the user holds
     (see auth.granted_permissions). Display/UI only: the backend guards (require_permission, require_builder,
     require_admin) still decide access."""
+    roles = account.role_names(user)
     return {"uid": user.uid, "email": user.email, "name": user.name, "role": user.role, "department": user.department,
-            "roles": list(user.roles), "groups": list(user.groups), "permissions": granted_permissions(user)}
+            "roles": list(user.roles), "groups": list(user.groups), "permissions": granted_permissions(user),
+            # names for the sidebar profile (the group / role APIs are admin-only)
+            "group_names": [g["name"] for g in account.group_names(user.groups)], "role_label": account.role_label(user, roles)}
