@@ -410,3 +410,19 @@ def test_a_source_cited_by_file_name_counts_as_cited_and_becomes_its_number():
     text, out = rt.prune_citations("請禁食 (資料來源：[電腦斷層與顯影劑注意事項.pdf]、[胃鏡檢查前後注意事項])。程式 `[其他.pdf]`，連結 [其他](http://x)", cites)
     assert text.startswith("請禁食 (資料來源：[2]、[1])") and "`[其他.pdf]`" in text and "[其他](http://x)" in text
     assert [(c.source, c.cited) for c in out] == [("胃鏡檢查前後注意事項.pdf", True), ("電腦斷層與顯影劑注意事項.pdf", True), ("其他.pdf", False)]
+
+
+def test_an_agent_can_answer_with_its_own_model(rig, monkeypatch):
+    monkeypatch.setattr(llm, "model_catalog", lambda: [{"id": "gemini-2.5-pro", "model": "gemini-2.5-pro"}])
+    s = Script("ok")
+    r, _ = rig(s, AgentIn(name="A", model="gemini-2.5-pro"), msg="hi")
+    assert s.sent[0]["model"] == "gemini-2.5-pro" and "Agent 指定模型" in r.trace[-1].summary
+    s2 = Script("ok")  # the person's pick in the chat box wins
+    rig(s2, AgentIn(name="A", model="gemini-2.5-pro"), msg="hi", pin_model="gemini-3-flash")
+    assert s2.sent[0]["model"] == "gemini-3-flash"
+    s3 = Script("ok")  # a model the gateway no longer serves: back to routing
+    rig(s3, AgentIn(name="A", model="retired-model"), msg="hi")
+    assert s3.sent[0]["model"] is None
+    s4 = Script("ok")  # 僅院內模型 outranks the agent's model
+    rig(s4, AgentIn(name="A", model="gemini-2.5-pro", routing={"sovereign_only": True}), msg="hi")
+    assert s4.sent[0]["model"] is None and s4.sent[0]["group"] == "sovereign"

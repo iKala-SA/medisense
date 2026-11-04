@@ -247,6 +247,9 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     flow = agent.flow
     rag_files = rag_files or []
     res = RunResult(reply="", trace=_Trace(emit))
+    pinned_by = "使用者指定模型"
+    if not pin_model and agent.model and agent.model in {m["id"] for m in llm.model_catalog()}:
+        pin_model, pinned_by = agent.model, "Agent 指定模型"  # the agent's own model; a model gone from the gateway falls back to routing
     if pin_model and (agent.routing.sovereign_only or routing.sovereign_only()):
         pin_model = None  # data-residency policy outranks a model pick
     base = agent.instructions or f"You are {agent.name}. {agent.description}".strip()
@@ -262,7 +265,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     group, note = pick_group(agent, llm_node, user_message)
     think = THINK.get(group)
     if pin_model:
-        group, note, think = pin_model, "使用者指定模型", ("medium" if "pro" in pin_model else None)
+        group, note, think = pin_model, pinned_by, ("medium" if "pro" in pin_model else None)
     web_blocked = ""
     if web_search and (agent.routing.sovereign_only or routing.sovereign_only()):
         web_blocked = "僅本地模型已啟用，網路搜尋已停用"

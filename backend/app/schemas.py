@@ -178,6 +178,9 @@ class AgentIn(BaseModel):
     department: str = ""  # one of DEPARTMENTS or "" (legacy free-text values read back as "")
     code: str = ""  # short specialty code shown on hub cards, e.g. CARD-801
     model_group: ModelGroup = "fast"
+    # One exact model the agent answers with (an id from GET /api/models `models`); "" = automatic routing. A model the person
+    # picks in the chat box still wins, and 僅院內模型 / a model no longer served falls back to routing.
+    model: str = Field(default="", max_length=120)
     temperature: float = Field(default=0.3, ge=0, le=2)
     top_p: float = Field(default=0.95, ge=0, le=1)
     routing: RoutingPolicy = Field(default_factory=RoutingPolicy)
