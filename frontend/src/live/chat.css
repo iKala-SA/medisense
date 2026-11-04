@@ -169,3 +169,16 @@
 .cx-who .jelly{width:26px!important;height:26px!important}
 .cx-answer .cx-livehead{margin-top:2px}
 .conversation .cx-foot{margin-top:14px}
+
+/* Connector write waiting for the person chatting to confirm it (or already decided). */
+.cx-approval{margin:12px 0 4px;padding:12px 14px;border:1px solid #e6e8eb;border-radius:12px;background:#fafbfc;font-size:13.5px;color:#1c2420}
+.cx-approval.wait{border-color:#f0d9a8;background:#fff9ec}
+.cx-approval.approved,.cx-approval.cancelled{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:18px;font-size:12.5px;color:#52625a}
+.cx-approval.approved{border-color:#cfe3d8;background:#f4faf7;color:#17623f}
+.cx-approval-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;color:#8a5a00}
+.cx-approval p{margin:0 0 8px}
+.cx-approval pre{margin:0 0 10px;padding:10px 12px;max-height:220px;overflow:auto;background:#fff;border:1px solid #efe3c6;border-radius:8px;font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.cx-approval-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cx-approval small,.cx-approval-actions small{color:#7b828d;font-size:12px}
+.cx-approval-actions .btn{height:30px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid #c6dcd2}
+.cx-approval-actions .btn.primary{border-color:#239660}

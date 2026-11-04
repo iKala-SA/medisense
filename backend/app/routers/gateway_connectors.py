@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from .. import db, sharing
 from ..auth import User, require_admin
-from ..config import settings
 from ..engine import connectors as eng
 from ..engine import gateway_actions as ga
 from ..engine import open_connector as oc
@@ -77,16 +76,8 @@ def _check_actions(service: str, ids: list[str]) -> list[str]:
     return list(dict.fromkeys(ids))
 
 
-GOOGLE_SERVICES = {"gmail", "googlecalendar", "googledrive", "googledocs", "googlesheets", "googleslides", "googleforms", "googlemeet",
-                   "googlechat", "googletasks"}
-
-
-def platform_client(service: str) -> dict:
-    """The platform-wide OAuth app for this service's vendor (Google only so far), or {} when none is configured."""
-    s = settings()
-    if service in GOOGLE_SERVICES and s.google_oauth_client_id and s.google_oauth_client_secret:
-        return {"clientId": s.google_oauth_client_id, "clientSecret": s.google_oauth_client_secret}
-    return {}
+GOOGLE_SERVICES = ga.GOOGLE_SERVICES
+platform_client = ga.platform_client  # the platform-wide Google OAuth app, shared with the first-class calendar type
 
 
 def _require_fields(opt: dict, values: dict, *, have_stored: bool = False) -> None:

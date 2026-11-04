@@ -54,6 +54,7 @@ export const api={
   deleteAgent:id=>call(`/api/agents/${id}`,{method:'DELETE'}),
   run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',headers:bqh(),body:body({message,session_id,use_published,version})}),
   approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',headers:bqh(),body:body({session_id,approve})}),
+  chatApprove:(session_id,approve)=>call('/api/chat/approve',{method:'POST',headers:bqh(),body:body({session_id,approve})}),
   draftAgent:(message,current,history,kind='flow')=>call('/api/agents/draft',{method:'POST',body:body({message,current,history,kind})}),
   improveInstructions:b=>call('/api/agents/improve',{method:'POST',body:body(b)}),
   validateSteps:steps=>call('/api/agents/validate-steps',{method:'POST',body:body({steps})}),

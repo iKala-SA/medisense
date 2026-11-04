@@ -1,5 +1,7 @@
 """Connectors: shared hospital-wide objects. Anyone signed in can list and attach; only the owner or
 an admin edits credentials, tests, or deletes. Secret values go to Secret Manager and never come back."""
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from google.cloud import firestore
 
@@ -13,6 +15,7 @@ from ..schemas import ConnectorIn, ConnectorOut, ConnectorStats, Share
 
 # Run-only users never see connectors (Hub + chat only); tool nodes call them server-side.
 router = APIRouter(prefix="/api/connectors", tags=["connectors"], dependencies=[Depends(require_builder)])
+log = logging.getLogger(__name__)
 
 
 def _usage() -> dict[str, int]:
@@ -100,6 +103,22 @@ def _guard_redaction(body: ConnectorIn, cur: dict | None, user: User) -> None:
         raise HTTPException(422, "a reason is required to switch de-identification off")
 
 
+def _with_scopes(type_: str, config: dict) -> dict:
+    """Per-user OAuth types: push the scopes the allowed actions need to the gateway and record them on the connector.
+    A gateway that cannot be updated blocks the save only when write actions were asked for (they cannot work without the
+    new scope); a read-only save keeps working as before."""
+    if not eng.is_user_oauth(type_):
+        return config
+    try:
+        scopes = eng.sync_oauth_scopes(type_, config)
+    except oc.OpenConnectorError as exc:
+        if eng.has_write_actions(type_, config):
+            raise HTTPException(422, f"無法更新連接器閘道的授權範圍（寫入動作需要新的授權範圍）：{exc}") from exc
+        log.warning("connector %s: scope sync skipped: %s", type_, exc)
+        return config
+    return {**config, "scopes": [s for s in scopes if s not in ga.IDENTITY_SCOPES]} if scopes else config
+
+
 @router.get("", response_model=list[ConnectorOut])
 def list_connectors(user: User = Depends(current_user)):
     usage = _usage()
@@ -117,7 +136,8 @@ def create_connector(body: ConnectorIn, user: User = Depends(current_user)):
     # A secret sent in config by an older client is still stored as a secret, never as config.
     incoming = {**_legacy_secrets(body.type, body.config), **{k: v for k, v in body.secrets.items() if v}}
     stored = {k: sm.put(ref.id, k, v) for k, v in incoming.items() if k in allowed}
-    data = {**sharing.share_fields(Share()), "type": body.type, "label": body.label, "scope": body.scope, "config": _public(body.type, body.config), "secrets": stored,
+    config = _with_scopes(body.type, _public(body.type, body.config))
+    data = {**sharing.share_fields(Share()), "type": body.type, "label": body.label, "scope": body.scope, "config": config, "secrets": stored,
             "redact_pii": body.redact_pii, "audit_payloads": body.audit_payloads, "owner_uid": user.uid,
             "owner_email": user.email, "status": "unverified", "last_test": None, "created_at": db.now(), "updated_at": db.now()}
     ref.set(data)
@@ -150,7 +170,7 @@ def update_connector(connector_id: str, body: ConnectorIn, user: User = Depends(
     for k, v in incoming.items():
         if k in allowed:  # absent / empty == keep existing
             stored[k] = sm.put(connector_id, k, v)
-    config = _public(body.type, body.config)
+    config = _with_scopes(body.type, _public(body.type, body.config))
     changed_creds = any(v for v in body.secrets.values()) or config != _public(body.type, cur_config)
     snap.reference.update({"label": body.label, "scope": body.scope, "config": config, "secrets": stored,
                            "redact_pii": body.redact_pii, "audit_payloads": body.audit_payloads, "updated_at": db.now(),

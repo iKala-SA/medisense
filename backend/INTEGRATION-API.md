@@ -140,10 +140,29 @@ Prices in the registry are used for cost when a served model is not in the built
   Agent: `agent_id` (published snapshot / shared) else the first published agent named exactly `Medisense` else a built-in single-LLM assistant. `model_group` overrides the agent's group (default `auto`). `knowledge_doc_ids` are searched only when the agent's canvas is empty or has a knowledge node. Audit `chat.run`.
 - `POST /api/chat/attachments` multipart: `file` (same types as the knowledge library: pdf, txt, md, docx, pptx, html, csv, json; max `MAX_UPLOAD_MB`, default 25 -> 413) and optional form field `session_id` (a new session is created if omitted) -> `{ "session_id", "attachment_id", "name", "chars", "snippet" }` (snippet = first 500 chars of the de-identified text). Max 5 per session (409). Attachment text is added to the model's system prompt for later messages in that session.
 - Streaming (`/api/chat/stream`) is NOT available.
+- `pending_approval` (also on `GET /api/sessions/{id}`) is `{node_id, message, preview, approver: "user" | "owner"}` when the turn stopped before a connector write.
+  `approver: "user"`: the agent's capability marks the action 需核准, so the person chatting confirms it themselves with
+  `POST /api/chat/approve` `{session_id, approve}` -> `RunResponse` (approve = the paused action runs as that user, then the model continues;
+  reject = "已取消此動作，流程停止。"). `approver: "owner"`: a canvas approval node; only the agent owner / an admin may decide (`POST /api/agents/{id}/approve`; `/api/chat/approve` returns 403).
+  Audit `agent.approve` / `agent.reject` carry `by_user: true` for user confirmations. Draft (sandbox) runs never pause: writes are simulated there.
 
 ## Calendar
 
 `GET /api/calendar/status` -> `{ "connected": false, "reason": "Google Calendar OAuth consent screen not approved yet" }`.
+
+### Creating things through connectors (2026-11-03)
+- **Google Calendar (`type: "calendar"`)**: `config.write_actions` (admin, checkboxes) may contain `quick_add_event`, `create_event`, `patch_event`, `delete_event`;
+  default none. Saving a calendar connector pushes the scopes the ticked actions need to the gateway (`calendar.readonly`, plus `calendar.events` when any write is on)
+  and records them in `config.scopes`; users whose grant lacks a required scope show `state: reauth_required` with `missing_scopes` in `/api/my-connectors` and must
+  "重新授權". Tool arguments are flat (`summary, start, end, description, location, attendees (comma-separated), timeZone (default Asia/Taipei), calendarId, sendUpdates`)
+  and are folded into the gateway's `{calendarId, event:{...}, sendUpdates}` input; a bare `YYYY-MM-DD` start/end is an all-day boundary.
+- **Google Docs and any other service**: enable it from the service catalog (`POST /api/gateway-connectors`, service `googledocs`, allow e.g.
+  `googledocs.create_document` `{title, text}` or `googledocs.insert_text_action`). The agent tool now receives the action's real input schema (nested objects
+  and arrays included), so the model fills `event`-style objects directly; `GET /api/connectors/{id}/actions` marks such arguments `kind: "textarea"` with a `schema`.
+- Writes only happen in production runs (chat on a published agent, schedules) and, when the capability says 需核准 (the default), after the user confirms.
+- General chat (no `agent_id`, or the default Medisense agent) offers every gateway-backed connector shared with the caller, with no cap on the number of actions (the same list as
+  `GET /api/my-connectors`) as tools: all allowed read actions plus the admin-opened write actions, every write confirmed by the user. A picked agent
+  keeps exactly its own capabilities. A connector the user has not connected yet answers "請先到「連接器」頁按「連線我的帳號」".
 
 ## New audit actions (admin audit page)
 access: `agent.share, group.create|update|delete, skill.share, schedule.share, space.share`; build: `skill.create|update|delete|enable|disable, schedule.create|update|delete|enable|disable, space.create|update|delete|documents, routing.update, model.create|update|delete|apply`; inference: `schedule.run, chat.run, chat.attach, session.update|delete`.
@@ -160,12 +179,12 @@ Tokens and credentials live in the gateway only. A user's own grants are gateway
 ### Using a connector (any signed-in role)
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/my-connectors` | Connectors shared with me: `{id, type, service, mode: user_oauth\|shared\|none, label, description, allowed_actions, state: connected\|not_connected\|reauth_required\|shared\|unavailable, account_label, scopes, problem}` |
+| GET | `/api/my-connectors` | Connectors shared with me: `{id, type, service, mode: user_oauth\|shared\|none, label, description, allowed_actions, write_actions, state: connected\|not_connected\|reauth_required\|shared\|unavailable, missing_scopes, account_label, scopes, problem}` (`reauth_required` also when my grant lacks a scope the connector now needs) |
 | POST | `/api/my-connectors/{id}/connect` | `{authorization_url, state}` for my own grant (409 for shared/no-auth connectors, 503 if the OAuth client is not set up) |
 | GET | `/api/my-connectors/{id}/status` | one item, same shape |
 | DELETE | `/api/my-connectors/{id}/connection` | disconnect and revoke my grant |
 | GET | `/api/oc/oauth/callback` | public OAuth redirect target, relayed to the gateway; nothing else of the gateway is exposed |
-| GET | `/api/calendar/status`, `/events?from&to&max`, `/freebusy?from&to` | my own Google Calendar (read-only); 409 when not connected |
+| GET | `/api/calendar/status`, `/events?from&to&max`, `/freebusy?from&to` | my own Google Calendar for the workbench (reads; writes go through agents, see "Creating things through connectors"); 409 when not connected |
 
 ### Browsing everything the gateway supports (builder / admin)
 - `GET /api/gateway-catalog?q&category&auth&enabled_only&offset&limit` -> `{total, gateway_total, items:[{service, name, homepage, icon_url, categories, auth_types, enabled_type}], facets:{categories, auth}, enabled}`

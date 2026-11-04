@@ -62,7 +62,13 @@ def calendar_connector(fs, as_user):
 def test_catalog_marks_calendar_available_and_per_user():
     spec = connectors.TYPES["calendar"]
     assert spec["available"] and connectors.is_user_oauth("calendar") and connectors.user_oauth_types() == ["calendar"]
-    assert all(not a["write"] for a in spec["actions"])  # first version is read-only
+    # reads and writes are both listed; which writes may run is the admin's `write_actions` choice (none by default)
+    assert {a["id"] for a in spec["actions"] if a["write"]} == {"quick_add_event", "create_event", "patch_event", "delete_event"}
+    writes = next(f for f in spec["fields"] if f["key"] == "write_actions")
+    assert writes["default"] == [] and all(not o.get("disabled") for o in writes["options"])
+    assert connectors.calendar_allowed({}) == (connectors.CALENDAR_READ, [])
+    assert connectors.calendar_scopes({}) == [connectors.CALENDAR_READ_SCOPE]
+    assert connectors.calendar_scopes({"allowed_actions": ["list_events"], "write_actions": ["create_event"]}) == [connectors.CALENDAR_READ_SCOPE, connectors.CALENDAR_WRITE_SCOPE]
 
 
 def test_conn_name_is_stable_and_safe():
@@ -528,11 +534,117 @@ def test_callback_is_forwarded_under_the_gateways_mount_prefix(monkeypatch):
 
 
 def test_platform_google_client_reused(monkeypatch):
-    from app.config import settings
+    from app.engine import gateway_actions as ga
     from app.routers import gateway_connectors as gc
 
-    monkeypatch.setattr(gc, "settings", lambda: type("S", (), {"google_oauth_client_id": "id", "google_oauth_client_secret": "sec"})())
+    monkeypatch.setattr(ga, "settings", lambda: type("S", (), {"google_oauth_client_id": "id", "google_oauth_client_secret": "sec"})())
     assert gc.platform_client("gmail") == {"clientId": "id", "clientSecret": "sec"}
     assert gc.platform_client("slack") == {}
-    monkeypatch.setattr(gc, "settings", lambda: type("S", (), {"google_oauth_client_id": "", "google_oauth_client_secret": ""})())
+    monkeypatch.setattr(ga, "settings", lambda: type("S", (), {"google_oauth_client_id": "", "google_oauth_client_secret": ""})())
     assert gc.platform_client("gmail") == {}
+
+
+# ------------------------------------------------------------------ calendar write actions (opened 2026-11-03)
+WRITE_CFG = {"allowed_actions": ["list_events"], "write_actions": ["create_event", "quick_add_event", "delete_event"]}
+
+
+def test_calendar_write_actions_build_the_gateway_event_payload(gw):
+    out = connectors.invoke("calendar", WRITE_CFG, {}, "create_event",
+                            {"summary": "心臟科討論", "start": "2026-11-04T15:00:00", "end": "2026-11-04T15:30:00", "attendees": "a@x.tw, b@x.tw",
+                             "location": "3F 會議室", "sendUpdates": "all", "description": ""}, redact_pii=False, user_id="u-u1")
+    assert json.loads(out) == {"items": []}
+    call = next(x for x in gw.calls if x[1] == "/v1/actions/googlecalendar.create_event")
+    assert call[3] == {"connectionName": "u-u-u1"}  # the user's own account, never someone else's
+    assert call[2]["input"] == {"calendarId": "primary", "sendUpdates": "all",
+                                "event": {"summary": "心臟科討論", "location": "3F 會議室", "attendees": [{"email": "a@x.tw"}, {"email": "b@x.tw"}],
+                                          "start": {"dateTime": "2026-11-04T15:00:00", "timeZone": "Asia/Taipei"},
+                                          "end": {"dateTime": "2026-11-04T15:30:00", "timeZone": "Asia/Taipei"}}}
+    # all-day dates and offset timestamps are passed as Google expects them
+    connectors.invoke("calendar", WRITE_CFG, {}, "create_event", {"summary": "休假", "start": "2026-11-10", "end": "2026-11-11"}, redact_pii=False, user_id="u-u1")
+    assert gw.calls[-1][2]["input"]["event"]["start"] == {"date": "2026-11-10"}
+    connectors.invoke("calendar", WRITE_CFG, {}, "create_event", {"summary": "x", "start": "2026-11-10T09:00:00+08:00", "end": "2026-11-10T10:00:00Z"}, redact_pii=False, user_id="u-u1")
+    assert gw.calls[-1][2]["input"]["event"]["start"] == {"dateTime": "2026-11-10T09:00:00+08:00"}
+    connectors.invoke("calendar", WRITE_CFG, {}, "quick_add_event", {"text": "明天下午三點 跟藥劑部開會"}, redact_pii=False, user_id="u-u1")
+    assert gw.calls[-1][1] == "/v1/actions/googlecalendar.quick_add_event" and gw.calls[-1][2]["input"] == {"calendarId": "primary", "text": "明天下午三點 跟藥劑部開會"}
+    connectors.invoke("calendar", WRITE_CFG, {}, "delete_event", {"eventId": "e9", "sendUpdates": "bogus"}, redact_pii=False, user_id="u-u1")
+    assert gw.calls[-1][2]["input"] == {"calendarId": "primary", "eventId": "e9"}
+    with pytest.raises(RuntimeError, match="需要"):
+        connectors.invoke("calendar", WRITE_CFG, {}, "create_event", {"summary": "沒有時間"}, redact_pii=False, user_id="u-u1")
+
+
+def test_calendar_writes_need_the_admins_permission_and_are_write_actions(gw):
+    with pytest.raises(RuntimeError, match="尚未開放"):  # default config: nothing may be written
+        connectors.invoke("calendar", CAL_CFG, {}, "create_event", {"summary": "x", "start": "2026-11-10", "end": "2026-11-11"}, redact_pii=False, user_id="u-u1")
+    with pytest.raises(RuntimeError, match="尚未開放"):  # only the ticked write actions
+        connectors.invoke("calendar", WRITE_CFG, {}, "patch_event", {"eventId": "e1", "summary": "y"}, redact_pii=False, user_id="u-u1")
+    assert not [x for x in gw.calls if x[1].startswith("/v1/actions/")]
+    assert connectors.is_write("calendar", WRITE_CFG, "create_event") and not connectors.is_write("calendar", WRITE_CFG, "list_events")
+
+
+class ScopeGateway(FakeGateway):
+    """The real gateway keeps one OAuth client per service; saving scopes needs its clientId."""
+
+    def __call__(self, method, path, *, json=None, params=None):
+        if path == "/api/oauth/configs" and method == "GET":
+            self.calls.append((method, path, json, params))
+            return [{"service": "googlecalendar", "clientId": "cid-cal"}]
+        return super().__call__(method, path, json=json, params=params)
+
+
+@pytest.fixture
+def sgw(monkeypatch):
+    monkeypatch.setenv("OPEN_CONNECTOR_URL", "http://oc.test")
+    monkeypatch.setenv("OPEN_CONNECTOR_TOKEN", "t")
+    config.settings.cache_clear()
+    g = ScopeGateway()
+    monkeypatch.setattr(oc, "_request", g)
+    yield g
+    config.settings.cache_clear()
+
+
+def test_saving_a_calendar_connector_pushes_least_privilege_scopes_to_the_gateway(fs, as_user, sgw):
+    c = as_user(ADMIN)
+    made = c.post("/api/connectors", json={"type": "calendar", "label": "Cal", "config": CAL_CFG}).json()
+    put = next(x for x in sgw.calls if x[1] == "/api/oauth/configs/googlecalendar")
+    assert put[2] == {"clientId": "cid-cal", "requestedScopes": [connectors.CALENDAR_READ_SCOPE, "openid", "email"]}
+    assert made["config"]["scopes"] == [connectors.CALENDAR_READ_SCOPE]
+    sgw.calls.clear()
+    r = c.put(f"/api/connectors/{made['id']}", json={"type": "calendar", "label": "Cal", "config": {**CAL_CFG, "write_actions": ["create_event"]}})
+    assert r.status_code == 200, r.text
+    put = next(x for x in sgw.calls if x[1] == "/api/oauth/configs/googlecalendar")
+    assert put[2]["requestedScopes"] == [connectors.CALENDAR_READ_SCOPE, connectors.CALENDAR_WRITE_SCOPE, "openid", "email"]
+    assert r.json()["config"]["scopes"] == [connectors.CALENDAR_READ_SCOPE, connectors.CALENDAR_WRITE_SCOPE]
+    # a gateway that cannot take the new scope blocks a save that opens writes, but not a read-only save
+    sgw.fail = oc.OpenConnectorError("down", "unreachable")
+    assert c.put(f"/api/connectors/{made['id']}", json={"type": "calendar", "label": "Cal", "config": {**CAL_CFG, "write_actions": ["create_event"]}}).status_code == 422
+    assert c.put(f"/api/connectors/{made['id']}", json={"type": "calendar", "label": "Cal", "config": CAL_CFG}).status_code == 200
+
+
+def test_a_grant_without_the_new_scope_must_be_renewed(fs, as_user, sgw):
+    c = as_user(ADMIN)
+    cid = c.post("/api/connectors", json={"type": "calendar", "label": "Cal", "config": {**CAL_CFG, "write_actions": ["create_event"]}}).json()["id"]
+    c.put(f"/api/connectors/{cid}/share", json={"access": "account", "role": "use", "members": []})
+    sgw.apps = [{"service": "googlecalendar", "alias": oc.conn_name(PLAIN.uid), "status": "active", "accountLabel": "u@example.com",
+                 "scopes": [connectors.CALENDAR_READ_SCOPE, "openid", "email"]}]
+    mine = as_user(PLAIN).get("/api/my-connectors").json()[0]
+    assert mine["state"] == "reauth_required" and mine["missing_scopes"] == [connectors.CALENDAR_WRITE_SCOPE] and mine["write_actions"] == ["create_event"]
+    sgw.apps[0]["scopes"].append(connectors.CALENDAR_WRITE_SCOPE)
+    assert as_user(PLAIN).get("/api/my-connectors").json()[0]["state"] == "connected"
+    sgw.apps[0]["scopes"] = ["x"]  # a gateway that reports scopes in another form never locks people out
+    assert as_user(PLAIN).get("/api/my-connectors").json()[0]["state"] == "connected"
+
+
+def test_gateway_actions_carry_structured_schemas_for_the_model(egw):
+    from app.engine import gateway_actions as ga
+
+    send = next(a for a in ga.describe({"service": "slack", "allowed_actions": ["slack.send_message"]}) if a["id"] == "slack.send_message")
+    blocks = next(x for x in send["args"] if x["key"] == "blocks")
+    assert blocks["kind"] == "textarea" and blocks["schema"] == {"type": "array", "items": {"type": "string"}}
+    assert next(x for x in send["args"] if x["key"] == "text") == {"key": "text", "label": "text", "kind": "text", "required": True}
+    # Google Calendar style nested event object: vendor keywords are dropped, anyOf collapses to its first branch
+    raw = {"type": "object", "additionalProperties": False, "required": ["start", "end"], "description": "Event",
+           "properties": {"summary": {"type": "string", "minLength": 1}, "start": {"type": "object", "properties": {"dateTime": {"type": "string", "format": "date-time"}}}, "end": {"type": "object"},
+                          "attendees": {"type": "array", "minItems": 1, "items": {"anyOf": [{"type": "object", "properties": {"email": {"type": "string"}}, "required": ["email"]}, {"type": "string"}]}}}}
+    assert ga.clean_schema(raw) == {"type": "object", "description": "Event", "required": ["start", "end"],
+                                    "properties": {"summary": {"type": "string"}, "start": {"type": "object", "properties": {"dateTime": {"type": "string"}}, "required": []}, "end": {"type": "object", "properties": {}},
+                                                   "attendees": {"type": "array", "items": {"type": "object", "properties": {"email": {"type": "string"}}, "required": ["email"]}}}}

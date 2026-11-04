@@ -339,3 +339,50 @@ def test_the_model_is_told_to_answer_in_the_users_language(rig):
     sys_prompt = s.sent[0]["system"]
     assert "language of the user's latest message" in sys_prompt and "French" in sys_prompt
     assert "USER's language" in s.sent[0]["tools"][0]["function"]["parameters"]["properties"]["reason"]["description"]
+
+
+def _capability_agent(fs, require_approval=True):
+    fs.put("connectors/cal1", {"type": "calendar", "label": "Google Calendar", "config": {"write_actions": ["quick_add_event"]}})
+    return AgentIn.model_validate({"name": "A", "capabilities": {"connectors": [{"connector_id": "cal1", "action": "quick_add_event", "require_approval": require_approval}]}})
+
+
+def test_a_capability_marked_需核准_pauses_for_the_user_even_without_an_approval_node(fs, rig, monkeypatch):
+    ran = []
+    monkeypatch.setattr(rt, "invoke_connector", lambda cid, action, args, **k: ran.append(args) or ("已建立", "Google Calendar · quick_add_event · 成功"))
+    ag = _capability_agent(fs)
+    tool = next(iter(rt.build_tools(ag, [], "x").values()))
+    assert tool.write and tool.gate == "user" and tool.spec["function"]["parameters"]["required"] == ["reason", "text"]
+    r, _ = rig(Script([call(tool.name, {"reason": "使用者要排會議", "text": "明天 15:00 心臟科討論"})], "好的"), ag)
+    assert r.pending and r.pending["approver"] == "user" and "快速建立事件" in r.pending["preview"] and not ran
+    assert r.trace[-1].type == "approval" and "使用者確認" in r.trace[-1].summary
+    monkeypatch.setattr(llm, "complete", Script("已幫您建立"))
+    r2 = rt.run_agent(ag, agent_id="a", user_id="u", user_message="x", history=[], resume=r.pending)
+    assert ran == [{"text": "明天 15:00 心臟科討論"}] and r2.reply == "已幫您建立" and not r2.pending
+    assert r2.trace[0].summary == "已由使用者核准，繼續執行"
+
+
+def test_a_capability_with_approval_off_runs_straight_through(fs, rig, monkeypatch):
+    ran = []
+    monkeypatch.setattr(rt, "invoke_connector", lambda cid, action, args, **k: ran.append(args) or ("ok", "成功"))
+    ag = _capability_agent(fs, require_approval=False)
+    tool = next(iter(rt.build_tools(ag, [], "x").values()))
+    assert not tool.write and not tool.gate
+    r, _ = rig(Script([call(tool.name, {"reason": "r", "text": "t"})], "done"), ag)
+    assert ran and not r.pending
+
+
+def test_structured_arguments_reach_the_connector_as_json_not_strings(fs, rig, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(rt, "invoke_connector", lambda cid, action, args, **k: seen.update(args) or ("ok", "成功"))
+    fs.put("connectors/g1", {"type": "gateway", "label": "Cal", "config": {"service": "googlecalendar", "allowed_actions": ["googlecalendar.create_event"]}})
+    monkeypatch.setattr(rt.ga, "describe", lambda cfg: [{"id": "googlecalendar.create_event", "label": "create_event", "description": "Create", "write": True, "operation": "write",
+                                                         "args": [{"key": "calendarId", "label": "Calendar", "kind": "text", "required": True},
+                                                                  {"key": "event", "label": "Event", "kind": "textarea", "required": True,
+                                                                   "schema": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": []}}]}])
+    ag = AgentIn.model_validate({"name": "A", "capabilities": {"connectors": [{"connector_id": "g1", "action": "googlecalendar.create_event", "require_approval": False}]}})
+    tool = next(iter(rt.build_tools(ag, [], "x").values()))
+    params = tool.spec["function"]["parameters"]
+    assert params["properties"]["event"]["type"] == "object" and params["properties"]["event"]["properties"] == {"summary": {"type": "string"}}
+    assert params["required"] == ["reason", "calendarId", "event"] and tool.spec["function"]["description"].endswith("：Create")
+    rig(Script([call(tool.name, {"reason": "r", "calendarId": "primary", "event": {"summary": "門診會議"}})], "done"), ag)
+    assert seen == {"calendarId": "primary", "event": {"summary": "門診會議"}}

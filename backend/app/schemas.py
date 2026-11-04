@@ -1068,6 +1068,7 @@ class SessionDetail(SessionSummary):
     messages: list[SessionMessage] = Field(default_factory=list)
     attachments: list[dict[str, Any]] = Field(default_factory=list)  # {id, name, chars}
     feedback: dict[str, str] = Field(default_factory=dict)  # assistant message index -> "up" | "down"
+    pending_approval: dict[str, Any] | None = None  # {node_id, message, preview, approver} when the last turn is waiting for a decision
 
 
 FeedbackReason = Literal["inaccurate", "incomplete", "misunderstood", "sources", "wordy", "unsafe", "slow", "other"]

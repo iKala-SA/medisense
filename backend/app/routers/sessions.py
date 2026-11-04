@@ -63,13 +63,15 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     d = snap.to_dict() or {}
     from ..engine import chat_images
+    from .runs import _public_pending
     imgs = chat_images.message_images(d)
     return SessionDetail(**_summary(snap.id, d).model_dump(),
                          messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []))
                                    for i, m in enumerate(d.get("messages") or [])],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],
-                         feedback={str(k): v for k, v in (d.get("feedback") or {}).items()})
+                         feedback={str(k): v for k, v in (d.get("feedback") or {}).items()},
+                         pending_approval=_public_pending(d.get("pending")))
 
 
 @router.patch("/{session_id}", response_model=SessionSummary)

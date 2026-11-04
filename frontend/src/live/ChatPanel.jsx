@@ -91,7 +91,7 @@ export default function ChatPanel({m,run,tab,setTab,focus,onClose,notify}){
     </div>
     <div className="cx-pbody">
       {tab==='steps'?<>
-        {!steps.length?<p className="cx-empty">{live?'正在準備…':'這則回答沒有保存執行步驟（較舊的對話）。'}</p>:<Steps trace={steps} model={live?run.model:undefined} run={live?run:undefined}/>}
+        {!steps.length?<p className="cx-empty">{live?'正在準備…':m?.stopped?'回覆在完成任何步驟前就已停止。':'這則回答沒有保存執行步驟（較舊的對話）。'}</p>:<Steps trace={steps} model={live?run.model:undefined} run={live?run:undefined}/>}
         {!live&&trace.length>0&&<dl className="cx-meta">
           <div><dt><Cpu size={13}/>模型</dt><dd>{llm.length?[...new Set(llm.map(s=>modelLabel(s.model)))].join('、'):'—'}</dd></div>
           {llm[0]?.group&&<div><dt>{GROUP_LABEL[llm[0].group]?'路由群組':'選擇方式'}</dt><dd>{GROUP_LABEL[llm[0].group]||'使用者指定'}</dd></div>}

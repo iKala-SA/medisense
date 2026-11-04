@@ -117,3 +117,10 @@ main.card-page,.card-page{padding-top:0!important}
 .quick-composer-wrap .bq-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid #d5e6dd;border-radius:999px;padding:3px 9px;font-size:12px;color:#17623f;background:#fff;cursor:pointer;white-space:nowrap}
 .quick-composer-wrap button.bq-chip:hover{background:#f3fcf8}
 .quick-composer-wrap .bq-chip.ok{border-color:transparent;color:#7b828d;cursor:default;padding:3px 4px}
+/* 停止回覆: the send button turns into a stop button while an answer is streaming (ChatGPT-style) */
+.quick-composer-wrap .send.stop{background:#1f2328;color:#fff;cursor:pointer}
+.quick-composer-wrap .send.stop:hover{background:#3a3f45}
+.cx-stopped{margin:6px 0 0;font-size:12px;color:#9a9ca3}
+/* Connector rows in the + menu: a quiet "重新授權" next to the check of a connected account; the row's second line shows the account or why it needs renewing. */
+.tools-menu .tool-submenu .conn-link.quiet{color:#7b828d;font-weight:500;font-size:12px}
+.tools-menu .tool-submenu .conn-row:hover .conn-link.quiet{color:#239660}

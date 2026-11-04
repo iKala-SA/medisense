@@ -2,7 +2,7 @@ import React,{useMemo,useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkCjk from 'remark-cjk-friendly';
-import {CaretRight,CheckCircle,Circle,CircleNotch,Copy,ListChecks,Brain,Lightning,FileText} from '@phosphor-icons/react';
+import {CaretRight,CheckCircle,Circle,CircleNotch,Copy,ListChecks,Brain,Lightning,FileText,HandPalm} from '@phosphor-icons/react';
 import {Jelly} from '../Jelly';
 import {artifactComponents} from './Artifact';
 import FeedbackBar from './Feedback';
@@ -72,7 +72,24 @@ export function LiveRun({run,onSteps,agent}){
   </div>;
 }
 
-export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mock}){
+/* A connector write waiting for the person chatting to confirm it (approver 'user'), or a note that the agent owner must. */
+export function ApprovalCard({pending,decided,busy,onDecide}){
+  if(!pending&&!decided)return null;
+  if(decided)return <div className={'cx-approval '+decided}>{decided==='approved'?<><CheckCircle size={15} weight="fill"/>已確認，動作已執行</>:<><Circle size={15}/>已取消，未執行任何變更</>}</div>;
+  const mine=pending.approver==='user';
+  return <div className="cx-approval wait" role="group" aria-label="需要確認的動作">
+    <div className="cx-approval-head"><HandPalm size={16} weight="fill"/><b>{mine?'執行前請確認':'等待 Agent 負責人核准'}</b></div>
+    <p>{pending.message}</p>
+    {pending.preview&&<pre>{pending.preview}</pre>}
+    {mine?<div className="cx-approval-actions">
+      <button type="button" className="btn primary sm" disabled={busy} onClick={()=>onDecide?.(true)}>確認執行</button>
+      <button type="button" className="btn sm" disabled={busy} onClick={()=>onDecide?.(false)}>取消</button>
+      <small>這會以您自己的帳號在外部服務建立或修改資料。</small>
+    </div>:<small>此動作由 Agent 的擁有者或管理員在 Agent 頁面核准後才會執行。</small>}
+  </div>;
+}
+
+export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mock,busy=false,onDecide}){
   const n=m.citations?.length||0;
   const md=useMemo(()=>withCites(m.ans,n),[m.ans,n]);
   const comps=useMemo(()=>({
@@ -83,6 +100,8 @@ export default function ChatAnswer({m,onCite,onSteps,notify,sessionId,canSave,mo
   return <div className="cx-answer">
     <Who name={m.agent}/>
     <div className="cx-md"><Markdown remarkPlugins={[remarkGfm,remarkCjk]} components={comps}>{md}</Markdown></div>
+    <ApprovalCard pending={m.pending} decided={m.decided} busy={busy} onDecide={onDecide}/>
+    {m.stopped&&m.ans!=='（已停止回覆）'&&<p className="cx-stopped">已停止回覆</p>}
     {n>0&&<div className="cx-refs">{m.citations.map((c,i)=><button key={i} type="button" onClick={()=>onCite(i+1)} title={c.source}><FileText size={13}/><b>{i+1}</b><span>{c.source}</span></button>)}</div>}
     <div className="cx-foot">
       <button type="button" onClick={()=>onSteps()}><ListChecks size={15}/>{m.used&&m.used!=='—'?m.used:'執行步驟'}<CaretRight size={13}/></button>
