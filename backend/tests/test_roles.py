@@ -1,3 +1,5 @@
+from app.auth import User
+
 from .conftest import ADMIN, PLAIN
 
 
@@ -219,14 +221,15 @@ def test_admin_role_can_be_assigned_to_users_and_groups(fs, as_user):
 def test_permission_resources_are_unique_and_match_design():
     from app.permissions import RESOURCES
     ids = [r[0] for r in RESOURCES]
-    assert len(ids) == 12 and len(set(ids)) == 12
+    # 11 features, each with a full (`x`) and a read-only (`x-viewer`) entry
+    assert len(ids) == 22 and len(set(ids)) == 22
     assert ids[0] == "chat" and ids[-1] == "settings"
 
 
 def test_permissions_list_is_admin_only_and_ordered(fs, as_user):
     assert as_user(PLAIN).get("/api/permissions").status_code == 403
     rows = as_user(ADMIN).get("/api/permissions").json()
-    assert [r["id"] for r in rows][:2] == ["chat", "workbench"] and len(rows) == 12
+    assert [r["id"] for r in rows][:3] == ["chat", "chat-viewer", "workbench"] and len(rows) == 22
     assert rows[0] == {"id": "chat", "name": "對話", "desc": "AI 對話與聊天紀錄", "order": 1}
 
 
@@ -247,3 +250,36 @@ def test_role_permissions_reject_unknown_and_admin_is_fixed(fs, as_user):
     assert c.patch("/api/roles/auditor", json={"permissions": ["ghost"]}).status_code == 422
     assert c.patch("/api/roles/admin", json={"permissions": ["chat"]}).status_code == 403
     assert c.patch("/api/roles/auditor", json={"permissions": []}).json()["permissions"] == []
+
+
+def staff_with(fs, rid, permissions):
+    fs.put(f"roles/{rid}", {"id": rid, "name": rid, "custom": True, "permissions": permissions})
+    return User(uid=f"u-{rid}", email=f"{rid}@example.com", name=rid, role="user", roles=(rid,))
+
+
+def test_roles_viewer_reads_roles_and_catalog_but_cannot_write(fs, as_user):
+    seed(fs)
+    client = as_user(staff_with(fs, "ro", ["roles-viewer"]))
+    assert client.get("/api/roles").status_code == 200
+    assert client.get("/api/permissions").status_code == 200
+    assert client.post("/api/roles", json={"name": "x", "desc": ""}).status_code == 403
+    assert client.patch("/api/roles/auditor", json={"name": "y"}).status_code == 403
+    assert client.delete("/api/roles/auditor").status_code == 403
+
+
+def test_roles_permission_reads_and_writes(fs, as_user):
+    seed(fs)
+    client = as_user(staff_with(fs, "editor", ["roles"]))
+    assert client.get("/api/roles").status_code == 200
+    assert client.get("/api/permissions").status_code == 200
+    assert client.post("/api/roles", json={"name": "現場主管", "desc": ""}).status_code == 201
+    assert client.patch("/api/roles/auditor", json={"name": "稽核員2"}).status_code == 200
+
+
+def test_user_without_roles_permission_is_refused(fs, as_user):
+    seed(fs)
+    client = as_user(staff_with(fs, "other", ["chat"]))
+    assert client.get("/api/roles").status_code == 403
+    assert client.get("/api/permissions").status_code == 403
+    assert client.post("/api/roles", json={"name": "x", "desc": ""}).status_code == 403
+    assert as_user(PLAIN).get("/api/roles").status_code == 403

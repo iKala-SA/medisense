@@ -61,7 +61,7 @@ function log(event,m='—',level='內部',reason='操作示範',query='—'){set
 const {me,authError,checking,setAuthError}=useAuth({onSignedIn:m=>{setAdmin(m.role==='admin');setLogged(true)},onSignedOut:()=>setLogged(false)});
 // Menu items below need a permission id from app/permissions.py (UI only; the API still checks require_admin/builder).
 const hasPerm=id=>!!me?.permissions?.includes(id);
-const canGroups=hasPerm('groups'),canRoles=hasPerm('roles'),canUsers=hasPerm('users');
+const canGroups=hasPerm('groups')||hasPerm('groups-viewer'),canRoles=hasPerm('roles')||hasPerm('roles-viewer'),canUsers=hasPerm('users')||hasPerm('users-viewer');
 const adminNavPerm={Users:canUsers,Roles:canRoles,Groups:canGroups};
 const visibleAdminNav=adminNav.filter(([,key])=>adminNavPerm[key]??true);
 const roleLabel=me?({admin:'管理員',builder:'建置者',user:'員工'}[me.role]||me.role):(admin?'管理員':'員工'),displayName=me?.name||'Paggie',accountEmail=me?.email||'paggie@example.invalid';

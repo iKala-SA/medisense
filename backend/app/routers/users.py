@@ -19,7 +19,7 @@ from firebase_admin import auth as fb_auth
 from google.cloud import firestore
 
 from .. import db
-from ..auth import User, effective_role, forget, is_bootstrap_admin, require_admin, users
+from ..auth import User, effective_role, forget, is_bootstrap_admin, require_permission, users
 from ..config import settings
 from ..schemas import (
     DEPARTMENTS,
@@ -33,7 +33,9 @@ from ..schemas import (
 )
 from .roles import SYSTEM_ROLES
 
-router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/users", tags=["users"])
+view = require_permission("users")
+manage = require_permission("users", write=True)
 log = logging.getLogger(__name__)
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -84,7 +86,7 @@ def _all() -> list[UserOut]:
     return sorted(rows, key=lambda u: str(u.last_seen_at or ""), reverse=True)
 
 
-@router.get("", response_model=UserDirectory)
+@router.get("", response_model=UserDirectory, dependencies=[Depends(view)])
 def list_users():
     rows = _all()
     counts: dict[str, int] = {}
@@ -95,7 +97,7 @@ def list_users():
 
 
 @router.get("/export.csv")
-def export_csv(user: User = Depends(require_admin)):
+def export_csv(user: User = Depends(manage)):
     rows = _all()
     buf = io.StringIO()
     buf.write("\ufeff")  # BOM so Excel opens Chinese headers correctly
@@ -110,14 +112,14 @@ def export_csv(user: User = Depends(require_admin)):
                              headers={"Content-Disposition": 'attachment; filename="tcvgh-accounts.csv"'})
 
 
-@router.get("/{email}", response_model=UserDetail)
+@router.get("/{email}", response_model=UserDetail, dependencies=[Depends(view)])
 def get_user(email: str):
     data = _load(email).to_dict() or {}
     return _out(data, UserDetail, owned=_owned(data.get("uid", "")))
 
 
 @router.post("", response_model=UserDetail, status_code=201)
-def preregister(body: UserCreate, user: User = Depends(require_admin)):
+def preregister(body: UserCreate, user: User = Depends(manage)):
     email = body.email.strip().lower()
     if not EMAIL.match(email):
         raise HTTPException(422, "invalid e-mail")
@@ -152,7 +154,7 @@ def _set_firebase_disabled(uid: str, disabled: bool) -> bool:
 
 
 @router.patch("/{email}", response_model=UserDetail)
-def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)):
+def update_user(email: str, body: UserPatch, user: User = Depends(manage)):
     snap = _load(email)
     email = snap.id
     data = snap.to_dict() or {}
@@ -216,7 +218,7 @@ def update_user(email: str, body: UserPatch, user: User = Depends(require_admin)
 
 
 @router.delete("/{email}", status_code=204)
-def cancel_preregistration(email: str, user: User = Depends(require_admin)):
+def cancel_preregistration(email: str, user: User = Depends(manage)):
     """Only for pre-registrations nobody has used yet; real accounts are suspended, not deleted."""
     snap = _load(email)
     if (snap.to_dict() or {}).get("uid"):

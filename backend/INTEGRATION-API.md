@@ -19,37 +19,53 @@ Rules: owner and admin always view+edit. `use` = view/run, `edit` = view/run/edi
 ## Profile  (`/api/me`)  — any signed-in user
 
 Response: `{ "uid", "email", "name", "role": "admin" | "builder" | "user", "department", "roles": ["<role id>", ...], "groups": ["<group id>", ...], "permissions": ["<resource id>", ...] }`. `groups` is the user's group membership (`users/{email}.groups`).
-`roles` is the user's assigned role ids (`users/{email}.roles`, record only). `permissions` is the distinct union of the `permissions` stored on the user's roles (`roles/{id}`) and on the roles assigned to each group the user belongs to (`groups/{id}.role_ids`, via `users/{email}.groups`). Limited to known ids from `GET /api/permissions` and ordered as in `app/permissions.py`; a missing role or group document contributes nothing. Use it for UI only: `role` still decides access. Not enforced yet.
+`roles` is the user's assigned role ids (`users/{email}.roles`, record only). `permissions` is the distinct union of the `permissions` stored on the user's roles (`roles/{id}`) and on the roles assigned to each group the user belongs to (`groups/{id}.role_ids`, via `users/{email}.groups`). Limited to known ids from `GET /api/permissions` and ordered as in `app/permissions.py`; a missing role or group document contributes nothing. Use it for UI only. It is computed from `roles` and `groups` only; the account `role` does not add permissions. Guards: the groups routes enforce `groups` / `groups-viewer` (see Groups below); other routes still use `role` (`require_admin` / `require_builder`).
 
-## Roles (admin-only; reads, creates and name/desc edits in Firestore `roles`)
+## Roles (`roles` / `roles-viewer`; reads, creates and name/desc edits in Firestore `roles`)
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/api/roles?search=&type=all\|system\|custom` | admin | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
-| DELETE | `/api/roles/{id}` | admin | delete a custom role; 204. Built-in roles (`admin`, `builder`, `user`, with or without an override document) return 403; unknown id 404. Group `role_ids` referencing the role are cleaned up in the same request; records `role.delete` in the audit log |
-| POST | `/api/roles` | admin | create a custom role `{name (1–40, required), desc? (≤300)}`; the id is generated; returns 201 with the role (`custom: true`, `en: ""`, `can: []`); records `role.create` in the audit log |
-| PATCH | `/api/roles/{id}` | admin | partial update of `name` / `en` / `desc` / `status` / `can` (`{name?, en?, desc?, status?, can?}`, name 1–40 chars, `en` ≤40 and may be empty, desc ≤300, `status` boolean with true = 啟用, `can` ≤20 labels of 1–20 chars, trimmed and de-duplicated; `permissions` ≤11 resource ids from `GET /api/permissions`, replaces the whole list, unknown id 422); writes `roles/{id}` (merged, so system roles get an override document) and records `role.update` in the audit log; `admin` returns 403 (fixed role); unknown custom id 404; returns the updated role. Labels are display-only until the permission matrix exists |
+| GET | `/api/roles?search=&type=all\|system\|custom` | `roles` or `roles-viewer` | role list + stats; see `specifications/BE-ROLE-SPEC.md` |
+| DELETE | `/api/roles/{id}` | `roles` | delete a custom role; 204. Built-in roles (`admin`, `builder`, `user`, with or without an override document) return 403; unknown id 404. Group `role_ids` referencing the role are cleaned up in the same request; records `role.delete` in the audit log |
+| POST | `/api/roles` | `roles` | create a custom role `{name (1–40, required), desc? (≤300)}`; the id is generated; returns 201 with the role (`custom: true`, `en: ""`, `can: []`); records `role.create` in the audit log |
+| PATCH | `/api/roles/{id}` | `roles` | partial update of `name` / `en` / `desc` / `status` / `can` (`{name?, en?, desc?, status?, can?}`, name 1–40 chars, `en` ≤40 and may be empty, desc ≤300, `status` boolean with true = 啟用, `can` ≤20 labels of 1–20 chars, trimmed and de-duplicated; `permissions` ≤11 resource ids from `GET /api/permissions`, replaces the whole list, unknown id 422); writes `roles/{id}` (merged, so system roles get an override document) and records `role.update` in the audit log; `admin` returns 403 (fixed role); unknown custom id 404; returns the updated role. Labels are display-only until the permission matrix exists |
 
 Response: `{ "roles": [{ "id", "name", "en", "desc", "custom", "status", "member_count", "permission_count", "can": ["label", ...] }], "stats": { "total_roles", "system_roles", "custom_roles", "assigned_users" } }`. System roles `admin` / `builder` / `user` are always listed (overridable via `roles/{id}`); `stats` ignores the filters. `can` holds the capability labels the frontend shows (e.g. `"發布核可"`); `permission_count` = len(can). Custom roles have no `en` and empty `can`. The per-resource matrix is not implemented yet.
 
-## Permissions  (`/api/permissions`)  — admin
+## Permissions  (`/api/permissions`)  — `roles` or `roles-viewer` (read)
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/api/permissions` | admin | the 11 permission-matrix resources, read-only, from `app/permissions.py` (not Firestore); ordered by `order` |
+| GET | `/api/permissions` | `roles` or `roles-viewer` | the 22 permission-matrix entries (11 resources, each with a `-viewer` read-only twin), read-only, from `app/permissions.py` (not Firestore); ordered by `order` |
 
-Response: `[{ "id", "name", "desc", "order" }]`, e.g. `{ "id": "chat", "name": "對話", "desc": "AI 對話與聊天紀錄", "order": 1 }`. Not enforced yet: `require_admin` and `require_builder` still decide access.
+Response: `[{ "id", "name", "desc", "order" }]`, e.g. `{ "id": "chat", "name": "對話", "desc": "AI 對話與聊天紀錄", "order": 1 }`. Enforced on the roles routes via `require_permission("roles")`; other routes still use `require_admin` / `require_builder`.
+
+## Users  (`/api/users`)  — `users` / `users-viewer` (read); `users` (write)
+
+| Method | Path | Access | Notes |
+|---|---|---|---|
+| GET | `/api/users` | `users` or `users-viewer` | account directory |
+| GET | `/api/users/{email}` | `users` or `users-viewer` | account detail |
+| GET | `/api/users/export.csv` | `users` | account CSV export (personal data, so write-level) |
+| POST | `/api/users` | `users` | pre-register an account |
+| PATCH | `/api/users/{email}` | `users` | role, roles, status, department, original_view (with `reason`) |
+| DELETE | `/api/users/{email}` | `users` | cancel a pre-registration -> 204 |
+
+Access is decided by `require_permission("users")` (`auth.py`). The admin account role always passes. The `roles` field is the user's assigned role ids and only records the assignment; it does not change access.
 
 ## Sharing
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/api/directory?q=` | any signed-in | search box for the share dialog |
-| GET/POST | `/api/groups` | admin | list / create |
-| GET/PUT/DELETE | `/api/groups/{id}` | admin | PUT = full replace (includes `member_emails`), DELETE -> 204 |
-| PATCH | `/api/groups/{id}` | admin | partial update of `name` / `description` / `role_ids` (`{name?, description?, role_ids?}`); members unchanged; duplicate names allowed; `role_ids` must reference existing roles (422 `unknown role` otherwise; `admin` and `user` are allowed); it is a link only and grants no permissions yet; see `specifications/BE-GROUP-SPEC.md` §4.3 |
-| GET / POST | `/api/groups/{id}/members` | admin | member list (`GroupMemberOut[]`) / batch add `{emails[≤100]}` -> `{added, skipped, rejected[{email, reason: invalid_email \| domain_not_allowed \| not_a_registered_account}]}`; only existing accounts; 422 if the group would exceed 1000; §4.5 |
-| DELETE | `/api/groups/{id}/members/{email}` | admin | remove one member -> 204; 404 if not a member; §4.5 |
+| GET | `/api/groups` | `groups` or `groups-viewer` | list (read-only with `groups-viewer`) |
+| POST | `/api/groups` | `groups` | create (`require_permission("groups", write=True)`; admin role always passes) |
+| GET | `/api/groups/{id}` | `groups` or `groups-viewer` | read one |
+| PUT / DELETE | `/api/groups/{id}` | `groups` | PUT = full replace (includes `member_emails`), DELETE -> 204 |
+| PATCH | `/api/groups/{id}` | `groups` | partial update of `name` / `description` / `role_ids` (`{name?, description?, role_ids?}`); members unchanged; duplicate names allowed; `role_ids` must reference existing roles (422 `unknown role` otherwise; `admin` and `user` are allowed); it is a link only and grants no permissions yet; see `specifications/BE-GROUP-SPEC.md` §4.3 |
+| GET | `/api/groups/{id}/members` | `groups` or `groups-viewer` | member list (`GroupMemberOut[]`) |
+| POST | `/api/groups/{id}/members` | `groups` | batch add `{emails[≤100]}` -> `{added, skipped, rejected[{email, reason: invalid_email \| domain_not_allowed \| not_a_registered_account}]}`; only existing accounts; 422 if the group would exceed 1000; §4.5 |
+| DELETE | `/api/groups/{id}/members/{email}` | `groups` | remove one member -> 204; 404 if not a member; §4.5 |
 | PUT | `/api/agents/{id}/share` | builder; owner or admin only | audit `agent.share`; returns `AgentOut` |
 
 `GET /api/directory?q=nin` -> `{ "users": [{"email","name","department"}], "groups": [{"id","name","description","member_count"}] }` (max 20 each; suspended users hidden; empty q lists everyone up to the cap).

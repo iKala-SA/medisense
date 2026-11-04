@@ -2,11 +2,9 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
-from .auth import User, current_user
+from .auth import User, current_user, granted_permissions
 from .config import settings
 from .engine import llm
-from .permissions import RESOURCES
 from .routers import (
     tts,
     agents,
@@ -93,23 +91,10 @@ def model_groups(user: User = Depends(current_user)):
     return {"groups": llm.routing_table(), "models": llm.model_catalog()}
 
 
-def _granted_permissions(user: User) -> list[str]:
-    """Distinct permission ids from the user's own roles and from the roles of every group the user belongs to,
-    in the order of app/permissions.py. A missing role or group document contributes nothing."""
-    role_ids = set(user.roles)
-    for gid in user.groups:
-        snap = db.client().collection("groups").document(gid).get()
-        role_ids.update(r for r in (snap.to_dict() or {}).get("role_ids") or [] if isinstance(r, str))
-    granted: set[str] = set()
-    for rid in role_ids:
-        snap = db.client().collection("roles").document(rid).get()
-        granted.update(p for p in (snap.to_dict() or {}).get("permissions") or [] if isinstance(p, str))
-    return [rid for rid, _name, _desc in RESOURCES if rid in granted]
-
-
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
-    """Profile for the frontend. `roles` are the assigned role ids; `permissions` the resource ids granted by them.
-    Display/UI only: the backend guards (require_admin, require_builder) still decide access."""
+    """Profile for the frontend. `roles` are the assigned role ids; `permissions` the resource ids the user holds
+    (see auth.granted_permissions). Display/UI only: the backend guards (require_permission, require_builder,
+    require_admin) still decide access."""
     return {"uid": user.uid, "email": user.email, "name": user.name, "role": user.role, "department": user.department,
-            "roles": list(user.roles), "groups": list(user.groups), "permissions": _granted_permissions(user)}
+            "roles": list(user.roles), "groups": list(user.groups), "permissions": granted_permissions(user)}
