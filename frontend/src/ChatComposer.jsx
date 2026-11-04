@@ -95,6 +95,23 @@ const trigItems=!trig?[]:trig.ch==='/'
   ?(live?(skillList||[]):[{id:'s1',name:'衛教語氣',sub:'用淺白的話說明'}]).filter(x=>!skills.some(k=>k.id===x.id)&&(x.name+x.sub).toLowerCase().includes(trig.q.toLowerCase()))
   :[{name:'Medisense',sub:'預設的企業與醫療 AI 助理',pick:true},...(agents||[]).filter(a=>a.status==='已發布'||a.published)].filter(a=>a.name.toLowerCase().includes(trig.q.toLowerCase())).map(a=>({id:a.id||a.name,name:a.name,sub:a.desc||a.sub||''}));
 useEffect(()=>{if(skills.some(k=>!prompt.includes('/'+k.name)))setSkills(skills.filter(k=>prompt.includes('/'+k.name)))},[prompt]);// eslint-disable-line react-hooks/exhaustive-deps
+/* "/技能名" in the text shows in blue (ChatGPT style). A textarea cannot colour part of its text, so a mirror with the same
+   box and font sits on top of it (pointer-events: none) and draws the text; the textarea's own glyphs are transparent while a
+   skill is present, its caret and selection stay visible. Re-measured on every render, so growth and wrapping follow. */
+const mirror=useRef(null);
+const skillNames=skills.map(k=>k.name).filter(n=>prompt.includes('/'+n));
+const hasSkill=skillNames.length>0;
+useLayoutEffect(()=>{
+  const t=ta.current,m=mirror.current;if(!hasSkill||!t||!m)return;
+  const cs=getComputedStyle(t);
+  Object.assign(m.style,{left:t.offsetLeft+'px',top:t.offsetTop+'px',width:t.offsetWidth+'px',height:t.offsetHeight+'px',
+    fontFamily:cs.fontFamily,fontSize:cs.fontSize,fontWeight:cs.fontWeight,lineHeight:cs.lineHeight,letterSpacing:cs.letterSpacing,
+    paddingTop:cs.paddingTop,paddingRight:cs.paddingRight,paddingBottom:cs.paddingBottom,paddingLeft:cs.paddingLeft,
+    borderTopWidth:cs.borderTopWidth,borderLeftWidth:cs.borderLeftWidth,textAlign:cs.textAlign});
+  m.scrollTop=t.scrollTop;
+});
+const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const mirrorText=!hasSkill?null:prompt.split(new RegExp('(/(?:'+skillNames.map(esc).join('|')+'))','g')).map((p,i)=>i%2?<span key={i} className="ta-skill-tok">{p}</span>:p);
 function detect(el){
   const v=el.value,pos=el.selectionStart??v.length,m=/(^|\s)([\/@])([^\s/@]*)$/.exec(v.slice(0,pos));
   if(!m||(m[2]==='@'&&!agents)){setTrig(null);return}
@@ -123,7 +140,7 @@ function pickSource(name){setSelectedSources(a=>a.includes(name)?a.filter(x=>x!=
 return <div ref={wrap} className={'quick-composer-wrap pop-'+dir} style={{'--pop-max':room+'px','--agent-w':agentW+'px'}}><input ref={file} hidden type="file" multiple onChange={e=>{onAttach?.([...e.target.files]);e.target.value=''}}/>{pickOpen&&<PickData live={live} picked={picked} onClose={()=>setPickOpen(false)} onSave={v=>{setPicked(v);setPickOpen(false);setKnowledge('具體資料')}}/>}{menu&&<button className="composer-dismiss" aria-label="關閉選單" onClick={()=>setMenu(null)}/>}<div className={'composer'+(tall?' tall':'')+(dropping?' dropping':'')} onDragOver={e=>{if([...(e.dataTransfer?.types||[])].includes('Files')){e.preventDefault();setDropping(true)}}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDropping(false)}} onDrop={e=>{setDropping(false);const fs=[...(e.dataTransfer?.files||[])];if(fs.length){e.preventDefault();onAttach?.(fs)}}}>{canExpand&&<button type="button" className="composer-expand" aria-label={expanded?'縮小輸入框':'展開輸入框'} title={expanded?'縮小':'展開'} onClick={()=>setExpanded(v=>!v)}>{expanded?<ArrowsInSimple size={18}/>:<ArrowsOutSimple size={18}/>}</button>}{attachments.length>0&&<div className="att-row">{attachments.map(a=>a.kind==='image'
   ?<div key={a.key} className={'att-img'+(a.status==='error'?' err':'')} title={a.error||a.name}><img src={a.url} alt={a.name}/>{a.status==='uploading'&&<span className="att-spin"><CircleNotch className="spin" size={16}/></span>}<button type="button" aria-label={'移除 '+a.name} onClick={()=>onRemoveAttachment?.(a)}><X size={12} weight="bold"/></button></div>
   :<div key={a.key} className={'att-file'+(a.status==='error'?' err':'')} title={a.error||a.name}><Paperclip size={14}/><span>{a.name}</span>{a.status==='uploading'&&<CircleNotch className="spin" size={14}/>}<button type="button" aria-label={'移除 '+a.name} onClick={()=>onRemoveAttachment?.(a)}><X size={12} weight="bold"/></button></div>)}
-  {attachments.some(a=>a.kind==='image')&&<small className="att-note">圖片會自動遮蔽姓名、證號等個資（不含臉部與手寫），原圖不會保存。</small>}</div>}<textarea ref={ta} onPaste={e=>{const fs=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));if(fs.length){e.preventDefault();onAttach?.(fs)}}} rows={1} aria-label="輸入訊息" placeholder="詢問問題…" value={prompt} onChange={e=>{setPrompt(e.target.value);detect(e.target)}} onBlur={()=>setTimeout(()=>setTrig(null),150)} onKeyDown={e=>{
+  {attachments.some(a=>a.kind==='image')&&<small className="att-note">圖片會自動遮蔽姓名、證號等個資（不含臉部與手寫），原圖不會保存。</small>}</div>}{hasSkill&&<div ref={mirror} className="ta-mirror" aria-hidden="true">{mirrorText}{'\n'}</div>}<textarea ref={ta} className={hasSkill?'ta-skill':undefined} onScroll={e=>{if(mirror.current)mirror.current.scrollTop=e.currentTarget.scrollTop}} onPaste={e=>{const fs=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));if(fs.length){e.preventDefault();onAttach?.(fs)}}} rows={1} aria-label="輸入訊息" placeholder="詢問問題…" value={prompt} onChange={e=>{setPrompt(e.target.value);detect(e.target)}} onBlur={()=>setTimeout(()=>setTrig(null),150)} onKeyDown={e=>{
     if(trig&&!e.nativeEvent.isComposing){
       if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(trigItems.length){e.preventDefault();setTrigIdx(i=>(i+(e.key==='ArrowDown'?1:trigItems.length-1))%trigItems.length)}return}
       if((e.key==='Enter'||e.key==='Tab')&&trigItems.length){e.preventDefault();chooseTrig(trigItems[trigIdx]);return}
