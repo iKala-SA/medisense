@@ -48,7 +48,8 @@ def list_sessions(limit: int = Query(30, ge=1, le=100), cursor: str | None = Non
             q = q.where(filter=firestore.FieldFilter("updated_at", "<", datetime.fromisoformat(cursor)))
         except ValueError as exc:
             raise HTTPException(422, "bad cursor") from exc
-    docs = list(q.order_by("updated_at", direction=firestore.Query.DESCENDING).limit(limit + 1).stream())
+    docs = [d for d in q.order_by("updated_at", direction=firestore.Query.DESCENDING).limit(limit + 1).stream()
+            if (d.to_dict() or {}).get("env") != "sandbox"]  # draft tests live in the sandbox, not in 最近項目
     page = docs[:limit]
     nxt = None
     if len(docs) > limit and page:
@@ -61,11 +62,16 @@ def list_sessions(limit: int = Query(30, ge=1, le=100), cursor: str | None = Non
 def get_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     d = snap.to_dict() or {}
+    from ..engine import chat_images
+    from .runs import _public_pending
+    imgs = chat_images.message_images(d)
     return SessionDetail(**_summary(snap.id, d).model_dump(),
-                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta")) for m in d.get("messages") or []],
+                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []))
+                                   for i, m in enumerate(d.get("messages") or [])],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],
-                         feedback={str(k): v for k, v in (d.get("feedback") or {}).items()})
+                         feedback={str(k): v for k, v in (d.get("feedback") or {}).items()},
+                         pending_approval=_public_pending(d.get("pending")))
 
 
 @router.patch("/{session_id}", response_model=SessionSummary)
@@ -103,4 +109,6 @@ def delete_session(session_id: str, user: User = Depends(current_user)):
     from ..engine import chat_images
     chat_images.delete([a["blob"] for a in (snap.to_dict() or {}).get("attachments") or [] if a.get("blob")])
     snap.reference.delete()
+    from .shares import delete_for_session
+    delete_for_session(session_id)  # its share link goes with it
     db.audit(user.uid, "session.delete", user.email, session_id=session_id)

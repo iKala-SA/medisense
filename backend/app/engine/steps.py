@@ -88,7 +88,7 @@ import time  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
 
 from ..schemas import AgentIn, FlowNode  # noqa: E402
-from . import deid, features, flow, llm  # noqa: E402
+from . import deid, features, flow, llm, runenv  # noqa: E402
 
 log = logging.getLogger(__name__)
 MAX_OUT = 100_000  # PRD §7.4: a step output above 100 KB is cut
@@ -252,7 +252,8 @@ def _do_action(st: Step, cfg: dict, prompt: str, *, agent: AgentIn, agent_id: st
         except (ValueError, AssertionError):
             raise StepFailed("無法產生有效的動作參數") from None
         write = bool((act or {}).get("write", True))
-        if cfg.get("require_approval", write):
+        simulated = runenv.is_sandbox() and connectors.is_write(ctype, (snap.to_dict() or {}).get("config") or {}, action)  # sandbox: nothing real to approve
+        if cfg.get("require_approval", write) and not simulated:
             raise NeedsApproval({"connector_id": cid, "action": action, "args": args, "label": (act or {}).get("label") or action})
     result, summary = flow.invoke_connector(cid, action, args, agent_id=agent_id, user_id=user.uid)
     return _clip(result), [], f"{summary}\n參數：{json.dumps(args, ensure_ascii=False)}"

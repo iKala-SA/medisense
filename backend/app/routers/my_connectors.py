@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from .. import db, sharing
 from ..auth import User, current_user
 from ..engine import connectors as eng
+from ..engine import gateway_actions as ga
 from ..engine import open_connector as oc
 
 router = APIRouter(prefix="/api/my-connectors", tags=["my-connectors"])
@@ -25,20 +26,37 @@ def _item(cid: str, data: dict, user: User, apps: list[dict] | None, problem: st
     mode, service = eng.connector_mode(data), eng.connector_service(data)
     cfg = data.get("config") or {}
     mine = next((a for a in (apps or []) if a.get("service") == service and a.get("alias") == oc.conn_name(user.uid)), None)
+    granted = (mine or {}).get("scopes") or []
+    granted = granted.split() if isinstance(granted, str) else [str(s) for s in granted]
+    # A grant made before the admin opened write actions lacks the new scope: it must be renewed before those actions work.
+    # Only judged when the gateway reports Google-style scope URLs, so an unknown format never locks everyone out.
+    missing = [s for s in eng.required_scopes(data) if s.startswith("https://") and s not in granted] if any(g.startswith("https://") for g in granted) else []
     if problem:
         state = "unavailable"
     elif mode in ("shared", "none"):
         state = "shared"  # the admin holds the credential; nothing for the user to connect
     elif not mine:
         state = "not_connected"
-    elif mine.get("status") == "active":
+    elif mine.get("status") == "active" and not missing:
         state = "connected"
     else:
         state = "reauth_required"
+    write_actions = cfg.get("write_actions") if data["type"] == "calendar" else [a["id"] for a in _gateway_writes(data)]
     return {"id": cid, "type": data["type"], "service": service, "mode": mode, "label": data.get("label") or spec["label"],
             "description": data.get("scope") or cfg.get("description") or spec["description"],
-            "allowed_actions": cfg.get("allowed_actions") or (eng.CALENDAR_READ if data["type"] == "calendar" else []), "state": state,
-            "account_label": (mine or {}).get("accountLabel", ""), "scopes": (mine or {}).get("scopes", []), "problem": problem}
+            "allowed_actions": cfg.get("allowed_actions") or (eng.CALENDAR_READ if data["type"] == "calendar" else []),
+            "write_actions": write_actions or [], "state": state, "missing_scopes": missing,
+            "account_label": (mine or {}).get("accountLabel", ""), "scopes": granted, "problem": problem}
+
+
+def _gateway_writes(data: dict) -> list[dict]:
+    """Write/destructive actions an admin allowed on a generic gateway connector (empty when the gateway cannot be asked)."""
+    if data.get("type") != "gateway":
+        return []
+    try:
+        return [a for a in ga.describe(data.get("config") or {}) if a["write"]]
+    except oc.OpenConnectorError:
+        return []
 
 
 @router.get("")

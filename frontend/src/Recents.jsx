@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {PushPin,LockKey,Export,Archive,ArrowCounterClockwise,DotsThree,FolderSimple,FolderSimplePlus,NotePencil,ArrowsDownUp,Layout,Trash,PencilSimple,FolderOpen,FolderSimpleMinus,Check,CaretRight,CaretDown,Plus} from '@phosphor-icons/react';
 import {api} from './api';
 import {fitMenu} from './fitMenu';
+import {ShareDialog} from './ChatShare';
 import './recents.css';
 
 /* Sidebar sections modelled on ChatGPT: 專案 (folders of chats) and 最近項目 (the rest), with a section menu (…),
@@ -46,6 +47,7 @@ export function useRecents({MOCK,chats,setChats,projects,setProjects,notify,onDe
   const [busy,setBusy]=useState(false);
   const run=async(fn)=>{if(busy)return;setBusy(true);try{await fn()}catch(e){notify?.(e.message)}finally{setBusy(false)}};
   return {
+    mock:MOCK,notify,
     renameChat:(id,title)=>run(async()=>{title=(title||'').trim();if(!title)return;if(!MOCK)await api.renameSession(id,title);setChats(l=>l.map(c=>c.id===id?{...c,title}:c))}),
     patchChat:(id,patch)=>run(async()=>{if(!MOCK)await api.updateSession(id,patch);setChats(l=>l.map(c=>c.id===id?{...c,...patch}:c))}),
     moveChat:(id,pid)=>run(async()=>{if(!MOCK)await api.moveSession(id,pid||'');setChats(l=>l.map(c=>c.id===id?{...c,project_id:pid||''}:c))}),
@@ -57,14 +59,14 @@ export function useRecents({MOCK,chats,setChats,projects,setProjects,notify,onDe
 }
 
 /* the … menu of one chat; `anchor` is the button */
-export function ChatMenu({chat,anchor,projects,actions,onClose,onRename,onAsk,onNewProject}){
+export function ChatMenu({chat,anchor,projects,actions,onClose,onRename,onAsk,onNewProject,onShare}){
   const done=fn=>()=>{onClose();fn()},lock=!!chat.locked;
   return <Pop anchor={anchor} onClose={onClose} width={236}>
     <Item icon={PencilSimple} disabled={lock} onClick={done(onRename)}>重新命名</Item>
     <Item icon={PushPin} onClick={done(()=>actions.patchChat(chat.id,{pinned:!chat.pinned}))}>{chat.pinned?'取消釘選':'釘選'}</Item>
     <Item icon={LockKey} onClick={done(()=>actions.patchChat(chat.id,{locked:!chat.locked}))}>{lock?'解除鎖定':'鎖定對話'}</Item>
     <hr/>
-    <Item icon={Export} disabled title="對話可能含院內資料，分享功能需先定義權限後才會開放">分享</Item>
+    <Item icon={Export} title="建立去識別化的唯讀連結（30 天）" onClick={done(onShare)}>分享</Item>
     <hr/>
     {chat.archived?<Item icon={ArrowCounterClockwise} disabled={lock} onClick={done(()=>actions.patchChat(chat.id,{archived:false}))}>取消封存</Item>:<Item icon={Archive} disabled={lock} onClick={done(()=>actions.patchChat(chat.id,{archived:true}))}>封存</Item>}
     <Item icon={Trash} danger disabled={lock} onClick={done(()=>onAsk({kind:'chat',chat}))}>刪除</Item>
@@ -79,13 +81,14 @@ export function ChatMenu({chat,anchor,projects,actions,onClose,onRename,onAsk,on
 }
 
 export function ChatRow({chat,active,onOpen,projects,actions,onAsk,onNewProject,showProject}){
-  const [menu,setMenu]=useState(null),[edit,setEdit]=useState(false),btn=useRef(null);
+  const [menu,setMenu]=useState(null),[edit,setEdit]=useState(false),[share,setShare]=useState(false),btn=useRef(null);
   const pr=showProject&&projects.find(p=>p.id===chat.project_id);
   return <div className={'rc-row'+(active?' active':'')+(menu?' menu-open':'')}>
     {edit?<NameInput value={chat.title} onDone={v=>{setEdit(false);if(v!=null&&v.trim()&&v.trim()!==chat.title)actions.renameChat(chat.id,v)}}/>
       :<button type="button" className="rc-main" title={chat.title} onClick={()=>onOpen(chat)}><span>{chat.title}</span>{pr&&<small>{pr.name}</small>}{chat.locked&&<LockKey size={13} className="rc-flag"/>}{chat.pinned&&<PushPin size={13} className="rc-flag"/>}</button>}
     {!edit&&<button type="button" ref={btn} className="rc-dots" aria-label={`「${chat.title}」的更多選項`} aria-haspopup="menu" aria-expanded={!!menu} onClick={()=>setMenu(btn.current)}><DotsThree size={20} weight="bold"/></button>}
-    {menu&&<ChatMenu chat={chat} anchor={menu} projects={projects} actions={actions} onClose={()=>setMenu(null)} onRename={()=>setEdit(true)} onAsk={onAsk} onNewProject={onNewProject}/>}
+    {menu&&<ChatMenu chat={chat} anchor={menu} projects={projects} actions={actions} onClose={()=>setMenu(null)} onRename={()=>setEdit(true)} onAsk={onAsk} onNewProject={onNewProject} onShare={()=>setShare(true)}/>}
+    {share&&<ShareDialog chat={chat} mock={actions.mock} notify={actions.notify} onClose={()=>setShare(false)}/>}
   </div>;
 }
 

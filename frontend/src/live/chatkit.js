@@ -36,10 +36,11 @@ export const STEP={input:'收到問題',turn:'思考',knowledge:'檢索院內文
 export const stepLabel=t=>STEP[t]||t;
 export const seconds=ms=>ms>=1000?(ms/1000).toFixed(1)+' 秒':ms+' 毫秒';
 
-/* Entry for one answered turn (live API or a reopened session). */
-export function toEntry(text,reply,{trace=[],citations=[],ms=0,agent,msgIndex,fb}={}){
+/* Entry for one answered turn (live API or a reopened session). `pending` = {message, preview, approver} while the turn waits
+   for a decision on a connector write (approver 'user': the person chatting confirms it in place). */
+export function toEntry(text,reply,{trace=[],citations=[],ms=0,agent,msgIndex,fb,pending=null,stopped=false}={}){
   const llm=[...trace].reverse().find(s=>s.model);
-  return {text,ans:reply,trace,citations,ms,agent,msgIndex,fb,
+  return {text,ans:reply,trace,citations,ms,agent,msgIndex,fb,pending:pending||null,stopped,
     used:llm?`${modelLabel(llm.model)}${GROUP_LABEL[llm.group]?' · '+GROUP_LABEL[llm.group]:''}`:'—',
     thinking:trace.map(s=>s.thinking).filter(Boolean)};
 }

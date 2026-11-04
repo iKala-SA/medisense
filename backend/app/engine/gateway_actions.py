@@ -5,14 +5,25 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..config import settings
 from . import open_connector as oc
 
 IDENTITY_SCOPES = {"openid", "email", "profile"}  # needed to label the connected account; never a data permission
 AUTH_MODES = {"oauth2": "user_oauth", "api_key": "shared", "custom_credential": "shared", "no_auth": "none"}
+GOOGLE_SERVICES = {"gmail", "googlecalendar", "googledrive", "googledocs", "googlesheets", "googleslides", "googleforms", "googlemeet",
+                   "googlechat", "googletasks"}
 
 
 def mode_of(auth_mode: str) -> str | None:
     return AUTH_MODES.get(auth_mode)
+
+
+def platform_client(service: str) -> dict:
+    """The platform-wide OAuth app for this service's vendor (Google only so far), or {} when none is configured."""
+    s = settings()
+    if service in GOOGLE_SERVICES and s.google_oauth_client_id and s.google_oauth_client_secret:
+        return {"clientId": s.google_oauth_client_id, "clientSecret": s.google_oauth_client_secret}
+    return {}
 
 
 def actions_of(service: str) -> list[dict]:
@@ -39,8 +50,37 @@ def scopes_for(service: str, allowed_ids: list[str]) -> list[str]:
     return chosen + [i for i in ("openid", "email") if i in declared and i not in chosen]
 
 
+_SCHEMA_KEYS = ("type", "description", "enum", "properties", "required", "items")
+
+
+def clean_schema(spec: Any, depth: int = 0) -> dict:
+    """A JSON schema reduced to what every tool-calling model accepts (type, description, enum, properties, required, items).
+    `anyOf`/`oneOf` keep their first branch; vendor keywords (format, minItems, additionalProperties, ...) are dropped."""
+    if not isinstance(spec, dict) or depth > 6:
+        return {"type": "string"}
+    if not spec.get("type") and (spec.get("anyOf") or spec.get("oneOf")):
+        first = (spec.get("anyOf") or spec.get("oneOf"))[0]
+        return clean_schema({**first, **({"description": spec["description"]} if spec.get("description") else {})}, depth)
+    out: dict = {k: spec[k] for k in _SCHEMA_KEYS if k in spec}
+    if "properties" in spec and isinstance(spec["properties"], dict):
+        out["type"] = "object"
+        out["properties"] = {k: clean_schema(v, depth + 1) for k, v in spec["properties"].items()}
+        out["required"] = [k for k in (spec.get("required") or []) if k in out["properties"]]
+    elif out.get("type") == "object":
+        out["properties"] = {}
+    if out.get("type") == "array":
+        out["items"] = clean_schema(spec.get("items") or {}, depth + 1)
+    out.setdefault("type", "string")
+    return out
+
+
+def _structured(spec: dict) -> bool:
+    return bool(spec) and (spec.get("type") in ("object", "array") or "properties" in spec or "items" in spec or "anyOf" in spec or "oneOf" in spec)
+
+
 def describe(config: dict) -> list[dict]:
-    """Allowed actions in the shape the Studio tool node expects (args derived from the input schema)."""
+    """Allowed actions in the shape the Studio tool node expects (args derived from the input schema). Structured arguments
+    (objects, arrays) are `kind: "textarea"` on the canvas (JSON) and carry their cleaned `schema` for the model."""
     allowed = set(config.get("allowed_actions") or [])
     out = []
     for a in actions_of(config["service"]):
@@ -48,8 +88,15 @@ def describe(config: dict) -> list[dict]:
             continue
         props = (a["schema"].get("properties") or {})
         req = set(a["schema"].get("required") or [])
+        args = []
+        for k, v in props.items():
+            v = v if isinstance(v, dict) else {}
+            arg = {"key": k, "label": v.get("description") or k, "kind": "textarea" if _structured(v) else "text", "required": k in req}
+            if _structured(v):
+                arg["schema"] = clean_schema(v)
+            args.append(arg)
         out.append({"id": a["id"], "label": a["name"], "description": a["description"], "write": a["operation"] != "read", "operation": a["operation"],
-                    "args": [{"key": k, "label": (v or {}).get("description") or k, "kind": "text", "required": k in req} for k, v in props.items()]})
+                    "args": args})
     return out
 
 

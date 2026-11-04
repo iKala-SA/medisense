@@ -1,4 +1,7 @@
-import {idToken} from './firebase';
+import {bigqueryToken,idToken} from './firebase';
+
+// The user's BigQuery token rides along on requests that may run database tools (it is never stored server-side).
+const bqh=()=>{const t=bigqueryToken();return t?{'X-BigQuery-Auth':`Bearer ${t}`}:{}};
 
 // Same-origin in production (Firebase Hosting rewrites /api/** to Cloud Run); Vite proxies it in dev.
 async function call(path,init={},json=true){
@@ -49,8 +52,9 @@ export const api={
   sandboxActivity:()=>call('/api/agents/activity'),
   unpublishAgent:id=>call(`/api/agents/${id}/unpublish`,{method:'POST'}),
   deleteAgent:id=>call(`/api/agents/${id}`,{method:'DELETE'}),
-  run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',body:body({message,session_id,use_published,version})}),
-  approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',body:body({session_id,approve})}),
+  run:(id,message,session_id,use_published=false,version)=>call(`/api/agents/${id}/run`,{method:'POST',headers:bqh(),body:body({message,session_id,use_published,version})}),
+  approve:(id,session_id,approve)=>call(`/api/agents/${id}/approve`,{method:'POST',headers:bqh(),body:body({session_id,approve})}),
+  chatApprove:(session_id,approve)=>call('/api/chat/approve',{method:'POST',headers:bqh(),body:body({session_id,approve})}),
   draftAgent:(message,current,history,kind='flow')=>call('/api/agents/draft',{method:'POST',body:body({message,current,history,kind})}),
   improveInstructions:b=>call('/api/agents/improve',{method:'POST',body:body(b)}),
   validateSteps:steps=>call('/api/agents/validate-steps',{method:'POST',body:body({steps})}),
@@ -160,11 +164,16 @@ export const api={
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
   updateSession:(id,patch)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body(patch)}),
   moveSession:(id,project_id)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({project_id})}),
+  // 分享: de-identified snapshot link (routers/shares.py)
+  getShare:id=>call(`/api/sessions/${id}/share`),
+  createShare:id=>call(`/api/sessions/${id}/share`,{method:'POST'}),
+  revokeShare:id=>call(`/api/sessions/${id}/share`,{method:'DELETE'}),
+  viewShare:id=>call(`/api/shares/${encodeURIComponent(id)}`),
   listProjects:()=>call('/api/projects'),
   createProject:name=>call('/api/projects',{method:'POST',body:body({name})}),
   renameProject:(id,name)=>call(`/api/projects/${id}`,{method:'PATCH',body:body({name})}),
   deleteProject:id=>call(`/api/projects/${id}`,{method:'DELETE'}),
-  chat:m=>call('/api/chat',{method:'POST',body:body(m)}),
+  chat:m=>call('/api/chat',{method:'POST',headers:bqh(),body:body(m)}),
   sendFeedback:f=>call('/api/chat/feedback',{method:'POST',body:body(f)}),
   saveToSpace:b=>call('/api/chat/save-to-space',{method:'POST',body:body(b)}),
   citedDocument:id=>call(`/api/chat/documents/${id}`),
@@ -172,7 +181,7 @@ export const api={
   fetchOriginal:(url,download=false)=>blob(download?`${url}&download=true`:url),
   /* Server-Sent Events from POST /api/chat/stream; onEvent gets each parsed event, resolves with the final RunResponse. */
   chatStream:async(m,onEvent,signal)=>{
-    const res=await fetch('/api/chat/stream',{method:'POST',signal,headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body(m)});
+    const res=await fetch('/api/chat/stream',{method:'POST',signal,headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json',...bqh()},body:body(m)});
     if(!res.ok){let d=await res.text();try{d=JSON.parse(d).detail??d}catch{/* plain text */}throw new Error(`${res.status} ${typeof d==='string'?d:JSON.stringify(d)}`)}
     const reader=res.body.getReader(),dec=new TextDecoder();let buf='',result=null;
     for(;;){
@@ -192,6 +201,7 @@ export const api={
   },
   chatAgent:id=>call(`/api/chat/agents/${id}`),
   chatRemoveAttachment:(sid,aid)=>call(`/api/chat/attachments/${sid}/${aid}`,{method:'DELETE'}),
+  chatImage:(sid,aid)=>blob(`/api/chat/attachments/${sid}/${aid}/image`), // the stored (redacted) copy; 410 once expired
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
@@ -201,15 +211,12 @@ export const api={
   createDbConnector:c=>call('/api/db-connectors',{method:'POST',body:body(c)}),
   updateDbConnector:(id,c)=>call(`/api/db-connectors/${id}`,{method:'PUT',body:body(c)}),
   deleteDbConnector:id=>call(`/api/db-connectors/${id}`,{method:'DELETE'}),
-  resolveDbAccess:(id,email)=>call(`/api/db-connectors/${id}/resolve`,{method:'POST',body:body({email})}),
-  dbApplyState:()=>call('/api/db-connectors/apply/state'),
-  dbApply:()=>call('/api/db-connectors/apply',{method:'POST'}),
-  testDbConnection:(kind,connection,user,password)=>call('/api/db-connectors/test-connection',{method:'POST',body:body({kind,connection,user,password})}),
+  testDbConnection:(kind,connection,user,password)=>call('/api/db-connectors/test-connection',{method:'POST',headers:bqh(),body:body({kind,connection,user,password})}),
+  testSavedDb:id=>call(`/api/db-connectors/${id}/test`,{method:'POST',headers:bqh()}),
   dbCatalog:()=>call('/api/db-connectors/catalog'),
   ttsVoices:()=>call('/api/tts/voices'),
   ttsAudio:async(text,voice,rate=1)=>{const res=await fetch('/api/tts',{method:'POST',headers:{Authorization:`Bearer ${await idToken()}`,'Content-Type':'application/json'},body:body({text,voice,rate})});
     if(!res.ok)throw new Error(`${res.status} ${await res.text()}`);return res.arrayBuffer()},
-  checkDbSql:(id,email,sql)=>call(`/api/db-connectors/${id}/check-sql`,{method:'POST',body:body({email,sql})}),
   myDbConnectors:()=>call('/api/db-connectors/mine'),
   // per-user OAuth connectors
   myConnectors:()=>call('/api/my-connectors'),

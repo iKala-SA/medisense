@@ -3,6 +3,7 @@
 The canvas (React Flow) saves `nodes` and `edges`. Each node has a `type` from NODE_TYPES and a
 `data` dict with the fields the left/right panels edit. The interpreter only trusts these schemas.
 """
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -1060,12 +1061,14 @@ class SessionMessage(BaseModel):
     role: str
     content: str
     meta: dict[str, Any] | None = None  # assistant turns: {trace, citations, model} so a reopened chat shows its steps and sources
+    images: list[dict[str, Any]] = Field(default_factory=list)  # user turns: [{id, name, mime, available}] -> GET /api/chat/attachments/{sid}/{id}/image
 
 
 class SessionDetail(SessionSummary):
     messages: list[SessionMessage] = Field(default_factory=list)
     attachments: list[dict[str, Any]] = Field(default_factory=list)  # {id, name, chars}
     feedback: dict[str, str] = Field(default_factory=dict)  # assistant message index -> "up" | "down"
+    pending_approval: dict[str, Any] | None = None  # {node_id, message, preview, approver} when the last turn is waiting for a decision
 
 
 FeedbackReason = Literal["inaccurate", "incomplete", "misunderstood", "sources", "wordy", "unsafe", "slow", "other"]
@@ -1170,119 +1173,53 @@ class OpenOriginalOut(BaseModel):
     watermark: str  # text the viewer repeats over the page
 
 
-# ---- database connectors (docs/DB-CONNECTORS-DESIGN.md) -------------------------------------------------------------
-DbKind = Literal["postgres", "mysql", "mssql", "cloud_sql_postgres", "cloud_sql_mysql", "cloud_sql_mssql", "bigquery"]
+# ---- database connectors (MVP: one login per connection; BigQuery runs as the signed-in user) ----------------------
+DbKind = Literal["postgres", "mysql", "mssql", "bigquery"]
 DB_REQUIRED = {  # connection fields per kind (non-secret)
     "postgres": ("host", "port", "database"), "mysql": ("host", "port", "database"), "mssql": ("host", "port", "database"),
-    "cloud_sql_postgres": ("project", "region", "instance", "database"), "cloud_sql_mysql": ("project", "region", "instance", "database"),
-    "cloud_sql_mssql": ("project", "region", "instance", "database"), "bigquery": ("project",),
+    "bigquery": ("project", "location", "datasets"),
 }
-_SLUG = r"^[a-z][a-z0-9_]{0,39}$"
-
-
-class DbParam(BaseModel):
-    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,39}$")
-    type: Literal["string", "integer", "float", "boolean"] = "string"
-    description: str = Field(default="", max_length=200)
-    required: bool = True
-
-
-class DbQuery(BaseModel):
-    """A: an administrator-written, parameterised, read-only query. The model can only fill the parameters."""
-    id: str = Field(pattern=_SLUG)
-    name: str = Field(min_length=1, max_length=80)
-    description: str = Field(default="", max_length=500)
-    statement: str = Field(min_length=1, max_length=4000)
-    parameters: list[DbParam] = Field(default_factory=list, max_length=12)
-
-
-class DbColumn(BaseModel):
-    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
-    type: str = Field(default="", max_length=40)
-    sensitive: bool = False  # never readable by natural-language queries
-
-
-class DbExample(BaseModel):
-    question: str = Field(max_length=300)
-    sql: str = Field(max_length=2000)
-
-
-class DbView(BaseModel):
-    """B: a view (or table) natural-language queries may read, with the columns they may use."""
-    id: str = Field(pattern=_SLUG)
-    name: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z_][A-Za-z0-9_.]*$")  # [dataset.|schema.]view
-    description: str = Field(default="", max_length=500)
-    columns: list[DbColumn] = Field(min_length=1, max_length=200)
-    examples: list[DbExample] = Field(default_factory=list, max_length=10)
-
-
-class DbSourceIn(BaseModel):
-    """One database login = one read-only database role (one Toolbox source). The password is write-only."""
-    id: str = Field(pattern=_SLUG)
-    label: str = Field(min_length=1, max_length=80)
-    user: str = Field(min_length=1, max_length=120)
-    password: str | None = Field(default=None, max_length=500)  # omitted on update = keep the stored one
-
-
-class DbRule(BaseModel):
-    """Members of `group_id` use `source_id` with these queries and views. Rules are tried in order; the first match wins."""
-    group_id: str = Field(min_length=1, max_length=80)
-    source_id: str = Field(default="", max_length=40)  # "" only for BigQuery (the user's own identity)
-    queries: list[str] = Field(default_factory=list, max_length=100)
-    views: list[str] = Field(default_factory=list, max_length=100)
 
 
 class DbConnectorIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     kind: DbKind
-    description: str = Field(default="", max_length=500)
+    description: str = Field(default="", max_length=500)  # shown to the model: what data lives here
     connection: dict[str, str] = Field(default_factory=dict)
-    sources: list[DbSourceIn] = Field(default_factory=list, max_length=20)
-    rules: list[DbRule] = Field(default_factory=list, max_length=50)
-    queries: list[DbQuery] = Field(default_factory=list, max_length=100)
-    views: list[DbView] = Field(default_factory=list, max_length=100)
+    user: str = Field(default="", max_length=120)  # not for BigQuery
+    password: str | None = Field(default=None, max_length=500)  # write-only; omitted on update = keep the stored one
     max_rows: int = Field(default=100, ge=1, le=1000)
 
     @model_validator(mode="after")
     def _consistent(self) -> "DbConnectorIn":
-        need = DB_REQUIRED[self.kind]
-        miss = [k for k in need if not str(self.connection.get(k, "")).strip()]
+        self.connection = {k: v.strip() for k, v in self.connection.items() if isinstance(v, str)}
+        miss = [k for k in DB_REQUIRED[self.kind] if not self.connection.get(k)]
         if miss:
             raise ValueError(f"connection is missing: {', '.join(miss)}")
-        self.connection = {k: v.strip() for k, v in self.connection.items() if isinstance(v, str)}
-        if self.connection.get("ip_type", "") not in ("", "public", "private", "psc"):
-            raise ValueError("ip_type must be public, private or psc")
-        sids, qids, vids = [x.id for x in self.sources], [x.id for x in self.queries], [x.id for x in self.views]
-        for what, ids in (("source", sids), ("query", qids), ("view", vids)):
-            if len(ids) != len(set(ids)):
-                raise ValueError(f"duplicate {what} id")
-        if self.kind == "bigquery" and self.sources:
-            raise ValueError("BigQuery runs as the signed-in user: it has no database logins")
-        for r in self.rules:
-            if self.kind == "bigquery":
-                if r.source_id:
-                    raise ValueError("BigQuery rules take no source")
-            elif r.source_id not in sids:
-                raise ValueError(f"rule uses unknown source '{r.source_id}'")
-            if bad := [q for q in r.queries if q not in qids]:
-                raise ValueError(f"rule uses unknown query: {', '.join(bad)}")
-            if bad := [v for v in r.views if v not in vids]:
-                raise ValueError(f"rule uses unknown view: {', '.join(bad)}")
+        if self.kind == "bigquery":
+            if self.user or self.password:
+                raise ValueError("BigQuery runs as the signed-in user: it takes no account or password")
+            if not re.fullmatch(r"[a-z][a-z0-9.:-]{3,62}", self.connection["project"]):
+                raise ValueError("invalid project id")
+            if not all(re.fullmatch(r"[A-Za-z0-9_]{1,1024}", d.strip()) for d in self.connection["datasets"].split(",")):
+                raise ValueError("datasets: letters, digits and _ only, comma separated")
+        else:
+            if not self.user.strip():
+                raise ValueError("user is required")
+            if not self.connection["port"].isdigit() or not 0 < int(self.connection["port"]) < 65536:
+                raise ValueError("invalid port")
         return self
 
 
 class DbConnectorOut(BaseModel):
     id: str
     name: str
-    kind: DbKind
+    kind: str
     description: str = ""
     connection: dict[str, str] = Field(default_factory=dict)
-    sources: list[dict[str, Any]] = Field(default_factory=list)  # {id, label, user, password_set}
-    rules: list[DbRule] = Field(default_factory=list)
-    queries: list[DbQuery] = Field(default_factory=list)
-    views: list[DbView] = Field(default_factory=list)
+    user: str = ""
+    password_set: bool = False
     max_rows: int = 100
-    status: str = "draft"  # draft -> applied (deployed to Toolbox)
     created_by: str = ""
     created_at: Any = None
     updated_at: Any = None

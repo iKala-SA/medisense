@@ -21,7 +21,7 @@ export default function PickData({live,picked,onSave,onClose}){
   const save=()=>onSave((rows||[]).filter(r=>sel.has(key(r))).map(r=>({t:r.t,id:r.id,name:r.name})));
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="modal pd-dialog" role="dialog" aria-modal="true" aria-label="新增資料">
     <header><h2>新增資料</h2><button type="button" className="icon-btn" aria-label="關閉" onClick={onClose}><X size={16}/></button></header>
-    <p className="pd-sub">選擇這次對話要讓 AI 參考的空間與資料庫。資料庫能查到什麼，仍依你所屬群組的規則。</p>
+    <p className="pd-sub">選擇這次對話要讓 AI 參考的空間與資料庫。資料庫為唯讀查詢；BigQuery 以你自己的 Google 帳號查詢。</p>
     <label className="search pd-search"><MagnifyingGlass size={15}/><input autoFocus aria-label="搜尋" placeholder="搜尋空間或資料庫" value={q} onChange={e=>setQ(e.target.value)}/></label>
     <div className="pd-tabs" role="tablist">{TABS.map(([k,l])=><button key={k} role="tab" aria-selected={tab===k} className={tab===k?'on':''} onClick={()=>setTab(k)}>{l}</button>)}</div>
     <div className="pd-table">{rows===null?<Loading/>:list.length?<table><thead><tr><th/><th>名稱</th><th>類型</th><th>內容</th></tr></thead><tbody>{list.map(r=><tr key={key(r)} onClick={()=>flip(r)} className={sel.has(key(r))?'on':''}>

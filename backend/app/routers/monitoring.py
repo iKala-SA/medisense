@@ -33,13 +33,23 @@ def _parse_range(frm: str | None, to: str | None) -> tuple[date, date]:
     return d_from, d_to
 
 
-def _rollups(d_from: date, d_to: date, department: str) -> list[dict]:
+ENVS = ("production", "sandbox")
+
+
+def _env(value: str) -> str:
+    if value not in ENVS:
+        raise HTTPException(422, "env must be production or sandbox")
+    return value
+
+
+def _rollups(d_from: date, d_to: date, department: str, env: str = "production") -> list[dict]:
     q = (db.client().collection("usage_daily")
          .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
          .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
     if department:
         q = q.where(filter=firestore.FieldFilter("department", "==", department))
-    return [d.to_dict() or {} for d in q.stream()]
+    rows = [d.to_dict() or {} for d in q.stream()]
+    return [r for r in rows if (r.get("env") or "production") == env]  # rows from before the sandbox split are production
 
 
 def _pct(cur: float, prev: float) -> float | None:
@@ -52,11 +62,12 @@ def departments():
 
 
 @router.get("/summary", response_model=MonitoringSummary)
-def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = ""):
+def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production"):
     d_from, d_to = _parse_range(frm, to)
-    rows = _rollups(d_from, d_to, department)
+    env = _env(env)
+    rows = _rollups(d_from, d_to, department, env)
     span = (d_to - d_from).days + 1
-    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department)
+    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department, env)
 
     by_day: dict[str, DailyPoint] = {}
     for i in range(span):
@@ -93,7 +104,7 @@ def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, 
     p_cost = sum(float(r.get("cost_usd", 0) or 0) for r in prev)
 
     today = date.fromisoformat(day_key())
-    month = _rollups(today.replace(day=1), today, "")
+    month = _rollups(today.replace(day=1), today, "", env)
     agents_col = db.client().collection("agents")
     total_agents = sum(1 for _ in agents_col.select([]).stream())
     published = sum(1 for _ in agents_col.where(filter=firestore.FieldFilter("status", "==", "published")).select([]).stream())
@@ -114,9 +125,9 @@ def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, 
     )
 
 
-def _agent_rows(d_from: date, d_to: date, department: str) -> list[AgentUsageRow]:
+def _agent_rows(d_from: date, d_to: date, department: str, env: str = "production") -> list[AgentUsageRow]:
     acc: dict[str, dict] = {}
-    for r in _rollups(d_from, d_to, department):
+    for r in _rollups(d_from, d_to, department, env):
         a = acc.setdefault(r.get("agent_id", ""), {"name": r.get("agent_name", ""), "department": r.get("department", ""),
                                                    "requests": 0, "failed": 0, "fallbacks": 0, "tokens": 0, "cost": 0.0, "ms": 0,
                                                    "models": defaultdict(int), "groups": defaultdict(int)})
@@ -161,16 +172,17 @@ def _sorted(rows: list[AgentUsageRow], sort: str) -> list[AgentUsageRow]:
 
 
 @router.get("/agents", response_model=list[AgentUsageRow])
-def agents(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", sort: str = "requests"):
+def agents(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", sort: str = "requests",
+           env: str = "production"):
     d_from, d_to = _parse_range(frm, to)
-    return _sorted(_agent_rows(d_from, d_to, department), sort)
+    return _sorted(_agent_rows(d_from, d_to, department, _env(env)), sort)
 
 
 @router.get("/export.csv")
-def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "",
+def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production",
                user: User = Depends(require_admin)):
     d_from, d_to = _parse_range(frm, to)
-    rows = _sorted(_agent_rows(d_from, d_to, department), "cost_usd")
+    rows = _sorted(_agent_rows(d_from, d_to, department, _env(env)), "cost_usd")
     buf = io.StringIO()
     buf.write("﻿")  # BOM so Excel opens Chinese headers correctly
     w = csv.writer(buf)
@@ -182,6 +194,6 @@ def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = Non
                     r.fallbacks, r.tokens, f"{r.cost_usd:.4f}", f"{r.cost_usd * rate:.0f}", r.avg_latency_ms])
     db.audit(user.uid, "monitoring.export", user.email, range_from=d_from.isoformat(), range_to=d_to.isoformat(),
              department=department, rows=len(rows))
-    name = f"tcvgh-agent-cost_{d_from.isoformat()}_{d_to.isoformat()}.csv"
+    name = f"tcvgh-agent-cost{'' if env == 'production' else '-' + env}_{d_from.isoformat()}_{d_to.isoformat()}.csv"
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{name}"'})

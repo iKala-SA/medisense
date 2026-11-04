@@ -30,7 +30,9 @@ from datetime import datetime, timedelta, timezone
 
 from ..config import settings
 from ..schemas import AgentIn, Citation, CitationPassage, FlowNode, StepTrace
-from . import connectors, db_tools, deid, features, llm, routing
+from . import connectors, db_tools, deid, features, llm, routing, runenv
+from . import gateway_actions as ga
+from . import open_connector as oc
 from .flow import THINK, _complete, _render, invoke_connector, pick_group
 
 log = logging.getLogger(__name__)
@@ -43,7 +45,9 @@ LANG_GUIDE = ("Language: always answer in the language of the user's latest mess
 REASON = {"type": "string", "description": "One short sentence explaining why you take this step, in the USER's language (it is shown to them as written)."}
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
          "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
-         "呼叫工具時務必填寫 reason。")
+         "呼叫工具時務必填寫 reason。"
+         "若有連接器工具（例如 Google 日曆、Google 文件、Slack）而使用者要求建立、修改或傳送外部資料，請直接呼叫對應的工具，"
+         "不要回答你做不到；寫入動作會先請使用者確認後才真正執行。")
 NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你可以用一般知識回答，但必須用使用者的語言明確說明："
                  "「院內文件中沒有找到相關依據，以下為一般知識，非院內依據」（Chinese wording; translate it, e.g. "
                  "\"No supporting hospital document was found; the following is general knowledge, not hospital evidence.\"），"
@@ -111,6 +115,7 @@ class Tool:
     fixed: dict = field(default_factory=dict)  # arguments the canvas node pins; the model cannot change them
     raw_args: bool = False  # dynamic (MCP) tool: the model sends a JSON object as `arguments`
     db: dict = field(default_factory=dict)  # 資料庫連接器 call: {connector_id, kind: query|sql, qid}
+    gate: str = ""  # "user": a capability action the creator marked 需核准 -> the person chatting confirms it before it runs
 
 
 def _fn(name: str, description: str, props: dict, required: list[str]) -> dict:
@@ -133,6 +138,11 @@ def _connector_tool(node: FlowNode, user_message: str) -> Tool | None:
     ctype = data.get("type", "")
     spec = connectors.TYPES.get(ctype, {})
     acts = spec.get("actions")
+    if ctype == "gateway":  # the gateway publishes each action's input schema: hand it to the model (nested objects included)
+        try:
+            acts = ga.describe(data.get("config") or {})
+        except oc.OpenConnectorError as exc:
+            log.warning("agent tool: gateway schema unavailable for %s: %s", cid, exc)
     act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
     raw = node.data.get("args") or {}
     if isinstance(raw, str):
@@ -144,8 +154,17 @@ def _connector_tool(node: FlowNode, user_message: str) -> Tool | None:
     name = re.sub(r"[^A-Za-z0-9_-]", "_", f"{ctype}_{node.id}")[:60]
     label = f"{data.get('name') or spec.get('label') or ctype} · {(act or {}).get('label') or action}"
     if act:
-        props = {a["key"]: {"type": "string", "description": a.get("label", a["key"])} for a in act["args"] if a["key"] not in fixed}
-        tool = Tool(name, "tool", _fn(name, label, props, []), label, write=bool(act.get("write", True)), connector_id=cid, action=action, fixed=fixed)
+        props, required = {}, []
+        for a in act["args"]:
+            if a["key"] in fixed:
+                continue
+            sch = a.get("schema")
+            props[a["key"]] = {**sch, "description": sch.get("description") or a.get("label") or a["key"]} if isinstance(sch, dict) else \
+                {"type": "string", "description": a.get("label") or a["key"]}
+            if a.get("required"):
+                required.append(a["key"])
+        desc = label if not act.get("description") else f"{label}：{act['description']}"
+        tool = Tool(name, "tool", _fn(name, desc, props, required), label, write=bool(act.get("write", True)), connector_id=cid, action=action, fixed=fixed)
     else:  # MCP tools are discovered at runtime, so their argument shape is free-form JSON
         props = {"arguments": {"type": "string", "description": "傳給工具的參數，JSON 物件字串"}}
         tool = Tool(name, "tool", _fn(name, label, props, []), label, write=True, connector_id=cid, action=action, fixed=fixed, raw_args=True)
@@ -164,12 +183,14 @@ def build_tools(agent: AgentIn, rag_files: list[str], user_message: str, web: bo
             "search_knowledge", "knowledge",
             _fn("search_knowledge", "搜尋院內知識庫（指引、辦法、醫學文件）。只在問題需要院內資料時使用；一次一個主題，關鍵字要具體。",
                 {"query": {"type": "string", "description": "搜尋關鍵字或完整問句"}}, ["query"]), "檢索院內文件")
-    listed = [FlowNode(id=f"cap{i}", type="tool", data={"connector_id": c.connector_id, "action": c.action, "require_approval": c.require_approval})
+    listed = [FlowNode(id=f"cap{i}", type="tool", data={"connector_id": c.connector_id, "action": c.action, "require_approval": c.require_approval, "approver": "user"})
               for i, c in enumerate(agent.capabilities.connectors)]  # PRD §4.3: connectors chosen in the agent's capabilities
     for n in [*agent.flow.nodes, *listed]:
         if n.type == "tool" and (t := _connector_tool(n, user_message)):
             if n.data.get("require_approval") is False:
                 t.write = False  # the creator turned approval off for this action
+            elif t.write and n.data.get("approver") == "user":
+                t.gate = "user"  # 需核准 on a capability: pause and let the person chatting confirm, canvas approval node or not
             tools[t.name] = t
         elif n.type == "his_emr" and "query_his" not in tools:
             tools["query_his"] = Tool("query_his", "his_emr", _fn("query_his", "查詢 HIS/EMR（尚未串接）。",
@@ -322,8 +343,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
                     call_args |= json.loads(str(args.get("arguments") or "{}"))
                 except json.JSONDecodeError:
                     return "參數不是合法 JSON，未執行。", "參數不是合法 JSON，未執行"
-            else:
-                call_args |= {k: str(v) for k, v in args.items() if v not in (None, "")}
+            else:  # structured arguments (objects / arrays from a gateway schema) stay JSON; scalars travel as strings
+                call_args |= {k: (v if isinstance(v, (dict, list)) else str(v)) for k, v in args.items() if v not in (None, "")}
             return invoke_connector(tool.connector_id, tool.action, call_args, agent_id=agent_id, user_id=user_id)
         except Exception as exc:  # noqa: BLE001 - any driver failure becomes a visible step result the model can react to
             return f"[工具錯誤] {exc.__class__.__name__}: {exc}"[:500], f"執行失敗：{exc.__class__.__name__}"
@@ -336,7 +357,8 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         seen_urls.update({c.uri: i + 1 for i, c in enumerate(res.citations) if c.uri.startswith("http")})
         queue = [resume["call"], *resume.get("rest", [])]
         approved_id = resume["call"]["id"]
-        res.trace.append(StepTrace(node_id=resume.get("node_id", "approval"), type="approval", summary="已由 Agent 負責人核准，繼續執行"))
+        who = "使用者" if resume.get("approver") == "user" else "Agent 負責人"
+        res.trace.append(StepTrace(node_id=resume.get("node_id", "approval"), type="approval", summary=f"已由{who}核准，繼續執行"))
     else:
         content = [{"type": "text", "text": user_message}, *images] if images else user_message  # images: redacted copies only
         messages = [*history, {"role": "user", "content": content}]
@@ -356,13 +378,19 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
             if tool is None:
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": "未知的工具，未執行。"})
                 continue
-            if tool.write and approval is not None and call["id"] != approved_id:
+            # A write pauses when the canvas has an approval node (the owner decides) or the capability says 需核准 (the person
+            # chatting confirms). Sandbox: writes are simulated, nothing to approve.
+            if tool.write and (approval is not None or tool.gate) and call["id"] != approved_id and not (runenv.is_sandbox() and tool.connector_id):
                 preview = f"{tool.label}\n{json.dumps({**tool.fixed, **args}, ensure_ascii=False, indent=2)}"
-                res.pending = {"node_id": approval.id, "message": _render(str(approval.data.get("message") or "核准這個動作？"), {"input": user_message}),
+                approver = "user" if tool.gate == "user" else "owner"
+                message = (_render(str(approval.data.get("message") or "核准這個動作？"), {"input": user_message}) if approval is not None
+                           else f"要執行「{tool.label}」嗎？這會在您的帳號上做出變更。")
+                res.pending = {"node_id": approval.id if approval is not None else "approval", "message": message, "approver": approver,
                                "preview": preview, "messages": messages, "citations": [c.model_dump() for c in res.citations],
                                "call": {**call, "args": {**args, **({"reason": reason} if reason else {})}},
                                "rest": [{**c, "args": c["args"]} for c in calls[i + 1:]], "input": user_message}
-                res.trace.append(StepTrace(node_id=call["id"], type="approval", reason=reason, summary=f"等待人工核准：{tool.label}"))
+                res.trace.append(StepTrace(node_id=call["id"], type="approval", reason=reason,
+                                           summary=f"等待{'使用者確認' if approver == 'user' else '人工核准'}：{tool.label}"))
                 return True
             if emit:
                 emit({"event": "step_start", "node_id": call["id"], "type": tool.kind})

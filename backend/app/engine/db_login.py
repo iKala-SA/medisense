@@ -1,7 +1,5 @@
-"""A real login attempt for postgres / mysql / mssql sources (the same host, port, database, login Toolbox will use).
-
-Used by the 建立 dialog's 驗證連線 and before 套用, so a wrong password is reported at once and by name instead of as a failed
-Cloud Run revision. Cloud SQL (reached through the Cloud SQL connector) and BigQuery (the user's own identity) are not tested here."""
+"""A real login attempt for postgres / mysql / mssql connections (驗證連線 on the connection form), so a wrong password or an
+unreachable host is reported at once and by name. BigQuery (the user's own identity) is tested in routers/db_connectors.py."""
 import logging
 
 log = logging.getLogger(__name__)

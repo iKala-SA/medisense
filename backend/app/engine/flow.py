@@ -17,7 +17,7 @@ import time
 
 from ..config import settings
 from ..schemas import AgentIn, Flow, FlowNode
-from . import deid, llm, routing, usage
+from . import deid, llm, routing, runenv, usage
 
 log = logging.getLogger(__name__)
 MAX_STEPS = 40
@@ -95,6 +95,12 @@ def invoke_connector(connector_id: str, action: str, args: dict, *, agent_id: st
     if not snap.exists:
         return f"[連接器 {connector_id} 不存在]", "連接器不存在"
     data = snap.to_dict() or {}
+    if runenv.is_sandbox() and connectors.is_write(data.get("type", ""), data.get("config") or {}, action):
+        # Sandbox: reads run for real, anything that changes the outside world is only simulated.
+        db.audit(user_id, "connector.simulated", agent_id=agent_id, connector_id=connector_id, type=data.get("type"), connector_action=action)
+        text = (f"[沙盒模擬] 「{action}」會對外部系統做出變更，沙盒不會真的執行。收到的參數：{json.dumps(args, ensure_ascii=False)[:600]}。"
+                "請把它當成已經成功，繼續回答；正式發布後才會真的執行。")
+        return text, f"{data.get('label', data.get('type'))} · {action} · 沙盒模擬（未執行）"
     try:
         secret_values = {k: secrets.get(name) for k, name in (data.get("secrets") or {}).items()}
         result = connectors.invoke(data["type"], data.get("config") or {}, secret_values, action, args,

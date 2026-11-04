@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from .. import db
 from ..auth import User, current_user
 from ..config import settings
+from ..engine import runenv
 from ..engine import steps as step_engine
 from ..engine.capabilities import rag_files_for
 from ..engine.extract import NoTextError, extract_text
@@ -52,7 +53,7 @@ def start_run(agent_id: str, body: StepRunIn, user: User = Depends(current_user)
         raise HTTPException(422, "Step 流程有錯誤：" + "；".join(problems))
     ref = _col().document(uuid.uuid4().hex)
     base = {"uid": user.uid, "agent_id": agent_id, "agent_name": agent.name, "trigger": "manual", "triggered_by": user.email,
-            "draft": not body.use_published, "started_at": step_engine.now_iso(), "expire_at": db.expiry(settings().session_retention_days)}
+            "draft": not body.use_published, "env": runenv.of(body.use_published), "started_at": step_engine.now_iso(), "expire_at": db.expiry(settings().session_retention_days)}
     from ..engine import deid
     types = {s.id: s.type for s in step_engine.flatten(agent.steps)}
     # what the user typed is de-identified before it is stored anywhere (file inputs are ids of already de-identified uploads)
@@ -60,8 +61,9 @@ def start_run(agent_id: str, body: StepRunIn, user: User = Depends(current_user)
     run = {"status": "running", "inputs": safe_inputs, "steps": []}
     save = _saver(ref, base)
     save(run)
-    db.audit(user.uid, "step_run.start", user.email, agent_id=agent_id, run_id=ref.id, draft=base["draft"])
-    out = step_engine.run_steps(agent, agent_id=agent_id, user=user, run=run, rag_files=rag_files, save=save)
+    with runenv.use(runenv.of(body.use_published)):
+        db.audit(user.uid, "step_run.start", user.email, agent_id=agent_id, run_id=ref.id, draft=base["draft"])
+        out = step_engine.run_steps(agent, agent_id=agent_id, user=user, run=run, rag_files=rag_files, save=save)
     out["ended_at"] = step_engine.now_iso() if out["status"] != "waiting_approval" else None
     save(out)
     return _public(ref.id, {**base, **out})
@@ -102,7 +104,8 @@ def approve(run_id: str, body: StepRunApproveIn, user: User = Depends(current_us
         run.update(status="cancelled", pending=None, error="你拒絕了這個動作", ended_at=step_engine.now_iso())
         save(run)
         return _public(snap.id, {**d, **run})
-    out = step_engine.run_steps(agent, agent_id=agent_id, user=user, run=run, rag_files=rag_files, save=save, approved=pending)
+    with runenv.use(runenv.of(not d.get("draft"))):
+        out = step_engine.run_steps(agent, agent_id=agent_id, user=user, run=run, rag_files=rag_files, save=save, approved=pending)
     out["ended_at"] = step_engine.now_iso() if out["status"] != "waiting_approval" else None
     save(out)
     return _public(snap.id, {**d, **out})

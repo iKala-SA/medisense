@@ -16,7 +16,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from google.cloud import firestore
@@ -24,13 +24,13 @@ from google.cloud import firestore
 from .. import db
 from ..auth import User, current_user, require_builder
 from ..config import settings
-from ..engine import chat_images, deid, llm, routing
+from ..engine import bigquery, chat_images, deid, llm, routing
 from ..engine import connectors as connectors_engine
 from ..engine import db_tools
 from ..engine.extract import NoTextError, extract_text
-from ..schemas import DEPARTMENTS, AgentIn, AttachmentOut, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments
+from ..schemas import DEPARTMENTS, AgentIn, ApproveRequest, AttachmentOut, CapConnector, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments, StepTrace
 from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
-from .runs import _agent_def, execute_run
+from .runs import RunStopped, _agent_def, can_decide, decide_pending, execute_run
 from .originals import access_for
 from .projects import own_project
 from .spaces import _load_editable, add_documents, doc_visible
@@ -86,6 +86,34 @@ def _attachment_context(sess: dict) -> str:
     return f"以下為使用者上傳的附件內容（已去識別化），回答時可引用：\n{body}"
 
 
+def my_connector_caps(user: User) -> list[CapConnector]:
+    """Every action of every gateway-backed connector this user may use (owner, shared, account-wide), as agent capabilities:
+    reads run as the user, writes pause for the user's confirmation. A connector the user has not connected yet still shows up;
+    calling it answers with the "請先連線" message, which is the right hint. Admin-only types (webhook, slack, mcp...) stay with
+    agents that were built with them."""
+    from .my_connectors import _visible
+
+    per_connector: list[list[CapConnector]] = []
+    for cid, snap in sorted(_visible(user).items(), key=lambda kv: (kv[1].to_dict() or {}).get("label", "")):
+        d = snap.to_dict() or {}
+        cfg = d.get("config") or {}
+        if d.get("type") == "calendar":
+            reads, writes = connectors_engine.calendar_allowed(cfg)
+            actions = [*reads, *writes]
+        elif d.get("type") == "gateway":
+            actions = list(cfg.get("allowed_actions") or [])
+        else:
+            actions = []
+        if actions:
+            per_connector.append([CapConnector(connector_id=cid, action=a, require_approval=True) for a in actions])
+    # Round-robin across connectors: every allowed action is offered (no cap), the interleaving only keeps each service
+    # represented early in the tool list.
+    caps: list[CapConnector] = []
+    for i in range(max((len(x) for x in per_connector), default=0)):
+        caps.extend(x[i] for x in per_connector if i < len(x))
+    return caps
+
+
 def _prepare(body: ChatRequest, user: User) -> dict:
     """Resolve agent, knowledge scope, model pin and session for one chat turn -> execute_run keyword arguments."""
     if body.model and body.model not in {m["id"] for m in llm.model_catalog()}:
@@ -102,6 +130,12 @@ def _prepare(body: ChatRequest, user: User) -> dict:
         agent = agent.model_copy(update={"skill_ids": list(dict.fromkeys([*agent.skill_ids, *body.skill_ids]))})
     if not chosen and body.db_connectors:  # what each database returns is still decided by THIS user's group rules at call time
         agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"db_connectors": list(dict.fromkeys(body.db_connectors))})})
+    if not chosen:  # general chat: the connectors shared with this user (the + menu's 連接器 list) are offered as tools, writes confirmed by the user
+        mine = my_connector_caps(user)
+        if mine:
+            known = {(c.connector_id, c.action) for c in agent.capabilities.connectors}
+            offered = [*agent.capabilities.connectors, *[c for c in mine if (c.connector_id, c.action) not in known]]
+            agent = agent.model_copy(update={"capabilities": agent.capabilities.model_copy(update={"connectors": offered})})  # no cap: every allowed action
 
     doc_ids = []
     if chosen:  # a picked agent does exactly what it was built to do: its own knowledge (and spaces, by YOUR rights), its connectors, no wider scope
@@ -135,12 +169,15 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     if body.project_id and not existing.get("project_id"):  # only a conversation without a project can be filed
         own_project(body.project_id, user)
         extra["project_id"] = body.project_id
+    # Chat always runs the live definition (published snapshot or the built-in assistant): production, never the sandbox.
+    # Without this flag every connector write in chat was only simulated ("沙盒模擬") and the session was filed as a sandbox run.
     return dict(agent=agent, rag_files=rag_files, agent_id=agent_id, user=user, message=body.message, session_id=session_id,
-                audit_action="chat.run",
+                use_published=True, audit_action="chat.run",
                 audit_extra={"model_group": body.model_group, "pinned_model": body.model or "", "web_search": (agent.capabilities.web_search if chosen else body.web_search), "knowledge_docs": len(doc_ids),
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
-                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None)
+                pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None,
+                message_images=chat_images.unsent_ids(existing))
 
 
 @router.get("/agents/{agent_id}")
@@ -164,13 +201,8 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
         act = next((a for a in acts if a["id"] == action), None) if isinstance(acts, list) else None
         cons.append({"id": cid, "service": d.get("service") or d.get("type", ""), "label": d.get("label") or d.get("name") or spec.get("label") or d.get("type", ""),
                      "action": (act or {}).get("label") or action})
-    dbs = []  # databases the agent lists, and whether THIS user's group rules let them query it
-    for c, g in db_tools.grants_for(agent.capabilities.db_connectors, user.email):
-        dbs.append({"id": c["id"], "name": c.get("name", ""), "kind": c.get("kind", ""), "allowed": True, "queries": len(g["queries"]), "views": len(g["views"])})
-    granted = {d["id"] for d in dbs}
-    for cid in agent.capabilities.db_connectors:
-        if cid not in granted and (snap := db.client().collection("db_connectors").document(cid).get()).exists:
-            dbs.append({"id": cid, "name": (snap.to_dict() or {}).get("name", ""), "kind": (snap.to_dict() or {}).get("kind", ""), "allowed": False, "queries": 0, "views": 0})
+    dbs = [{"id": c["id"], "name": c.get("name", ""), "kind": c.get("kind", ""), "allowed": True}  # MVP: anyone using the agent
+           for c in db_tools.connectors_for(agent.capabilities.db_connectors)]
     inputs = [{"id": st.id, "type": st.type, "title": st.title, "placeholder": st.config.get("placeholder", ""), "default": st.config.get("default", ""),
                "allow_override": st.config.get("allow_override", True), "required": st.config.get("required", True)}
               for st in agent.steps if st.enabled and st.type in ("text_input", "file_upload")]
@@ -180,8 +212,30 @@ def agent_profile(agent_id: str, user: User = Depends(current_user)):
 
 
 @router.post("", response_model=RunResponse)
-def chat(body: ChatRequest, user: User = Depends(current_user)):
-    return execute_run(**_prepare(body, user))
+def chat(body: ChatRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
+    with bigquery.user_token(x_bigquery_auth):  # the user's own short-lived Google token, never stored
+        return execute_run(**_prepare(body, user))
+
+
+@router.post("/approve", response_model=RunResponse)
+def chat_approve(body: ApproveRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
+    """The person chatting confirms (approve) or cancels (reject) the action their conversation paused on: a connector write
+    the agent's capability marks 需核准, e.g. creating a calendar event or a Google Doc on that user's own account. Owner-level
+    pauses (a canvas approval node) still need the agent owner or an admin (403 here)."""
+    sess_ref = db.client().collection("sessions").document(body.session_id)
+    sess = sess_ref.get().to_dict()
+    if not sess or sess.get("uid") != user.uid:
+        raise HTTPException(404, "session not found")
+    pending = sess.get("pending")
+    if not pending:
+        raise HTTPException(409, "nothing is waiting for approval in this session")
+    agent_id = str(pending.get("agent_id") or sess.get("agent_id") or "")
+    snap = db.client().collection("agents").document(agent_id).get() if agent_id else None
+    if snap is None or not snap.exists:
+        raise HTTPException(404, "agent not found")
+    if not can_decide(snap.to_dict() or {}, sess, user):
+        raise HTTPException(403, "此動作需要 Agent 負責人或管理員核准")
+    return decide_pending(agent_id, sess_ref, sess, user, body.approve, x_bigquery_auth)
 
 
 def _sse(event: dict) -> bytes:
@@ -189,13 +243,31 @@ def _sse(event: dict) -> bytes:
 
 
 @router.post("/stream")
-async def chat_stream(body: ChatRequest, user: User = Depends(current_user)):
+async def chat_stream(body: ChatRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
     kwargs = await run_in_threadpool(_prepare, body, user)  # validation errors are plain HTTP errors, before the stream opens
     events: queue.Queue = queue.Queue()
+    stop = threading.Event()  # set when the client closes the stream (停止, a new chat, a closed tab)
+    draft, steps = {"text": ""}, []
+
+    def emit(ev: dict) -> None:
+        """Feeds the stream and keeps the answer so far (the same rules as the browser's reduceRun)."""
+        if stop.is_set():
+            raise RunStopped(draft["text"], steps)
+        kind = ev.get("event")
+        if kind == "step_start" and ev.get("type") == "turn":
+            draft["text"] = ""
+        elif kind == "delta" and ev.get("kind") != "thought":
+            draft["text"] += ev.get("text", "")
+        elif kind == "step_skip":  # a turn that ended in tool calls was a decision, not the answer
+            draft["text"] = ""
+        elif kind == "step_done":
+            steps.append(StepTrace(**ev["step"]))
+        events.put(ev)
 
     def work():
         try:
-            r = execute_run(**kwargs, emit=events.put)
+            with bigquery.user_token(x_bigquery_auth):
+                r = execute_run(**kwargs, emit=emit)
             events.put({"event": "done", "result": r.model_dump()})
         except HTTPException as exc:
             events.put({"event": "error", "status": exc.status_code, "detail": str(exc.detail)})
@@ -208,9 +280,13 @@ async def chat_stream(body: ChatRequest, user: User = Depends(current_user)):
     threading.Thread(target=work, daemon=True).start()
 
     async def gen():
-        yield b": open\n\n"
-        while (item := await asyncio.to_thread(events.get)) is not None:
-            yield _sse(item)
+        try:
+            yield b": open\n\n"
+            yield _sse({"event": "session", "session_id": kwargs["session_id"]})  # so a stopped first turn still belongs to this chat
+            while (item := await asyncio.to_thread(events.get)) is not None:
+                yield _sse(item)
+        finally:  # the client went away (or the run finished): stop at the next token or step
+            stop.set()
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
@@ -269,7 +345,8 @@ async def _add_image(file: UploadFile, session_id: str | None, user: User) -> At
     except Exception as exc:  # noqa: BLE001 - redaction failed: nothing is stored and nothing reaches a model
         log.exception("image redaction failed")
         raise HTTPException(502, "圖片的個資遮蔽失敗，未上傳；請稍後再試") from exc
-    sess["attachments"] = [*atts, {"id": aid, "name": name, "chars": 0, "kind": "image", "mime": mime, "blob": path, "text": "", "at": db.now()}]
+    sess["attachments"] = [*atts, {"id": aid, "name": name, "chars": 0, "kind": "image", "mime": mime, "blob": path, "text": "", "at": db.now(),
+                                "msg_at": len(sess.get("messages") or [])}]  # sent with the next user message
     sess["updated_at"] = db.now()
     sess["expire_at"] = db.expiry(settings().session_retention_days)
     ref.set(sess)
@@ -279,12 +356,22 @@ async def _add_image(file: UploadFile, session_id: str | None, user: User) -> At
 
 @router.get("/attachments/{session_id}/{att_id}/image")
 def attachment_image(session_id: str, att_id: str, user: User = Depends(current_user)):
-    """The stored (redacted) copy of one of the caller's own images, for the thumbnail."""
+    """The stored (redacted) copy of one of the caller's own images, for the thumbnail (also in a reopened conversation).
+    Same rule as GET /api/sessions/{id}: owner only, 404 otherwise. 410 when the image was removed or has expired.
+    There is no unredacted original to return: only the redacted copy was ever stored."""
     sess = db.client().collection("sessions").document(session_id).get().to_dict() or {}
-    att = next((a for a in sess.get("attachments") or [] if a.get("id") == att_id and a.get("kind") == "image"), None)
-    if not att or sess.get("uid") != user.uid:
+    if not sess or sess.get("uid") != user.uid:
         raise HTTPException(404, "image not found")
-    return Response(chat_images.load(att["blob"]), media_type=att.get("mime", "image/png"), headers={"Cache-Control": "private, max-age=300"})
+    att = next((a for a in sess.get("attachments") or [] if a.get("id") == att_id and a.get("kind") == "image"), None)
+    if not att:
+        if any(att_id in (m.get("images") or []) for m in sess.get("messages") or []):
+            raise HTTPException(410, "image expired")
+        raise HTTPException(404, "image not found")
+    try:
+        data = chat_images.load(att["blob"])
+    except chat_images.Gone as exc:
+        raise HTTPException(410, "image expired") from exc
+    return Response(data, media_type=att.get("mime", "image/png"), headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.delete("/attachments/{session_id}/{att_id}", status_code=204)

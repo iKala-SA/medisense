@@ -1,5 +1,7 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube} from '@phosphor-icons/react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {fitMenu} from '../fitMenu';
+import {Plus,MagnifyingGlass,DotsThree,Chat,PencilSimple,Copy,DownloadSimple,Export,Trash,Sparkle,FileArrowUp,FilePlus,ListChecks,Cube,TreeStructure} from '@phosphor-icons/react';
 import {api} from '../api';
 import {ShareDialog} from '../live/ShareLive';
 import {canEditAgent,errText,isMine} from '../live/kit';
@@ -9,25 +11,49 @@ const TABS=[['all','全部'],['mine','我的'],['published','已發布']];
 const ago=t=>{if(!t)return '';const d=new Date(t);if(isNaN(d))return '';const m=(Date.now()-d)/60000;return m<1?'剛剛':m<60?`${Math.round(m)} 分鐘前`:m<1440?`${Math.round(m/60)} 小時前`:`${Math.round(m/1440)} 天前`};
 const download=(name,obj)=>{const u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)};
 
+/* The row menu is drawn on <body>, anchored to its button: the list card clips anything that sticks out of it. */
+function RowMenu({anchor,onClose,children}){
+  const ref=useRef(null),r=anchor.getBoundingClientRect(),up=window.innerHeight-r.bottom<300&&r.top>window.innerHeight-r.bottom;
+  useLayoutEffect(()=>{fitMenu(ref.current)},[]);
+  useEffect(()=>{const k=e=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',k);window.addEventListener('resize',onClose);return()=>{window.removeEventListener('keydown',k);window.removeEventListener('resize',onClose)}},[onClose]);
+  return createPortal(<><div className="ag-dismiss" onClick={onClose}/><div ref={ref} className="ag-menu fixed" role="menu" onClick={onClose}
+    style={{position:'fixed',right:Math.max(8,window.innerWidth-r.right),...(up?{bottom:window.innerHeight-r.top+6}:{top:r.bottom+6})}}>{children}</div></>,document.body);
+}
+
 function Row({flow,a,me,onOpen,onChat,onDup,onShare,onDelete}){
-  const [menu,setMenu]=useState(false),edit=canEditAgent(a,me),mine=isMine(a,me),pub=a.status==='published';
+  const [menu,setMenu]=useState(false),btn=useRef(null),edit=canEditAgent(a,me),mine=isMine(a,me),pub=a.status==='published';
   const st=a.review?.state==='pending'?['待審核','warn']:a.review?.state==='rejected'?['已退回','bad']:pub?[`已發布 v${a.version}`,'ok']:['草稿',''];
   return <div className="ag-row2" role="row">
-    <button className="nm" onClick={flow?onOpen:edit?onOpen:pub?onChat:undefined}><span className="ag-icon-tile">{a.icon||<Cube size={20}/>}</span>
+    <button className="nm" onClick={flow?onOpen:edit?onOpen:pub?onChat:undefined}><span className="ag-icon-tile">{a.icon||(flow?<TreeStructure size={20}/>:<Cube size={20}/>)}</span>
       <span className="tx"><b title={a.name}>{a.name}</b><small>{a.description||'（尚無說明）'}</small>
         {(a.steps?.length>0||a.capabilities?.web_search||a.capabilities?.connectors?.length>0)&&<span className="tags">{a.steps?.length>0&&<span className="ag-chip"><ListChecks size={12}/>{a.steps.length} 步流程</span>}{a.capabilities?.web_search&&<span className="ag-chip">網路搜尋</span>}{a.capabilities?.connectors?.length>0&&<span className="ag-chip">{a.capabilities.connectors.length} 個連接器</span>}</span>}</span></button>
     <span className="st"><span className={'ag-badge '+st[1]}>{st[0]}</span></span>
     <span className="own">{mine?'我':(a.owner_email||'').split('@')[0]}</span><span className="when">{ago(a.updated_at)}</span>
     <span className="act">{pub&&!flow&&<button className="ag-btn primary" onClick={onChat}><Chat size={15}/>對話</button>}{edit?<button className="ag-btn" onClick={onOpen}>編輯</button>:flow&&<button className="ag-btn primary" onClick={onOpen}>執行</button>}
-      <span className="ag-menuwrap"><button className="ag-icon" aria-label={`「${a.name}」的更多選項`} aria-haspopup="menu" onClick={()=>setMenu(m=>!m)}><DotsThree size={20} weight="bold"/></button>
-        {menu&&<><div className="ag-dismiss" onClick={()=>setMenu(false)}/><div className="ag-menu" role="menu" onClick={()=>setMenu(false)}>
+      <span className="ag-menuwrap"><button ref={btn} className="ag-icon" aria-label={`「${a.name}」的更多選項`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(m=>!m)}><DotsThree size={20} weight="bold"/></button>
+        {menu&&btn.current&&<RowMenu anchor={btn.current} onClose={()=>setMenu(false)}>
           {edit&&<button role="menuitem" onClick={onOpen}><PencilSimple size={16}/>編輯</button>}
           {pub&&!flow&&<button role="menuitem" onClick={onChat}><Chat size={16}/>開始對話</button>}
           <button role="menuitem" onClick={onDup}><Copy size={16}/>複製為新草稿</button>
           <button role="menuitem" onClick={()=>download(a.name+'.json',agentToIn(a))}><DownloadSimple size={16}/>匯出 JSON</button>
           {edit&&<button role="menuitem" onClick={onShare}><Export size={16}/>分享</button>}
-          {edit&&<><hr/><button role="menuitem" className="danger" onClick={onDelete}><Trash size={16}/>刪除</button></>}</div></>}</span></span>
+          {edit&&<><hr/><button role="menuitem" className="danger" onClick={onDelete}><Trash size={16}/>刪除</button></>}</RowMenu>}</span></span>
   </div>;
+}
+
+/* 待審核的發布申請 (admins): the review queue that used to live on the sandbox page. */
+function ReviewQueue({kind,notify,onChanged}){
+  const [rows,setRows]=useState(null),[busy,setBusy]=useState(''),[rej,setRej]=useState(null),[reason,setReason]=useState('');
+  const load=()=>api.reviewQueue().then(l=>setRows((l||[]).filter(a=>(a.kind||(a.steps?.length?'flow':'agent'))===kind))).catch(()=>setRows([]));
+  useEffect(()=>{load()},[kind]);// eslint-disable-line
+  if(!rows?.length)return null;
+  const decide=async(a,approve)=>{setBusy(a.id);try{await api.reviewAgent(a.id,approve,approve?'':reason);setRej(null);setReason('');notify(approve?`已核准並發布「${a.name}」`:'已退回申請');await load();onChanged?.()}catch(e){notify(errText(e))}finally{setBusy('')}};
+  return <section className="ag-review" aria-label="待審核的發布申請"><h2><ListChecks size={16}/>待審核的發布申請<span>{rows.length}</span></h2>
+    {rows.map(a=><div className="ag-rv-row" key={a.id}>
+      <div className="tx"><b>{a.name} <small>v{a.review.version}</small></b><small>申請人 {a.review.requested_by_email} · {ago(a.review.requested_at)}</small></div>
+      {rej===a.id?<div className="ag-rv-rej"><input autoFocus placeholder="退回原因（必填）" value={reason} onChange={e=>setReason(e.target.value)}/><button className="ag-btn" disabled={!!busy||!reason.trim()} onClick={()=>decide(a,false)}>確認退回</button><button className="ag-btn" onClick={()=>setRej(null)}>取消</button></div>
+        :<div className="ag-rv-act"><button className="ag-btn" disabled={!!busy} onClick={()=>setRej(a.id)}>退回</button><button className="ag-btn primary" disabled={!!busy} onClick={()=>decide(a,true)}>{busy===a.id?'處理中…':'核准並發布'}</button></div>}
+    </div>)}</section>;
 }
 
 const kindOf=a=>a.kind||(a.steps?.length?'flow':'agent');
@@ -52,11 +78,12 @@ export default function AgentList({kind='agent',me,notify,onOpen,onCreateChat,on
   return <div className="ag-catalog">
     <header className="ag-lhead"><div><h1>{noun}</h1><p>{flow?'把固定的工作做成流程：輸入、查資料、產出、寄送，一次設定，反覆執行。':'探索專科助理，或建立你自己的 Agent。'}</p></div>
       {builder&&<div className="ag-menuwrap"><button className="ag-btn primary" disabled={busy} onClick={()=>setCreate(c=>!c)}><Plus size={16}/>建立{flow?'':' '}{noun}</button>
-        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" role="menu" onClick={()=>setCreate(false)}>
+        {create&&<><div className="ag-dismiss" onClick={()=>setCreate(false)}/><div className="ag-menu wide" ref={el=>fitMenu(el)} role="menu" onClick={()=>setCreate(false)}>
           <button role="menuitem" onClick={onCreateChat}><Sparkle size={17}/><span><b>用對話建立</b><small>{flow?'描述你要的流程，系統產生步驟草稿':'描述你要的助理，系統產生設定草稿'}</small></span></button>
           <button role="menuitem" onClick={blank}><FilePlus size={17}/><span><b>空白建立</b><small>從空白表單開始</small></span></button>
           <button role="menuitem" onClick={()=>file.current?.click()}><FileArrowUp size={17}/><span><b>匯入 JSON</b><small>匯入匯出的定義檔</small></span></button></div></>}
         <input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{e.target.files[0]&&importJson(e.target.files[0]);e.target.value=''}}/></div>}</header>
+    {me.role==='admin'&&<ReviewQueue kind={kind} notify={notify} onChanged={load}/>}
     <div className="ag-toolbar"><label className="ag-search"><MagnifyingGlass size={16}/><input aria-label="搜尋" placeholder={`搜尋${noun}、說明或負責人`} value={q} onChange={e=>setQ(e.target.value)}/></label>
       <div className="ag-seg">{TABS.map(([v,l])=><button key={v} className={tab===v?'on':''} onClick={()=>setTab(v)}>{l}</button>)}</div></div>
     {agents===null?<p className="ag-muted center">載入中…</p>

@@ -30,7 +30,7 @@ const STATUS={active:['ok','已連線（測試通過）'],error:['err','連線�
 export const StatusPill=({status})=>{const [c,t]=STATUS[status]||STATUS.unverified;return <span className={'lv-p-status '+c}><i/>{t}</span>};
 const isOauth=t=>t?.auth==='user_oauth';
 const canEdit=(me,c,t)=>!!me&&(c.type==='gateway'?me.role==='admin':true)&&(me.role==='admin'||(c.owner_uid===me.uid&&!isOauth(t)));
-const PERM_TITLE={allowed_actions:'管理讀取許可',write_actions:'管理寫入許可（尚未開放）'};
+const PERM_TITLE={allowed_actions:'管理讀取許可',write_actions:'管理寫入許可'};
 const MY_STATE={connected:['ok','已連線'],not_connected:['','未連線'],reauth_required:['warn','需重新授權'],unavailable:['err','暫時無法使用'],shared:['ok','可使用（管理員共用）']};
 const myChip=c=>c.state==='unavailable'?MY_STATE.unavailable:(c.state==='shared'||(c.mode==='none'&&c.state!=='connected'))?(c.mode==='none'?['ok','無需授權']:MY_STATE.shared):MY_STATE[c.state]||['','狀態未知'];
 // 常用連接器: custom MCP servers plus the Open Connector services of Google, Microsoft and Slack.
@@ -59,13 +59,15 @@ function MyConnections({notify,onChanged,reloadKey,query=''}){
   };
   const nq=query.trim().toLowerCase(),shown=(items||[]).filter(c=>!nq||(c.label+(c.service||'')+(c.description||'')).toLowerCase().includes(nq));
   return <section className="lv-mc">
-    <p>授權後，Medisense 只會以您自己的帳號讀取資料；其他人看不到您的內容，您可隨時中斷連線。</p>
+    <p>授權後，Medisense 只會以您自己的帳號存取資料（讀取，以及管理員開放的建立、修改動作，執行前會先請您確認）；其他人看不到您的內容，您可隨時中斷連線。</p>
     {items===null?<Loading/>:shown.length?<div className="lv-p-cards">{shown.map(c=>{
       const [cls,txt]=myChip(c),ok=c.state==='connected',working=busy===c.id,actionable=c.mode==='user_oauth'&&(c.state==='not_connected'||c.state==='reauth_required');
       return <div key={c.id} className="lv-p-card">
         <div className="lv-p-card-head">{c.service?<ProviderIcon service={c.service} name={c.label} size={40}/>:<span className="connector-icon"><TypeIcon id={c.type}/></span>}<div style={{minWidth:0}}><h3>{c.label}</h3></div></div>
         {c.description&&<p>{c.description}</p>}
         {c.problem&&c.state!=='connected'&&c.state!=='shared'&&<p style={{color:'#8a5a00'}}>{c.problem}</p>}
+        {c.state==='reauth_required'&&c.missing_scopes?.length>0&&<p style={{color:'#8a5a00'}}>管理員開放了新的動作（{(c.write_actions||[]).join('、')||'寫入'}），需要重新授權一次才能使用。</p>}
+        {c.write_actions?.length>0&&c.state!=='reauth_required'&&<p className="lv-p-meta">可寫入：{c.write_actions.join('、')}</p>}
         <div className="lv-p-card-foot"><span className={'lv-p-status '+cls}><i/>{txt}{ok&&c.account_label?' · '+c.account_label:''}</span>
           {ok&&c.mode!=='shared'&&c.mode!=='none'?<button className="btn sm" disabled={working} onClick={()=>disconnect(c)}>中斷連線</button>
             :!actionable?null

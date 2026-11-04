@@ -4,13 +4,16 @@ A connector is a hospital-wide shared object: `type` picks a spec from TYPES (wh
 which are secrets, which actions exist), `config` holds the non-secret fields, `secrets` maps secret
 fields to Secret Manager names. The canvas `tool` node references a connector id + action.
 
-Status of each type (decided 2026-10-24):
-  real now : mcp (Streamable HTTP), webhook, slack, teams, notion, calendar (per-user OAuth through Open Connector, read-only)
+Status of each type (decided 2026-10-24, calendar writes opened 2026-11-03):
+  real now : mcp (Streamable HTTP), webhook, slack, teams, notion, calendar (per-user OAuth through Open Connector: reads, and the
+             write actions an admin ticks: quick_add_event / create_event / patch_event / delete_event), gateway (any Open Connector
+             service enabled from the catalog, e.g. Google Docs `googledocs.create_document`)
   catalog  : gmail / drive (same gateway, next), his_fhir, pacs (nothing to connect to)
 """
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 
@@ -47,8 +50,74 @@ CALENDAR_ACTIONS = [
                                      {"key": "timeMax", "label": "迄（ISO 8601）", "kind": "text"}], write=False),
     _a("free_busy_query", "查忙碌時段", [{"key": "timeMin", "label": "起（ISO 8601）", "kind": "text"},
                                          {"key": "timeMax", "label": "迄（ISO 8601）", "kind": "text"}], write=False),
+    # Write actions (gateway input: {calendarId, event: {...}, sendUpdates}); the flat args below are folded into `event`.
+    _a("quick_add_event", "快速建立事件（自然語言）", [{"key": "text", "label": "事件描述，例如「明天下午三點 與心臟科討論 30 分鐘」", "kind": "text", "required": True},
+                                                      {"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                                      {"key": "sendUpdates", "label": "通知與會者：all / externalOnly / none", "kind": "text"}]),
+    _a("create_event", "建立事件", [{"key": "summary", "label": "標題", "kind": "text", "required": True},
+                                    {"key": "start", "label": "開始（ISO 8601，例如 2026-11-04T15:00:00+08:00；全天用 2026-11-04）", "kind": "text", "required": True},
+                                    {"key": "end", "label": "結束（ISO 8601；全天事件為結束日的次日）", "kind": "text", "required": True},
+                                    {"key": "description", "label": "說明", "kind": "textarea"},
+                                    {"key": "location", "label": "地點", "kind": "text"},
+                                    {"key": "attendees", "label": "與會者 email（逗號分隔）", "kind": "text"},
+                                    {"key": "timeZone", "label": "時區（預設 Asia/Taipei）", "kind": "text"},
+                                    {"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                    {"key": "sendUpdates", "label": "通知與會者：all / externalOnly / none", "kind": "text"}]),
+    _a("patch_event", "修改事件", [{"key": "eventId", "label": "事件 ID", "kind": "text", "required": True},
+                                   {"key": "summary", "label": "標題", "kind": "text"},
+                                   {"key": "start", "label": "開始（ISO 8601）", "kind": "text"},
+                                   {"key": "end", "label": "結束（ISO 8601）", "kind": "text"},
+                                   {"key": "description", "label": "說明", "kind": "textarea"},
+                                   {"key": "location", "label": "地點", "kind": "text"},
+                                   {"key": "attendees", "label": "與會者 email（逗號分隔，取代原名單）", "kind": "text"},
+                                   {"key": "timeZone", "label": "時區（預設 Asia/Taipei）", "kind": "text"},
+                                   {"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                   {"key": "sendUpdates", "label": "通知與會者：all / externalOnly / none", "kind": "text"}]),
+    _a("delete_event", "刪除事件", [{"key": "eventId", "label": "事件 ID", "kind": "text", "required": True},
+                                    {"key": "calendarId", "label": "日曆（預設 primary）", "kind": "text"},
+                                    {"key": "sendUpdates", "label": "通知與會者：all / externalOnly / none", "kind": "text"}]),
 ]
 CALENDAR_READ = [a["id"] for a in CALENDAR_ACTIONS if not a["write"]]
+CALENDAR_WRITE = [a["id"] for a in CALENDAR_ACTIONS if a["write"]]
+# Google scopes the gateway's googlecalendar provider declares for these actions (src/providers/googlecalendar/scopes.ts).
+CALENDAR_READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+DEFAULT_TZ = "Asia/Taipei"
+SEND_UPDATES = {"all", "externalOnly", "none"}
+
+
+def calendar_allowed(config: dict) -> tuple[list[str], list[str]]:
+    """(read actions, write actions) an admin allowed on a calendar connector. Reads default to all; writes default to none."""
+    reads = [a for a in (config.get("allowed_actions") or CALENDAR_READ) if a in CALENDAR_READ]
+    writes = [a for a in (config.get("write_actions") or []) if a in CALENDAR_WRITE]
+    return reads, writes
+
+
+def calendar_scopes(config: dict) -> list[str]:
+    """Google data scopes every user's grant must carry for the actions this connector allows."""
+    reads, writes = calendar_allowed(config)
+    return [*([CALENDAR_READ_SCOPE] if reads else []), *([CALENDAR_WRITE_SCOPE] if writes else [])]
+
+
+def oauth_scopes(type_: str, config: dict) -> list[str]:
+    """What the gateway should request from users for a per-user OAuth type: data scopes + identity (to label the account)."""
+    if type_ == "calendar":
+        return [*calendar_scopes(config), "openid", "email"]
+    return []
+
+
+def required_scopes(doc: dict) -> list[str]:
+    """Data scopes a user's grant needs to use this connector (empty = unknown / not applicable)."""
+    cfg = doc.get("config") or {}
+    if doc.get("type") == "calendar":
+        return calendar_scopes(cfg)
+    if doc.get("type") == "gateway":
+        return [s for s in (cfg.get("scopes") or []) if s not in ga.IDENTITY_SCOPES]
+    return []
+
+
+def has_write_actions(type_: str, config: dict) -> bool:
+    return type_ == "calendar" and bool(calendar_allowed(config)[1])
 
 
 TYPES: dict[str, dict] = {
@@ -134,17 +203,17 @@ TYPES: dict[str, dict] = {
     "calendar": {
         "label": "Google Calendar", "category": "gws", "protocol": "OAuth 2.0 · 每位使用者各自授權", "icon": "calendar_month", "badge": "每人各自授權",
         "available": True, "auth": "user_oauth", "oc_service": "googlecalendar",
-        "description": "讓 Agent 與工作台讀取使用者自己的 Google 日曆（目前唯讀）。每位使用者各自授權，只看得到自己的日曆；寫入動作尚未開放。",
+        "description": "讓 Agent 與工作台讀取使用者自己的 Google 日曆，並可開放建立、修改、刪除事件。每位使用者各自授權，只動得到自己的日曆；"
+                       "寫入動作在對話中執行前會先請使用者確認（Agent 能力的「需核准」），在草稿沙盒中只會模擬。",
         "fields": [
             _f("allowed_actions", "允許的讀取動作", "checkboxes", default=list(CALENDAR_READ), section="permissions",
                hint="管理讀取許可：只有勾選的動作能被 Agent 呼叫。",
                options=[{"value": a["id"], "label": f"{a['label']} · {a['id']}"} for a in CALENDAR_ACTIONS if not a["write"]]),
             _f("write_actions", "寫入動作（建立、修改、刪除事件）", "checkboxes", default=[], section="permissions",
-               hint="管理寫入許可：尚未開放。開放後會強制放在核准節點之後。",
-               options=[{"value": "create_event", "label": "create_event · 建立事件（尚未開放）", "disabled": True},
-                        {"value": "patch_event", "label": "patch_event · 修改事件（尚未開放）", "disabled": True}]),
+               hint="管理寫入許可：勾選後使用者授權時會多要求 calendar.events 權限；已連線的使用者需重新授權一次。",
+               options=[{"value": a["id"], "label": f"{a['label']} · {a['id']}"} for a in CALENDAR_ACTIONS if a["write"]]),
         ],
-        "actions": [a for a in CALENDAR_ACTIONS if not a["write"]],
+        "actions": list(CALENDAR_ACTIONS),
     },
     "drive": {
         "label": "Google Drive 文件病歷附檔庫", "category": "gws", "protocol": "Service Account · Drive API", "icon": "cloud", "badge": "GWS 官方認證",
@@ -419,6 +488,18 @@ def test_gateway(config: dict, connector_id: str) -> dict:
         return {"ok": False, "message": f"{exc.__class__.__name__}: {exc}"[:400], "ms": int((time.perf_counter() - t0) * 1000)}
 
 
+def sync_oauth_scopes(type_: str, config: dict) -> list[str]:
+    """Per-user OAuth types: tell the gateway which scopes every user's grant must request for the actions this connector
+    allows (least privilege, same as the catalog wizard). Returns the scopes pushed, [] when nothing was pushed.
+    Raises OpenConnectorError when the gateway refused (the caller decides whether that blocks the save)."""
+    if not is_user_oauth(type_) or not oc.configured():
+        return []
+    scopes = oauth_scopes(type_, config)
+    service = TYPES[type_]["oc_service"]
+    oc.save_oauth_client(service, ga.platform_client(service), scopes, set())
+    return scopes
+
+
 def _int(v: Any, default: int) -> int:
     try:
         return max(1, min(int(str(v).strip()), 250))
@@ -426,17 +507,71 @@ def _int(v: Any, default: int) -> int:
         return default
 
 
+def _event_time(value: Any, tz: str) -> dict:
+    """Google's EventDateTime: a bare date is an all-day boundary, anything else a timestamp (with the zone when it has no offset)."""
+    v = str(value).strip()
+    if len(v) == 10 and v[4] == "-" and v[7] == "-":
+        return {"date": v}
+    if v.endswith("Z") or (len(v) > 6 and v[-6] in "+-" and v[-3] == ":"):
+        return {"dateTime": v}
+    return {"dateTime": v, "timeZone": tz}
+
+
+def _event_body(clean: dict) -> dict:
+    """The gateway's `event` object from the flat tool arguments."""
+    tz = str(clean.get("timeZone") or DEFAULT_TZ)
+    event: dict[str, Any] = {k: str(clean[k]) for k in ("summary", "description", "location") if k in clean}
+    for k in ("start", "end"):
+        if k in clean:
+            event[k] = _event_time(clean[k], tz)
+    if "attendees" in clean:
+        raw = clean["attendees"]
+        emails = raw if isinstance(raw, list) else [e for e in re.split(r"[,\s;]+", str(raw)) if e]
+        event["attendees"] = [{"email": str(e.get("email") if isinstance(e, dict) else e).strip()} for e in emails if e]
+    return event
+
+
+def _calendar_write_payload(action: str, clean: dict, cal: str) -> dict:
+    payload: dict[str, Any] = {"calendarId": cal}
+    if str(clean.get("sendUpdates") or "") in SEND_UPDATES:
+        payload["sendUpdates"] = str(clean["sendUpdates"])
+    if action == "quick_add_event":
+        if not clean.get("text"):
+            raise RuntimeError("quick_add_event 需要 text（事件描述）")
+        return {**payload, "text": str(clean["text"])}
+    if action == "delete_event":
+        if not clean.get("eventId"):
+            raise RuntimeError("delete_event 需要 eventId")
+        return {**payload, "eventId": str(clean["eventId"])}
+    event = _event_body(clean)
+    if action == "create_event":
+        missing = [k for k in ("summary", "start", "end") if k not in event]
+        if missing:
+            raise RuntimeError(f"create_event 需要 {'、'.join(missing)}")
+        return {**payload, "event": event}
+    if not clean.get("eventId"):  # patch_event
+        raise RuntimeError("patch_event 需要 eventId")
+    if not event:
+        raise RuntimeError("patch_event 沒有任何要修改的欄位")
+    return {**payload, "eventId": str(clean["eventId"]), "event": event}
+
+
 def _calendar_call(config: dict, action: str, args: dict, user_id: str | None) -> str:
-    """One read-only Google Calendar action as the *running user*, through the Open Connector gateway."""
+    """One Google Calendar action as the *running user*, through the Open Connector gateway. Reads are allowed by
+    `allowed_actions`, writes only by `write_actions` (both set by the admin on the connector)."""
     if not user_id:
         raise RuntimeError("需要使用者身分才能呼叫個人日曆")
-    allowed = config.get("allowed_actions") or CALENDAR_READ
-    if action not in CALENDAR_READ or action not in allowed:
-        raise RuntimeError(f"此連接器未允許動作 {action}（目前僅開放唯讀動作）")
+    reads, writes = calendar_allowed(config)
+    if action in CALENDAR_WRITE and action not in writes:
+        raise RuntimeError(f"此連接器未允許動作 {action}（管理員尚未開放此寫入動作）")
+    if action not in CALENDAR_WRITE and (action not in CALENDAR_READ or action not in reads):
+        raise RuntimeError(f"此連接器未允許動作 {action}")
     cal = str(args.get("calendarId") or "primary")
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     clean = {k: v for k, v in args.items() if v not in ("", None)}
-    if action == "list_calendars":
+    if action in CALENDAR_WRITE:
+        payload = _calendar_write_payload(action, clean, cal)
+    elif action == "list_calendars":
         payload = {"maxResults": _int(clean.get("maxResults"), 50)}
     elif action == "list_events":
         payload = {"calendarId": cal, "timeMin": clean.get("timeMin") or now, "maxResults": _int(clean.get("maxResults"), 10),
@@ -456,6 +591,19 @@ def _calendar_call(config: dict, action: str, args: dict, user_id: str | None) -
             raise RuntimeError("您尚未連線 Google Calendar，請先到「連接器」頁按「連線我的帳號」") from exc
         raise RuntimeError(f"日曆閘道錯誤：{exc}") from exc
     return json.dumps(out, ensure_ascii=False)[:8000]
+
+
+def is_write(type_: str, config: dict, action: str) -> bool:
+    """Does this action change something outside the platform? Unknown (e.g. a free-form MCP tool) counts as yes."""
+    spec = TYPES.get(type_, {})
+    acts = spec.get("actions")
+    if isinstance(acts, list):
+        a = next((x for x in acts if x["id"] == action), None)
+        return bool((a or {}).get("write", True))
+    if type_ == "gateway":
+        a = next((x for x in ga.describe(config) if x["id"] == action), None)
+        return bool(a["write"]) if a else True
+    return True
 
 
 def invoke(type_: str, config: dict, secrets: dict, action: str, args: dict, *, redact_pii: bool, user_id: str | None = None,

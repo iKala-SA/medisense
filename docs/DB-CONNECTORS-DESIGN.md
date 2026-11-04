@@ -1,5 +1,12 @@
 # 資料庫連接器（Database）設計
 
+> **2026-11-03 改為 MVP（本節優先於下文）**：
+> - 連線 = 位置＋一組帳號密碼。PostgreSQL / MySQL / SQL Server 由後端用建立連線時填的帳號直接登入（`backend/app/engine/db_direct.py`），**不再經過 MCP Toolbox**（無 `tools.yaml`、無「套用」、無 GitHub Actions 部署）。Cloud SQL 請填私有 IP。
+> - BigQuery 不需帳號：使用者在對話中點「授權 BigQuery」，用自己的 Google token 查詢（`engine/bigquery.py`）；管理員填專案、區域、資料集。
+> - **移除**：預先定義查詢（A）、可查詢的檢視表（B 的白名單）、依群組的存取規則、每種權限等級一個帳號。使用連結了該連線的 Agent 的人都能查詢。
+> - 模型每個連線有兩個工具：列出資料表與欄位、執行一個唯讀 SELECT。保護：sqlglot 檢查（單一 SELECT、無註解、擋危險函式）、強制筆數上限、唯讀 session、30 秒逾時（SQL Server 由驅動程式取消查詢）、結果去識別化、稽核。
+> - **主要防線仍是資料庫帳號本身**：請用只讀得到去識別化 View 的唯讀帳號（見 DBA 檢查清單）。
+
 狀態：草案，待確認後實作。日期：2026-10-30。
 
 ## 1. 目標與範圍
@@ -58,8 +65,9 @@ Agent / 流程 / 對話 ─► 後端（授權、SQL 檢查、去識別化、稽
 - 第一階段要確認的 Toolbox 欄位（我只讀到部分頁面）：SQL Server、Cloud SQL MySQL / SQL Server 的完整 source 欄位，以及 toolsets 宣告語法。實作時逐頁驗證，不憑印象。
 
 ## 6. BigQuery：用使用者本人的身分（方案 A）
-- 設 `useClientOAuth: X-BigQuery-Auth`（自訂標頭，避免跟 Cloud Run 的 `Authorization` 衝突）、`writeMode: blocked`、`allowedDatasets`。
-- 使用者第一次查詢時，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`），隨請求送到後端，後端轉給 Toolbox。**我們不保存任何使用者憑證**。
+- **不經過 Toolbox**（2026-11-03 起）：後端用使用者的 token 直接呼叫 BigQuery REST API（`backend/app/engine/bigquery.py`）。理由：沒有共用帳號就不需要 Toolbox 的連線池；少一層也不用為 BigQuery 重新部署 Toolbox，「套用」只影響其他資料庫。
+- 使用者在對話框點「授權 BigQuery」，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`，只能用目前登入的同一個帳號），只存在瀏覽器記憶體，隨對話請求以 `X-BigQuery-Auth` 標頭送到後端，後端只在這次執行中使用。**我們不保存任何使用者憑證**，稽核記錄也不含 token。
+- 每次查詢：唯讀檢查（A 在儲存時；B 經 sqlglot 守門並強制 LIMIT）、`maximumBytesBilled`（預設 10 GiB，可用連線欄位 `max_bytes_billed` 改）、30 秒逾時、`maxResults` = 筆數上限；結果去識別化後才給模型。
 - 權限由 Google IAM 決定：使用者需有專案的「BigQuery 工作使用者」與資料集／視圖的「資料檢視者」。
 - 限制：**排程與背景執行無法使用 BigQuery**（沒有使用者在場）；token 過期時請使用者重新授權。
 - 你要做的：啟用 BigQuery API；OAuth 同意畫面設為「內部」並加入 `https://www.googleapis.com/auth/bigquery` 範圍；確認 Web OAuth 用戶端的授權來源包含平台網址；用 Google 群組授權使用者。
@@ -87,7 +95,7 @@ Toolbox 的資料來源與工具來自 `tools.yaml`；它支援動態重新載�
 4. Toolbox 部署腳本、DBA 清單、套用流程。
 5. 預先定義查詢（A）端到端，接上 Agent／流程。
 6. 範圍內自然語言查詢（B）端到端。
-7. BigQuery 使用者憑證流程。
+7. BigQuery 使用者憑證流程。（2026-11-03 完成：直接呼叫 BigQuery API，見 §6）
 
 ## 11. 未決與風險
 - §7 的設定更新方式（做法 1 或 2）。

@@ -82,20 +82,22 @@ def test_disabled_steps_are_skipped_and_invalid_flows_are_refused(fs, as_user, m
 
 
 def test_actions_ask_before_writing_and_can_be_rejected(fs, as_user, monkeypatch, audit_log):
+    """Production (the published snapshot): a write action waits for a human; rejecting it sends nothing."""
     fake_llm(monkeypatch, lambda kw: json.dumps({"text": "已通報", "channel": ""}))
     fs.put("connectors/c1", {"name": "Slack", "type": "slack", "config": {}})
     sent = []
     monkeypatch.setattr("app.engine.flow.invoke_connector", lambda cid, action, args, **k: (sent.append((cid, action, args)) or ("送出", "Slack · 成功")))
     c = as_user(BUILDER)
     aid = make(c, [S("s1", "action", "通報", connector_id="c1", action="send_message", prompt="通報藥局")])
-    run = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": False}).json()
+    assert as_user(ADMIN).post(f"/api/agents/{aid}/publish").status_code == 200
+    run = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": True}).json()
     assert run["status"] == "waiting_approval" and not sent and run["pending"]["args"]["text"] == "已通報"
     assert as_user(BUILDER2).post(f"/api/step-runs/{run['id']}/approve", json={"approve": True}).status_code == 404
     done = c.post(f"/api/step-runs/{run['id']}/approve", json={"approve": True}).json()
     assert done["status"] == "succeeded" and sent == [("c1", "send_message", {"text": "已通報", "channel": ""})] and done["pending"] is None
     assert c.post(f"/api/step-runs/{run['id']}/approve", json={"approve": True}).status_code == 409
     # reject
-    run2 = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": False}).json()
+    run2 = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": True}).json()
     rej = c.post(f"/api/step-runs/{run2['id']}/approve", json={"approve": False}).json()
     assert rej["status"] == "cancelled" and len(sent) == 1
     assert {"step_run.approve", "step_run.reject"} <= {a["action"] for a in audit_log()}
@@ -131,3 +133,20 @@ def test_a_step_can_pick_its_own_output_preference_and_knowledge_spaces(fs, as_u
     run = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": False}).json()
     assert run["status"] == "succeeded", run
     assert calls[0]["group"] == "fast" and seen["files"] == ["projects/p/ragFiles/F1"]
+
+
+def test_sandbox_simulates_write_actions_without_asking_and_tags_the_run(fs, as_user, monkeypatch, audit_log):
+    """Sandbox (a draft run): reads are real, a write action is only simulated, nothing is asked, and the run says so."""
+    fake_llm(monkeypatch, lambda kw: json.dumps({"text": "已通報", "channel": ""}))
+    fs.put("connectors/c1", {"name": "Slack", "type": "slack", "config": {}})
+    called = []
+    monkeypatch.setattr("app.engine.connectors.invoke", lambda *a, **k: called.append(a) or "REAL")
+    monkeypatch.setattr("app.engine.secrets.get", lambda n: "x")
+    c = as_user(BUILDER)
+    aid = make(c, [S("s1", "action", "通報", connector_id="c1", action="send_message", prompt="通報藥局")])
+    run = c.post(f"/api/agents/{aid}/step-runs", json={"use_published": False}).json()
+    assert run["status"] == "succeeded" and run["env"] == "sandbox" and not called
+    assert "沙盒模擬" in json.dumps(run["steps"], ensure_ascii=False)
+    rows = audit_log()
+    assert any(a["action"] == "connector.simulated" and a.get("env") == "sandbox" for a in rows)
+    assert all(a.get("env") == "sandbox" for a in rows if a["action"] in ("step_run.start", "connector.simulated"))

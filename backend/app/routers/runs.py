@@ -3,14 +3,14 @@ BEFORE it touches Firestore or LiteLLM (option B), so sessions never hold identi
 import time
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from openai import APIStatusError
 
 from .. import db, sharing
 from ..auth import User, current_user
 from ..config import settings
 from ..engine import agent as agent_runtime
-from ..engine import deid, llm, skills
+from ..engine import bigquery, deid, llm, runenv, skills
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -46,6 +46,9 @@ def _agent_def(agent_id: str, user: User, use_published: bool, version: int | No
     return agent, resolve_rag_files(agent.knowledge_doc_ids)
 
 
+STOPPED_EMPTY = "（已停止回覆）"
+
+
 def make_title(safe_message: str) -> str:
     """Session title from the first ~30 chars of the DE-IDENTIFIED message (never the raw text)."""
     return " ".join(safe_message.split())[:30]
@@ -56,11 +59,26 @@ def _meta(r) -> dict:
     return {"trace": [t.model_dump() for t in r.trace], "citations": [c.model_dump() for c in r.citations]}
 
 
-def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
+class RunStopped(BaseException):
+    """The person pressed 停止 (the chat stream was closed). Carries the answer streamed so far and the finished steps.
+    A BaseException so nothing on the way (model fallback, tool wrappers) mistakes it for a failure and carries on."""
+
+    def __init__(self, partial: str = "", steps: list | None = None):
+        super().__init__("stopped by the user")
+        self.partial, self.steps = partial, steps or []
+
+
+def execute_run(*args, use_published: bool = False, **kw) -> RunResponse:
+    """The shared pipeline (see _execute_run), inside the right environment: a draft runs in the sandbox, a published agent in production."""
+    with runenv.use(runenv.of(use_published)):
+        return _execute_run(*args, use_published=use_published, **kw)
+
+
+def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User, message: str, session_id: str | None, *,
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
                 session_extra: dict | None = None, pin_model: str | None = None, emit=None,
-                web_search: bool = False, images: list[dict] | None = None) -> RunResponse:
+                web_search: bool = False, images: list[dict] | None = None, message_images: list[str] | None = None) -> RunResponse:
     """The shared pipeline behind /run, /api/chat and schedules: de-identify -> flow -> save session -> audit."""
     session_id = session_id or uuid.uuid4().hex
     sess_ref = db.client().collection("sessions").document(session_id)
@@ -73,10 +91,15 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
     skill_prefix = skills.build_prefix(agent.skill_ids, user)
 
     t0 = time.perf_counter()
+    stopped = False
     try:
         r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=safe_message,
                                     history=history, rag_files=rag_files, skill_prefix=skill_prefix, extra_context=extra_context,
                                     pin_model=pin_model, emit=emit, web_search=web_search, images=images, user_email=user.email)
+    except RunStopped as stop:  # keep what was answered so far, like ChatGPT
+        stopped = True
+        r = agent_runtime.RunResult(reply=stop.partial.strip() or STOPPED_EMPTY, trace=list(stop.steps))
+        sess = sess_ref.get().to_dict() or sess  # re-read: the stop may land while the person is already sending the next message
     except APIStatusError as exc:
         if exc.status_code == 401:
             llm.reset_client_cache()
@@ -85,17 +108,21 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
 
     if not sess.get("title"):  # auto title on the first run
         sess["title"] = title or make_title(safe_message)
-    sess["messages"] = [*sess["messages"], {"role": "user", "content": safe_message},
-                        {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
+    user_msg = {"role": "user", "content": safe_message}
+    if message_images:  # ids of the (redacted) images sent with this message, so a reopened chat shows them again
+        user_msg["images"] = list(message_images)
+    sess["messages"] = [*sess["messages"], user_msg, {"role": "assistant", "content": r.reply, "meta": {**_meta(r), **({"stopped": True} if stopped else {})}}]
     # A run that stopped at an approval node parks its state on the session; a new message discards it.
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None
     sess.update(session_extra or {})
+    if runenv.is_sandbox():
+        sess["env"] = runenv.SANDBOX  # kept out of 最近項目; counted separately
     sess["updated_at"] = db.now()
     sess["expire_at"] = db.expiry(settings().session_retention_days)
     sess_ref.set(sess)
     db.audit(user.uid, audit_action, user.email, agent_id=agent_id, session_id=session_id, latency_ms=latency,
-             models=[t.model for t in r.trace if t.model], **(audit_extra or {}))
+             models=[t.model for t in r.trace if t.model], **({"stopped": True} if stopped else {}), **(audit_extra or {}))
 
     return RunResponse(session_id=session_id, reply=r.reply, trace=r.trace, citations=r.citations,
                        structured=r.structured, pending_approval=_public_pending(r.pending), latency_ms=latency,
@@ -103,68 +130,84 @@ def execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User,
 
 
 @router.post("/run", response_model=RunResponse)
-def run_agent(agent_id: str, body: RunRequest, user: User = Depends(current_user)):
+def run_agent(agent_id: str, body: RunRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
     agent, rag_files = _agent_def(agent_id, user, body.use_published, body.version)
     from ..engine.capabilities import rag_files_for
     rag_files = rag_files_for(agent, user, rag_files)  # knowledge spaces, by the runner's own rights (same as chat)
-    return execute_run(agent, rag_files, agent_id, user, body.message, body.session_id,
-                       use_published=body.use_published, version=body.version, web_search=agent.capabilities.web_search)
+    with bigquery.user_token(x_bigquery_auth):
+        return execute_run(agent, rag_files, agent_id, user, body.message, body.session_id,
+                           use_published=body.use_published, version=body.version, web_search=agent.capabilities.web_search)
 
 
 def _public_pending(p: dict | None) -> dict | None:
-    """What the UI needs; ctx/grounding stay server-side."""
-    return {"node_id": p["node_id"], "message": p["message"], "preview": p["preview"]} if p else None
+    """What the UI needs; ctx/grounding stay server-side. `approver`: "user" = the person chatting may confirm it themselves
+    (a capability marked 需核准); "owner" = a canvas approval node, decided by the agent owner or an admin."""
+    return {"node_id": p["node_id"], "message": p["message"], "preview": p["preview"], "approver": p.get("approver") or "owner"} if p else None
 
 
-@router.post("/approve", response_model=RunResponse)
-def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(current_user)):
-    """Agent owner (or admin) approves / rejects the step a run paused on, in the same conversation.
-    Approve resumes the flow from the node after the approval node with the saved context."""
-    snap = db.client().collection("agents").document(agent_id).get()
-    if not snap.exists:
-        raise HTTPException(404, "agent not found")
-    if not can_edit(snap.to_dict() or {}, user):
-        raise HTTPException(403, "only the agent owner can approve this step")
-    sess_ref = db.client().collection("sessions").document(body.session_id)
-    sess = sess_ref.get().to_dict()
-    if not sess or sess.get("agent_id") != agent_id:
-        raise HTTPException(404, "session not found")
+def can_decide(agent_data: dict, sess: dict, user: User) -> bool:
+    """Who may approve / reject what this session paused on: the agent owner or an admin always; the session's own user when
+    the pause is a user-confirmed capability action (it runs as that user, on that user's accounts)."""
+    pending = sess.get("pending") or {}
+    return can_edit(agent_data, user) or (pending.get("approver") == "user" and sess.get("uid") == user.uid)
+
+
+def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: bool, x_bigquery_auth: str | None = None) -> RunResponse:
+    """Approve (resume the run with the saved context: the paused call executes, then the model continues) or reject
+    (the run stops) the step this session is waiting on. Permission is the caller's job (`can_decide`)."""
     pending = sess.get("pending")
     if not pending:
         raise HTTPException(409, "nothing is waiting for approval in this session")
-
+    by_user = pending.get("approver") == "user"
     sess["pending"] = None
-    if not body.approve:
-        reply = "已拒絕此步驟，流程停止。"
+    if not approve:
+        reply = "已取消此動作，流程停止。" if by_user else "已拒絕此步驟，流程停止。"
         sess["messages"] = [*sess["messages"], {"role": "assistant", "content": reply}]
         sess["updated_at"] = db.now()
         sess["expire_at"] = db.expiry(settings().session_retention_days)
         sess_ref.set(sess)
-        db.audit(user.uid, "agent.reject", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"])
-        return RunResponse(session_id=body.session_id, reply=reply, latency_ms=0,
-                           trace=[StepTrace(node_id=pending["node_id"], type="approval", summary="負責人拒絕，流程停止")])
+        db.audit(user.uid, "agent.reject", user.email, agent_id=agent_id, session_id=sess_ref.id, node_id=pending["node_id"], by_user=by_user)
+        return RunResponse(session_id=sess_ref.id, reply=reply, latency_ms=0, message_index=len(sess["messages"]) - 1,
+                           trace=[StepTrace(node_id=pending["node_id"], type="approval", summary="使用者取消，流程停止" if by_user else "負責人拒絕，流程停止")])
 
     agent, rag_files = _agent_def(agent_id, user, bool(pending.get("use_published")), pending.get("version"))
-    history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
-    t0 = time.perf_counter()
-    try:
-        r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
-                                    history=history, rag_files=rag_files, resume=pending, user_email=user.email,
-                                    skill_prefix=skills.build_prefix(agent.skill_ids, user))
-    except APIStatusError as exc:
-        if exc.status_code == 401:
-            llm.reset_client_cache()
-        raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    latency = int((time.perf_counter() - t0) * 1000)
-    sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply}]
-    sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
-                       "version": pending.get("version"), "at": db.now()} if r.pending else None
-    sess["updated_at"] = db.now()
-    sess["expire_at"] = db.expiry(settings().session_retention_days)
-    sess_ref.set(sess)
-    db.audit(user.uid, "agent.approve", user.email, agent_id=agent_id, session_id=body.session_id, node_id=pending["node_id"],
-             latency_ms=latency, models=[t.model for t in r.trace if t.model])
-    return RunResponse(session_id=body.session_id, reply=r.reply, trace=r.trace, citations=r.citations,
-                       structured=r.structured, pending_approval=_public_pending(r.pending), latency_ms=latency)
+    with runenv.use(runenv.of(bool(pending.get("use_published")))), bigquery.user_token(x_bigquery_auth):
+        history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
+        t0 = time.perf_counter()
+        try:
+            r = agent_runtime.run_agent(agent, agent_id=agent_id, user_id=user.uid, user_message=str(pending.get("input", "")),
+                                        history=history, rag_files=rag_files, resume=pending, user_email=user.email,
+                                        skill_prefix=skills.build_prefix(agent.skill_ids, user))
+        except APIStatusError as exc:
+            if exc.status_code == 401:
+                llm.reset_client_cache()
+            raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        latency = int((time.perf_counter() - t0) * 1000)
+        sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
+        sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
+                           "version": pending.get("version"), "at": db.now()} if r.pending else None
+        sess["updated_at"] = db.now()
+        sess["expire_at"] = db.expiry(settings().session_retention_days)
+        sess_ref.set(sess)
+        db.audit(user.uid, "agent.approve", user.email, agent_id=agent_id, session_id=sess_ref.id, node_id=pending["node_id"], by_user=by_user,
+                 latency_ms=latency, models=[t.model for t in r.trace if t.model])
+    return RunResponse(session_id=sess_ref.id, reply=r.reply, trace=r.trace, citations=r.citations, structured=r.structured,
+                       pending_approval=_public_pending(r.pending), latency_ms=latency, message_index=len(sess["messages"]) - 1)
+
+
+@router.post("/approve", response_model=RunResponse)
+def approve_run(agent_id: str, body: ApproveRequest, user: User = Depends(current_user), x_bigquery_auth: str | None = Header(None)):
+    """Agent owner (or admin) approves / rejects the step a run paused on, in the same conversation; the session's own user
+    may do so too when the pause is a user-confirmed capability action. Approve resumes the flow with the saved context."""
+    snap = db.client().collection("agents").document(agent_id).get()
+    if not snap.exists:
+        raise HTTPException(404, "agent not found")
+    sess_ref = db.client().collection("sessions").document(body.session_id)
+    sess = sess_ref.get().to_dict()
+    if not sess or sess.get("agent_id") != agent_id:
+        raise HTTPException(404, "session not found")
+    if not can_decide(snap.to_dict() or {}, sess, user):
+        raise HTTPException(403, "only the agent owner can approve this step")
+    return decide_pending(agent_id, sess_ref, sess, user, body.approve, x_bigquery_auth)
