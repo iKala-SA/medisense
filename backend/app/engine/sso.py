@@ -29,7 +29,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 
 
 def ref():
-    return db.client().collection("config").document("sso")
+    return db.client().collection("config").document(settings().sso_config_doc or "sso")
 
 
 def reset_cache() -> None:

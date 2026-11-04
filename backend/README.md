@@ -158,6 +158,12 @@ cd frontend && npm run dev
 cd frontend && VITE_MOCK_API=1 npm run dev
 ```
 
+登入與 SSO locally (Docker): `bash scripts/sso-local.sh` starts Keycloak (:8180, admin / admin) and a test OpenLDAP, creates
+realm `medisense` with the backend's admin client and writes `backend/.env.sso-local` (`SSO_CONFIG_DOC=sso-local`, so the
+deployed login page is untouched). Then `set -a; source .env.sso-local; set +a; .venv/bin/uvicorn app.main:app --port 8080`
+and `cd frontend && API_PROXY_TARGET=http://localhost:8080 npm run dev:live`. The settings page and LDAP tests work end to
+end; signing in with Microsoft / LDAP needs the deployed Keycloak (Identity Platform must reach it publicly).
+
 ## 3b. Upgrading the deployed sandbox to this version
 
 ```bash

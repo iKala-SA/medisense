@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     keycloak_client_id: str = "medisense-backend"
     keycloak_client_secret: str = ""
     sso_oidc_provider_id: str = "oidc.medisense-sso"  # Identity Platform provider that trusts the Keycloak realm
+    # Firestore config/{doc} holding the sign-in settings. Local development against the shared sandbox database sets
+    # SSO_CONFIG_DOC=sso-local so testing with a local Keycloak never changes what the deployed login page shows.
+    sso_config_doc: str = "sso"
 
     @property
     def allowed_domain_list(self) -> list[str]:
