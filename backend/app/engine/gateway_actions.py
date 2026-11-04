@@ -11,7 +11,10 @@ from . import open_connector as oc
 IDENTITY_SCOPES = {"openid", "email", "profile"}  # needed to label the connected account; never a data permission
 AUTH_MODES = {"oauth2": "user_oauth", "api_key": "shared", "custom_credential": "shared", "no_auth": "none"}
 GOOGLE_SERVICES = {"gmail", "googlecalendar", "googledrive", "googledocs", "googlesheets", "googleslides", "googleforms", "googlemeet",
-                   "googlechat", "googletasks"}
+                   "googlechat", "googletasks", "google_bigquery"}
+# Services the database-connector path uses (SQL guard, row cut, de-identification): their grant is held by the gateway like any
+# other per-user OAuth service, but their actions are not offered to the model as plain connector tools.
+DB_SERVICES = {"google_bigquery"}
 
 
 def mode_of(auth_mode: str) -> str | None:

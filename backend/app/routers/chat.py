@@ -27,6 +27,7 @@ from ..config import settings
 from ..engine import bigquery, chat_images, deid, llm, routing
 from ..engine import connectors as connectors_engine
 from ..engine import db_tools
+from ..engine import gateway_actions as ga
 from ..engine.extract import NoTextError, extract_text
 from ..schemas import DEPARTMENTS, AgentIn, ApproveRequest, AttachmentOut, CapConnector, ChatRequest, RunResponse, SaveToSpaceIn, SaveToSpaceOut, SpaceDocuments, StepTrace
 from .knowledge import PREVIEW_CHARS, _blob_path, _bucket, _read_upload, create_document, resolve_rag_files
@@ -100,7 +101,7 @@ def my_connector_caps(user: User) -> list[CapConnector]:
         if d.get("type") == "calendar":
             reads, writes = connectors_engine.calendar_allowed(cfg)
             actions = [*reads, *writes]
-        elif d.get("type") == "gateway":
+        elif d.get("type") == "gateway" and cfg.get("service") not in ga.DB_SERVICES:  # BigQuery goes through 資料庫連接器 (SQL guard, row cut)
             actions = list(cfg.get("allowed_actions") or [])
         else:
             actions = []

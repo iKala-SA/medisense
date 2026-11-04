@@ -64,7 +64,7 @@ function ConnDialog({init,onClose,onSaved,onDeleted}){
       {inp('name','名稱','例：藥局資料庫',{autoFocus:!saved})}
       {inp('description','說明（選填，Agent 會參考）','這個資料庫裡有什麼資料')}
       <div className="lv-db-grid">{K.fields.map(([k,l,d,ph])=>inp(k,l,ph||d))}</div>
-      {bq?<p className="lv-db-note ic"><Lock size={13}/> 不需要帳號密碼：每位使用者在對話中點「授權 BigQuery」，以自己的 Google 帳號查詢，看得到的資料由 Google IAM 決定。</p>
+      {bq?<p className="lv-db-note ic"><Lock size={13}/> 不需要帳號密碼：每位使用者以自己的 Google 帳號查詢，看得到的資料由 Google IAM 決定。要讓使用者授權一次就長期有效，請在「連接器 → 全部服務」啟用 Google BigQuery（google_bigquery，允許 query / start_query_job / get_query_results）並分享；否則使用者在對話中點「授權 BigQuery」取得一小時的臨時授權。</p>
         :<div className="lv-db-grid">{inp('user','帳號','建議使用唯讀帳號',{autoComplete:'off'})}
           {inp('password','密碼',init.password_set?'已設定（留空沿用）':'',{type:'password',autoComplete:'new-password'})}</div>}
       <div className="lv-db-grid">{inp('max_rows','單次最多回傳筆數','100',{type:'number',min:1,max:1000,style:{maxWidth:160}})}</div>

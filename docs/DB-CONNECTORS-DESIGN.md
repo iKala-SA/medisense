@@ -66,7 +66,8 @@ Agent / 流程 / 對話 ─► 後端（授權、SQL 檢查、去識別化、稽
 
 ## 6. BigQuery：用使用者本人的身分（方案 A）
 - **不經過 Toolbox**（2026-11-03 起）：後端用使用者的 token 直接呼叫 BigQuery REST API（`backend/app/engine/bigquery.py`）。理由：沒有共用帳號就不需要 Toolbox 的連線池；少一層也不用為 BigQuery 重新部署 Toolbox，「套用」只影響其他資料庫。
-- 使用者在對話框點「授權 BigQuery」，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`，只能用目前登入的同一個帳號），只存在瀏覽器這個分頁（記憶體加 sessionStorage：重新整理不用再授權，關閉分頁即消失，不跨分頁、不跨網站），隨對話請求以 `X-BigQuery-Auth` 標頭送到後端，後端只在這次執行中使用。**我們不保存任何使用者憑證**，稽核記錄也不含 token。
+- **長期授權（建議）**：管理員在「連接器 → 全部服務」啟用 Google BigQuery（閘道服務 `google_bigquery`，允許 `query`、`start_query_job`、`get_query_results` 等讀取動作）並分享；使用者在「我的連線」連線一次，Google 的 refresh token 由 Open Connector 閘道保存並自動更新，直到使用者中斷連線。後端以該使用者的閘道連線執行 `start_query_job` + `get_query_results`（保留 `maximumBytesBilled` 與預設資料集），token 不經過後端與瀏覽器。
+- **臨時授權（備援）**：沒有上述服務時，使用者在對話框點「授權 BigQuery」，**瀏覽器向 Google 取得約一小時的 access token**（範圍 `bigquery`，只能用目前登入的同一個帳號），只存在瀏覽器這個分頁（記憶體加 sessionStorage：重新整理不用再授權，關閉分頁即消失，不跨分頁、不跨網站），隨對話請求以 `X-BigQuery-Auth` 標頭送到後端，後端只在這次執行中使用。**我們不保存任何使用者憑證**，稽核記錄也不含 token。
 - 每次查詢：唯讀檢查（A 在儲存時；B 經 sqlglot 守門並強制 LIMIT）、`maximumBytesBilled`（預設 10 GiB，可用連線欄位 `max_bytes_billed` 改）、30 秒逾時、`maxResults` = 筆數上限；結果去識別化後才給模型。
 - 權限由 Google IAM 決定：使用者需有專案的「BigQuery 工作使用者」與資料集／視圖的「資料檢視者」。
 - 限制：**排程與背景執行無法使用 BigQuery**（沒有使用者在場）；token 過期時請使用者重新授權。
