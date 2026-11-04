@@ -49,7 +49,7 @@ function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc})
     <p className="subtitle">{s.description||'（無說明）'}</p>
     <div className="lv-w-meta"><span className="badge">{TYPE[s.type]||s.type}</span><span className="lv-w-role">{ROLE_LABEL[s.my_role]||s.my_role}</span><span className="muted small">擁有者 {s.owner_email||'—'} · 更新 {fmtDate(s.updated_at)}</span></div>
     <div className="page-heading" style={{marginTop:16,alignItems:'flex-start'}}><h3 style={{margin:0,paddingTop:6}}>文件（{s.documents_count??(ids||[]).length}）</h3>
-      {edit&&builder&&<span className="bk"><DocUploader bare buttonLabel="加入文件" defaultDepartment={me.department||''} onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}>
+      {edit&&builder&&<span className="bk"><DocUploader bare buttonLabel="加入文件" defaultCategory="other" defaultDepartment={me.department||''} onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}>
         <button type="button" className="btn-ghost" disabled={docs===null} title="把文件庫裡已有的文件加進這個空間" onClick={()=>setPicking(true)}>從文件庫加入</button>
       </DocUploader></span>}</div>
     {edit&&builder&&<p className="muted small" style={{margin:'-4px 0 14px',lineHeight:1.7}}>支援 PDF、DOCX、PPTX、TXT、Markdown、HTML、CSV、JSON，單檔上限 25 MB。上傳後自動執行：Sensitive Data Protection 去識別化 → 文字擷取與分塊 → Vertex AI 向量嵌入 (text-multilingual-embedding-002)。原檔保留於 CMEK 加密儲存桶。</p>}

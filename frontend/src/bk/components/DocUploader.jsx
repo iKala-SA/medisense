@@ -3,11 +3,11 @@ import { api } from "../api";
 import { DEPARTMENTS, DOC_CATEGORIES } from "../types";
 import { ErrorBox, Icon, Spinner } from "./ui";
 const ACCEPT = ".pdf,.txt,.md,.docx,.pptx,.html,.csv,.json";
-/* `bare`: no drop zone and no explanatory text — just the two selects, the hidden file input and the primary button
-   (labelled `buttonLabel`), with status and errors beneath; `children` are rendered after the button (e.g. a secondary
-   action). The space page composes it into its own heading row and keeps the explanation as plain text. */
-function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focusSignal = 0, bare = false, buttonLabel = "選擇本機文獻檔案", children = null }) {
-  const [category, setCategory] = useState("");
+/* `bare`: just a primary button (labelled `buttonLabel`) that opens the file picker — no drop zone, no text, no selects:
+   the document gets `defaultCategory` and `defaultDepartment` — with status and errors beneath; `children` are rendered
+   after the button (e.g. a secondary action). The space page composes it into its own heading row. */
+function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded, compact = false, focusSignal = 0, bare = false, buttonLabel = "選擇本機文獻檔案", children = null }) {
+  const [category, setCategory] = useState(defaultCategory);
   const [department, setDepartment] = useState(defaultDepartment);
   const [busy, setBusy] = useState("");
   const [over, setOver] = useState(false);
@@ -54,7 +54,7 @@ function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focu
   if (bare) {
     return <div className="flex flex-col items-end gap-0.5">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {categorySelect}{departmentSelect}{fileInput}
+        {fileInput}
         <button className="btn-primary" disabled={!!busy} onClick={choose}>
           {busy ? <Spinner /> : <Icon name="upload_file" className="text-[18px]" />}{buttonLabel}</button>
         {children}
