@@ -102,7 +102,7 @@ def run(conn: dict, sql: str, *, max_rows: int, param_defs: list[dict] | None = 
     """Run one read-only query as the user. -> one JSON object per row (newline separated)."""
     token = token if token is not None else current_token()
     if not token:
-        raise BqError("需要你的 Google BigQuery 授權：請點對話框上方的「授權 BigQuery」，再問一次", needs_auth=True)
+        raise BqError("需要你的 Google BigQuery 授權：請點輸入框旁的「授權 BigQuery」完成 Google 授權，再問一次", needs_auth=True)
     body = {"query": sql, "useLegacySql": False, "maxResults": max_rows, "timeoutMs": TIMEOUT_MS,
             "maximumBytesBilled": str(int(conn.get("max_bytes_billed") or MAX_BYTES_BILLED)),
             "location": conn.get("location") or "asia-east1", "jobCreationMode": "JOB_CREATION_OPTIONAL",
