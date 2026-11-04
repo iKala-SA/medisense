@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useOrgGroups } from "../../live/orgGroups";
 import { Empty, ErrorBox, Icon, Spinner } from "../components/ui";
 import { Delta, Kpi, Row } from "../components/Kpi";
+import "./monitoring.css";
 const RANGES = [
   { id: "today", label: "\u4ECA\u65E5 (Today)" },
   { id: "7d", label: "\u8FD1 7 \u5929 (Last 7 Days)" },
@@ -43,9 +44,16 @@ function Monitoring() {
   const nav = useNavigate();
   const [range, setRange] = useState("7d");
   const [custom, setCustom] = useState(rangeDates("7d"));
-  const [group, setGroup] = useState("");
+  const [tab, setTab] = useState("cost"); // 成本監控 | 用量管理
+  const [filter, setFilter] = useState({ kind: "", id: "" }); // kind: person | group | agent
   const orgGroups = useOrgGroups();
-  const groupLabel = (orgGroups || []).find((g) => g.id === group)?.name || group;
+  const [people, setPeople] = useState([]);
+  const [agentList, setAgentList] = useState([]);
+  useEffect(() => {
+    api.listUsers?.().then((r) => setPeople(((r?.users) || r || []).filter((u) => u.uid).map((u) => ({ id: u.uid, name: u.name ? `${u.name}（${u.email}）` : u.email })))).catch(() => setPeople([]));
+    api.listAgents?.().then((r) => setAgentList((r || []).map((a) => ({ id: a.id, name: a.name || a.id })))).catch(() => setAgentList([]));
+  }, []);
+  const filterOptions = filter.kind === "person" ? people : filter.kind === "group" ? (orgGroups || []) : filter.kind === "agent" ? agentList : [];
   const [env, setEnv] = useState("production"); // 正式 vs 沙盒: the sandbox is counted apart
   const [sort, setSort] = useState("requests");
   const [summary, setSummary] = useState(null);
@@ -55,7 +63,8 @@ function Monitoring() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), group, env }), [range, custom, group, env]);
+  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), env,
+    ...(filter.id ? { [filter.kind]: filter.id } : {}) }), [range, custom, filter, env]);
   const load = useCallback(() => {
     setBusy(true);
     setErr("");
@@ -94,39 +103,40 @@ function Monitoring() {
   const budgetPct = summary && summary.monthly_budget_usd > 0 ? summary.month_cost_usd / summary.monthly_budget_usd * 100 : 0;
   const budgetTone = budgetPct >= 100 ? "error" : budgetPct >= 85 ? "warning" : "primary";
   const successPct = summary && summary.requests > 0 ? (summary.requests - summary.failed) / summary.requests * 100 : null;
-  return <div>
-      <section className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-[22px] font-semibold leading-snug">Agent 監控與模型成本儀表板 <span className="chip">GCP Vertex AI · LiteLLM</span></h1>
-          <p className="mt-1 max-w-3xl text-xs leading-5 text-outline">
-            全院自建 Agent 的推論呼叫、Token 消耗、模型成本與月度預算總覽。資料來自平台後端的每次模型呼叫紀錄（不含對話內容），成本依院內價格表估算。
-          </p>
+  return <div className="mon">
+      <section className="mon-top">
+        <div className="mon-tabs" role="tablist" aria-label="用量與成本">
+          {[["cost", "成本監控"], ["manage", "用量管理"]].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button className="btn-secondary" onClick={load} disabled={busy}><Icon name="refresh" className={`text-[16px] ${busy ? "animate-spin" : ""}`} />重新整理</button>
-          <button className="btn-primary" onClick={exportCsv} disabled={exporting || !summary}>{exporting ? <Spinner className="h-4 w-4" /> : <Icon name="download" className="text-[16px]" />}匯出成本報表 (CSV)</button>
-        </div>
+        {tab === "cost" && <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary" onClick={load} disabled={busy}><Icon name="refresh" className={`text-[18px] ${busy ? "animate-spin" : ""}`} />重新整理</button>
+          <button className="btn-primary" onClick={exportCsv} disabled={exporting || !summary}>{exporting ? <Spinner className="h-4 w-4" /> : <Icon name="download" className="text-[18px]" />}匯出 CSV</button>
+        </div>}
       </section>
 
-      <section className="mt-4 flex flex-wrap items-center gap-3">
+      {tab === "manage" ? <UsageLimits orgGroups={orgGroups} /> : <>
+      <section className="mon-filters">
         <div className="flex flex-wrap items-center gap-0.5 rounded-[10px] bg-surface-container p-[3px]">
-          {RANGES.map((r) => <button key={r.id} onClick={() => setRange(r.id)} className={`rounded-lg px-3 py-1 text-xs transition-colors ${range === r.id ? "bg-white font-medium text-primary shadow-card" : "text-on-surface-variant hover:text-on-surface"}`}>{r.label}</button>)}
-          {range === "custom" && <span className="ml-1 flex items-center gap-1 font-mono text-xs">
-              <input type="date" className="w-auto py-1 text-xs" value={custom.from} max={custom.to} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} />
+          {RANGES.map((r) => <button key={r.id} onClick={() => setRange(r.id)} className={`rounded-lg px-3 py-1.5 transition-colors ${range === r.id ? "bg-white font-semibold text-primary shadow-card" : "text-on-surface-variant hover:text-on-surface"}`}>{r.label}</button>)}
+          {range === "custom" && <span className="ml-1 flex items-center gap-1 font-mono">
+              <input type="date" className="w-auto py-1" value={custom.from} max={custom.to} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} />
               <span className="text-outline">→</span>
-              <input type="date" className="w-auto py-1 text-xs" value={custom.to} min={custom.from} max={ymd(/* @__PURE__ */ new Date())} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} />
+              <input type="date" className="w-auto py-1" value={custom.to} min={custom.from} max={ymd(/* @__PURE__ */ new Date())} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} />
             </span>}
         </div>
-        <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1" role="tablist" aria-label="環境">
-          {[["production", "正式環境"], ["sandbox", "沙盒"]].map(([k, l]) => <button key={k} role="tab" aria-selected={env === k} onClick={() => setEnv(k)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${env === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
+        <div className="flex items-center gap-0.5 rounded-[10px] bg-surface-container p-[3px]" role="tablist" aria-label="環境">
+          {[["production", "正式環境"], ["sandbox", "沙盒"]].map(([k, l]) => <button key={k} role="tab" aria-selected={env === k} onClick={() => setEnv(k)} className={`rounded-lg px-3 py-1.5 font-semibold transition-colors ${env === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
         </div>
         <span className="hidden flex-1 md:block" />
-        <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">群組過濾：
-          <button onClick={() => setGroup("")} className={`pill px-3 py-1 ${!group ? "bg-primary-tint font-medium text-primary-dark" : "bg-surface-container hover:bg-surface-container-high"}`}>全部（全院）</button>
-          <select className="w-auto py-1 text-xs" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="群組">
-            <option value="">選擇群組…</option>{(orgGroups || []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        <div className="mon-filter">
+          <select aria-label="篩選對象" value={filter.kind} onChange={(e) => setFilter({ kind: e.target.value, id: "" })}>
+            <option value="">全院</option><option value="person">使用者</option><option value="group">群組</option><option value="agent">Agent</option>
           </select>
-          {group && <span className="chip">{groupLabel}<button className="ml-1" onClick={() => setGroup("")}><Icon name="close" className="text-[12px]" /></button></span>}
+          {filter.kind && <select aria-label="篩選值" value={filter.id} onChange={(e) => setFilter({ ...filter, id: e.target.value })}>
+            <option value="">{filter.kind === "person" ? "選擇使用者…" : filter.kind === "group" ? "選擇群組…" : "選擇 Agent…"}</option>
+            {filterOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>}
+          {filter.kind && <button className="btn-ghost" onClick={() => setFilter({ kind: "", id: "" })} aria-label="清除篩選"><Icon name="close" className="text-[18px]" /></button>}
         </div>
       </section>
 
@@ -200,9 +210,12 @@ function Monitoring() {
               </div>}
           </section>
 
+          <UsageRanking kind="users" query={query} />
+          <UsageRanking kind="groups" query={query} />
+
           <section className="card mt-3 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
-              <h2 className="section-title">全院自建 Agent 用量排行榜 <span className="chip">{shown.length} Agents</span></h2>
+              <h2 className="section-title"><Icon name="smart_toy" className="text-primary" />Agent 用量排行榜 <span className="chip">{shown.length}</span></h2>
               <div className="flex flex-wrap gap-0.5 rounded-[10px] bg-surface-container p-[3px]">
                 {SORTS.map((s) => <button key={s.id} onClick={() => setSort(s.id)} className={`rounded-lg px-3 py-1 text-xs transition-colors ${sort === s.id ? "bg-white font-medium text-primary shadow-card" : "text-on-surface-variant hover:text-on-surface"}`}>{s.label}</button>)}
               </div>
@@ -246,16 +259,13 @@ function Monitoring() {
                 </div>
               </div>}
           </section>
-
-          <UsageBreakdown query={query} />
-          <UsageLimits orgGroups={orgGroups} />
         </>}
+      </>}
     </div>;
 }
 
-/* 依使用者 / 依群組: who (and which group) used the models in the selected window. */
-function UsageBreakdown({ query }) {
-  const [view, setView] = useState("users");
+/* 使用者用量排行榜 / 群組使用量排行榜: who, and which group, used the models in the selected window (same filters). */
+function UsageRanking({ kind, query }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -263,30 +273,29 @@ function UsageBreakdown({ query }) {
     let live = true;
     setRows(null);
     setErr("");
-    (view === "users" ? api.monitoringUsers(query) : api.monitoringGroups({ from: query.from, to: query.to, env: query.env }))
+    (kind === "users" ? api.monitoringUsers(query) : api.monitoringGroups(query))
       .then((r) => live && setRows(r || [])).catch((e) => live && setErr(String(e)));
     return () => { live = false; };
-  }, [view, query]);
+  }, [kind, query]);
   const max = Math.max(0.0001, ...(rows || []).map((r) => r.cost_usd));
+  const title = kind === "users" ? "使用者用量排行榜" : "群組使用量排行榜";
   return <section className="card mt-3 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
-        <h2 className="section-title"><Icon name="group" className="text-primary" />用量分布 {rows && <span className="chip">{rows.length}</span>}</h2>
-        <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1" role="tablist" aria-label="檢視">
-          {[["users", "依使用者"], ["groups", "依群組"]].map(([k, l]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${view === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
-        </div>
+        <h2 className="section-title"><Icon name={kind === "users" ? "person" : "group"} className="text-primary" />{title} {rows && <span className="chip">{rows.length}</span>}</h2>
       </div>
       <ErrorBox msg={err} />
-      {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon="group" title="這段期間沒有用量" hint="調整日期範圍或環境後再試" /> :
-      <div className="max-h-[420px] overflow-auto"><table className="w-full text-sm">
-        <thead className="sticky top-0 bg-surface-container-low text-xs text-on-surface-variant"><tr>
-          <Th>{view === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th><Th>占比</Th></tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.id} className="border-t border-hairline">
-          <td className="px-4 py-2"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-xs text-on-surface-variant">{view === "users" ? r.email : `${r.members} 位成員`}</p></td>
-          <td className="px-4 py-2 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-xs text-error">({r.failed} 失敗)</span>}</td>
-          <td className="px-4 py-2 text-right font-mono">{fmtTokens(r.tokens)}</td>
-          <td className="px-4 py-2 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
-          <td className="px-4 py-2 text-xs">{r.main_model || "—"}</td>
-          <td className="px-4 py-2"><div className="h-2 w-28 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, r.cost_usd / max * 100)}%` }} /></div></td>
+      {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon={kind === "users" ? "person" : "group"} title="這段期間沒有用量" hint="調整日期範圍、環境或篩選後再試" /> :
+      <div className="max-h-[440px] overflow-auto"><table className="w-full">
+        <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant"><tr>
+          <Th>#</Th><Th>{kind === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th><Th>占比</Th></tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={r.id} className="border-t border-hairline">
+          <td className="px-4 py-2.5 font-mono text-on-surface-variant">{i + 1}</td>
+          <td className="px-4 py-2.5"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-on-surface-variant mon-sub">{kind === "users" ? r.email : `${r.members} 位成員`}</p></td>
+          <td className="px-4 py-2.5 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-error mon-sub">({r.failed} 失敗)</span>}</td>
+          <td className="px-4 py-2.5 text-right font-mono">{fmtTokens(r.tokens)}</td>
+          <td className="px-4 py-2.5 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
+          <td className="px-4 py-2.5">{r.main_model || "—"}</td>
+          <td className="px-4 py-2.5"><div className="h-2.5 w-32 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, r.cost_usd / max * 100)}%` }} /></div></td>
         </tr>)}</tbody></table></div>}
     </section>;
 }

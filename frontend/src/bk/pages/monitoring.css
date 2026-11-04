@@ -1,0 +1,18 @@
+/* 用量與成本 (2026-11-04): larger type, tabs on top, one clean filter row */
+.bk .mon{font-size:15px}
+.bk .mon .text-xs{font-size:13px;line-height:1.35rem}
+.bk .mon .text-sm,.bk .mon table{font-size:14.5px}
+.bk .mon .text-\[11px\]{font-size:12.5px}
+.bk .mon .mon-sub{font-size:12.5px}
+.bk .mon .section-title{font-size:17px}
+.bk .mon .chip{font-size:12.5px}
+.bk .mon th{font-size:13px}
+.bk .mon .mon-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid #e6e8eb;margin-bottom:16px}
+.bk .mon .mon-tabs{display:flex;gap:28px}
+.bk .mon .mon-tabs button{padding:6px 2px 12px;font-size:20px;font-weight:600;color:#7b828d;border-bottom:3px solid transparent;margin-bottom:-1px;background:none}
+.bk .mon .mon-tabs button.on{color:#1c1c20;border-bottom-color:#239660}
+.bk .mon .mon-top>div:last-child:not(.mon-tabs){padding-bottom:10px}
+.bk .mon .mon-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:14px;margin-bottom:4px}
+.bk .mon .mon-filter{display:flex;align-items:center;gap:6px}
+.bk .mon .mon-filter select{width:auto;min-width:120px;font-size:14px;padding-top:6px;padding-bottom:6px}
+.bk .mon .mon-filter select+select{min-width:220px;max-width:340px}

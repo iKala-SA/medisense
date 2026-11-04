@@ -89,3 +89,18 @@ def test_usage_by_person_and_by_group(fs, as_user):
     assert [p["email"] for p in c.get("/api/monitoring/users", params={"group": "g1"}).json()] == ["amy@example.com"]
     groups = c.get("/api/monitoring/groups").json()
     assert groups == [{"id": "g1", "name": "心臟內科", "email": "", "members": 1, "requests": 2, "tokens": 30, "cost_usd": 0.5, "failed": 0, "main_model": "gemini-3-flash"}]
+
+
+def test_the_dashboard_filters_by_person_group_or_agent(fs, as_user):
+    day = _setup(fs)
+    for i, (uid, agent, cost) in enumerate((("u-amy", "a1", 0.3), ("u-amy", "a2", 0.2), ("u-bob", "a1", 0.1))):
+        fs.put(f"usage/r{i}", {"day": day, "env": "production", "uid": uid, "agent_id": agent, "agent_name": agent.upper(), "model": "m",
+                               "group": "fast", "prompt_tokens": 10, "completion_tokens": 0, "cost_usd": cost, "ok": True})
+    c = as_user(ADMIN)
+    assert c.get("/api/monitoring/summary", params={"person": "u-bob"}).json()["requests"] == 1
+    assert c.get("/api/monitoring/summary", params={"agent": "a1"}).json()["requests"] == 2
+    assert c.get("/api/monitoring/summary", params={"group": "g1", "agent": "a1"}).json()["requests"] == 1
+    assert [r["agent_id"] for r in c.get("/api/monitoring/agents", params={"person": "u-amy", "sort": "cost_usd"}).json()] == ["a1", "a2"]
+    assert [p["email"] for p in c.get("/api/monitoring/users", params={"agent": "a1"}).json()] == ["amy@example.com", "bob@example.com"]
+    assert [(g["id"], g["requests"]) for g in c.get("/api/monitoring/groups", params={"agent": "a2"}).json()] == [("g1", 1)]
+    assert c.get("/api/monitoring/groups", params={"group": "g1"}).json()[0]["requests"] == 2

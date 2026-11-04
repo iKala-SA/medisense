@@ -43,14 +43,25 @@ def _env(value: str) -> str:
     return value
 
 
-def _group_rollups(d_from: date, d_to: date, group: str, env: str) -> list[dict]:
-    """Usage of the members of one group (群組管理). The daily rollups are per agent, not per person, so this reads the raw
-    `usage` ledger for the window and turns each row into a rollup-shaped dict the summary / leaderboard code already sums."""
-    from ..engine.usage import model_key
-    from .groups import members_of
+def _uids_for(group: str, person: str) -> set[str] | None:
+    """The people a filter keeps: one person (uid), the members of a group, both (intersection), or None = everyone."""
+    keep = None
+    if group:
+        from .groups import members_of
+        keep = set(members_of(group)[1])
+    if person:
+        keep = {person} if keep is None else keep & {person}
+    return keep
 
-    _, uids = members_of(group)
-    if not uids:
+
+def _group_rollups(d_from: date, d_to: date, group: str, env: str, person: str = "", agent: str = "") -> list[dict]:
+    """Usage filtered by group members, one person and / or one agent. The daily rollups are per agent, not per person, so
+    this reads the raw `usage` ledger for the window and turns each row into a rollup-shaped dict the summary / leaderboard
+    code already sums."""
+    from ..engine.usage import model_key
+
+    uids = _uids_for(group, person)
+    if uids is not None and not uids:
         return []
     q = (db.client().collection("usage")
          .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
@@ -58,7 +69,7 @@ def _group_rollups(d_from: date, d_to: date, group: str, env: str) -> list[dict]
     out = []
     for d in q.stream():
         r = d.to_dict() or {}
-        if r.get("uid") not in uids or (r.get("env") or "production") != env:
+        if (uids is not None and r.get("uid") not in uids) or (agent and r.get("agent_id") != agent) or (r.get("env") or "production") != env:
             continue
         tokens = int(r.get("prompt_tokens", 0) or 0) + int(r.get("completion_tokens", 0) or 0)
         out.append({"day": r.get("day", ""), "env": env, "agent_id": r.get("agent_id", ""), "agent_name": r.get("agent_name", ""),
@@ -72,9 +83,10 @@ def _group_rollups(d_from: date, d_to: date, group: str, env: str) -> list[dict]
     return out
 
 
-def _rollups(d_from: date, d_to: date, department: str, env: str = "production", group: str = "") -> list[dict]:
-    if group:
-        return _group_rollups(d_from, d_to, group, env)
+def _rollups(d_from: date, d_to: date, department: str, env: str = "production", group: str = "", person: str = "",
+             agent: str = "") -> list[dict]:
+    if group or person or agent:
+        return _group_rollups(d_from, d_to, group, env, person, agent)
     q = (db.client().collection("usage_daily")
          .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
          .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
@@ -95,12 +107,12 @@ def departments():
 
 @router.get("/summary", response_model=MonitoringSummary)
 def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production",
-            group: str = ""):
+            group: str = "", person: str = "", agent: str = ""):
     d_from, d_to = _parse_range(frm, to)
     env = _env(env)
-    rows = _rollups(d_from, d_to, department, env, group)
+    rows = _rollups(d_from, d_to, department, env, group, person, agent)
     span = (d_to - d_from).days + 1
-    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department, env, group)
+    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department, env, group, person, agent)
 
     by_day: dict[str, DailyPoint] = {}
     for i in range(span):
@@ -158,9 +170,10 @@ def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, 
     )
 
 
-def _agent_rows(d_from: date, d_to: date, department: str, env: str = "production", group: str = "") -> list[AgentUsageRow]:
+def _agent_rows(d_from: date, d_to: date, department: str, env: str = "production", group: str = "", person: str = "",
+                agent: str = "") -> list[AgentUsageRow]:
     acc: dict[str, dict] = {}
-    for r in _rollups(d_from, d_to, department, env, group):
+    for r in _rollups(d_from, d_to, department, env, group, person, agent):
         a = acc.setdefault(r.get("agent_id", ""), {"name": r.get("agent_name", ""), "department": r.get("department", ""),
                                                    "requests": 0, "failed": 0, "fallbacks": 0, "tokens": 0, "cost": 0.0, "ms": 0,
                                                    "models": defaultdict(int), "groups": defaultdict(int)})
@@ -206,16 +219,16 @@ def _sorted(rows: list[AgentUsageRow], sort: str) -> list[AgentUsageRow]:
 
 @router.get("/agents", response_model=list[AgentUsageRow])
 def agents(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", sort: str = "requests",
-           env: str = "production", group: str = ""):
+           env: str = "production", group: str = "", person: str = "", agent: str = ""):
     d_from, d_to = _parse_range(frm, to)
-    return _sorted(_agent_rows(d_from, d_to, department, _env(env), group), sort)
+    return _sorted(_agent_rows(d_from, d_to, department, _env(env), group, person, agent), sort)
 
 
 @router.get("/export.csv")
 def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production",
-               group: str = "", user: User = Depends(require_admin)):
+               group: str = "", person: str = "", agent: str = "", user: User = Depends(require_admin)):
     d_from, d_to = _parse_range(frm, to)
-    rows = _sorted(_agent_rows(d_from, d_to, department, _env(env), group), "cost_usd")
+    rows = _sorted(_agent_rows(d_from, d_to, department, _env(env), group, person, agent), "cost_usd")
     buf = io.StringIO()
     buf.write("﻿")  # BOM so Excel opens Chinese headers correctly
     w = csv.writer(buf)
@@ -238,6 +251,11 @@ def _raw(d_from: date, d_to: date, env: str) -> list[dict]:
          .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
          .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
     return [r for r in (d.to_dict() or {} for d in q.stream()) if (r.get("env") or "production") == env]
+
+
+def _filter_raw(rows: list[dict], group: str, person: str, agent: str) -> list[dict]:
+    uids = _uids_for(group, person)
+    return [r for r in rows if (uids is None or r.get("uid") in uids) and (not agent or r.get("agent_id") == agent)]
 
 
 def _acc(rows: list[dict]) -> dict:
@@ -269,16 +287,12 @@ def _people() -> tuple[dict[str, dict], dict[str, list[str]]]:
 
 
 @router.get("/users", response_model=list[UsageByRow])
-def usage_by_user(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production", group: str = ""):
-    """One row per person who used a model in the window, most expensive first. `group`: only that group's members."""
+def usage_by_user(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production", group: str = "",
+                  person: str = "", agent: str = ""):
+    """One row per person who used a model in the window, most expensive first; filtered like the summary."""
     d_from, d_to = _parse_range(frm, to)
-    rows = _raw(d_from, d_to, _env(env))
-    people, members = _people()
-    if group:
-        from .groups import members_of
-        members_of(group)  # 404 for an unknown group
-        keep = set(members.get(group, []))
-        rows = [r for r in rows if r.get("uid") in keep]
+    rows = _filter_raw(_raw(d_from, d_to, _env(env)), group, person, agent)
+    people, _ = _people()
     by: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by[r.get("uid") or ""].append(r)
@@ -288,16 +302,20 @@ def usage_by_user(frm: str | None = Query(None, alias="from"), to: str | None = 
 
 
 @router.get("/groups", response_model=list[UsageByRow])
-def usage_by_group(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production"):
-    """One row per group (群組管理): the usage of its members. A person in several groups counts in each of them."""
+def usage_by_group(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production", group: str = "",
+                   person: str = "", agent: str = ""):
+    """One row per group (群組管理): the usage of its members. A person in several groups counts in each of them.
+    With a group filter only that group is listed; person / agent filters narrow the usage counted."""
     d_from, d_to = _parse_range(frm, to)
-    rows = _raw(d_from, d_to, _env(env))
+    rows = _filter_raw(_raw(d_from, d_to, _env(env)), group, person, agent)
     _, members = _people()
     by_uid: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_uid[r.get("uid") or ""].append(r)
     out = []
     for g in db.client().collection("groups").stream():
+        if group and g.id != group:
+            continue
         uids = members.get(g.id, [])
         out.append(_row(g.id, _acc([r for u in uids for r in by_uid.get(u, [])]), name=(g.to_dict() or {}).get("name", g.id), members=len(uids)))
     return sorted(out, key=lambda r: (-r.cost_usd, -r.requests, r.name))

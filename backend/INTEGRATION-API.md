@@ -164,6 +164,7 @@ Prices in the registry are used for cost when a served model is not in the built
 
 ## 用量與成本: usage limits and usage by person / group (admin)
 
+- Every `/api/monitoring/{summary,agents,users,groups,export.csv}` call accepts `group`, `person` (uid) and `agent` (agent id) filters (combinable).
 - `GET /api/monitoring/users?from&to&env&group` -> `[{id: uid, name, email, requests, tokens, cost_usd, failed, main_model}]`, most expensive first (raw ledger for the window).
 - `GET /api/monitoring/groups?from&to&env` -> `[{id, name, members, requests, tokens, cost_usd, failed, main_model}]`; a person in several groups counts in each.
 - `GET /api/monitoring/limits` -> `[{id, scope: group|model, target, target_label, period: day|month, metric: cost_usd|tokens|requests, limit, enabled, note, used, pct, exceeded}]`
