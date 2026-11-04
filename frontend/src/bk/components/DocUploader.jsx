@@ -3,7 +3,10 @@ import { api } from "../api";
 import { DEPARTMENTS, DOC_CATEGORIES } from "../types";
 import { ErrorBox, Icon, Spinner } from "./ui";
 const ACCEPT = ".pdf,.txt,.md,.docx,.pptx,.html,.csv,.json";
-function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focusSignal = 0 }) {
+/* `bare`: no drop zone and no explanatory text — just the two selects, the hidden file input and the primary button
+   (labelled `buttonLabel`), with status and errors beneath; `children` are rendered after the button (e.g. a secondary
+   action). The space page composes it into its own heading row and keeps the explanation as plain text. */
+function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focusSignal = 0, bare = false, buttonLabel = "選擇本機文獻檔案", children = null }) {
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState(defaultDepartment);
   const [busy, setBusy] = useState("");
@@ -25,6 +28,40 @@ function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focu
     return () => window.clearTimeout(t);
   }, [focusSignal]);
   const choose = () => category ? input.current?.click() : askCategory();
+  const categorySelect = <select
+    ref={categoryRef}
+    className={`w-auto py-1.5 text-sm ${needCategory && !category ? "border-error ring-2 ring-error/30" : ""}`}
+    value={category}
+    onChange={(e) => {
+      setCategory(e.target.value);
+      setNeedCategory(false);
+    }}
+  >
+    <option value="">選擇文件類別（必填）</option>{DOC_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+  </select>;
+  const departmentSelect = <select className="w-auto py-1.5 text-sm" value={department} onChange={(e) => setDepartment(e.target.value)}>
+    <option value="">所屬科別（選填）</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+  </select>;
+  const fileInput = <input ref={input} type="file" multiple hidden accept={ACCEPT} onChange={(e) => {
+    upload(e.target.files);
+    e.target.value = "";
+  }} />;
+  const messages = <>
+    {needCategory && !category && <p className="mt-2 flex items-center gap-1 text-xs text-error"><Icon name="error" className="text-[14px]" />請先選擇文件類別，再選擇檔案。</p>}
+    {busy && <p className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant"><Spinner />去識別化並建立索引中：{busy}（大型檔案約需 30 秒以上）</p>}
+    {err && <div className="mt-2"><ErrorBox msg={err} /></div>}
+  </>;
+  if (bare) {
+    return <div className="flex flex-col items-end gap-0.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {categorySelect}{departmentSelect}{fileInput}
+        <button className="btn-primary" disabled={!!busy} onClick={choose}>
+          {busy ? <Spinner /> : <Icon name="upload_file" className="text-[18px]" />}{buttonLabel}</button>
+        {children}
+      </div>
+      {messages}
+    </div>;
+  }
   const upload = async (list) => {
     if (!list?.length) return;
     if (!category) {
