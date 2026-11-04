@@ -90,7 +90,7 @@ useEffect(()=>{if(!MOCK&&(logged||PREVIEW)&&page==='新對話')loadAgents()},[pa
 const recents=useRecents({MOCK,chats:recentChats,setChats:setRecentChats,projects,setProjects,notify,onDeleted:id=>{if(id===liveSession||id===threadId)go('新對話')},onDeletedAll:()=>{setLiveSession(null);setMessages([]);setThreadId(crypto.randomUUID());go('新對話')},onProjectDeleted:id=>{if(projectId===id){setProjectId(null);if(page==='專案')go('新對話')}}});
 useEffect(()=>{
   if(MOCK||(!logged&&!PREVIEW))return;
-  api.listSessions(100).then(r=>setRecentChats(r.items.map(i=>({id:i.id,title:i.title||'對話',messages:null,agent:'Medisense',model:'Auto',project_id:i.project_id||'',created_at:i.created_at,updated_at:i.updated_at,pinned:!!i.pinned,locked:!!i.locked,archived:!!i.archived})))).catch(()=>{});
+  api.listSessions(100).then(r=>setRecentChats(r.items.map(i=>({id:i.id,title:i.title||'對話',messages:null,agent:i.agent_name||'Medisense',model:'Auto',project_id:i.project_id||'',created_at:i.created_at,updated_at:i.updated_at,pinned:!!i.pinned,locked:!!i.locked,archived:!!i.archived})))).catch(()=>{});
   api.listProjects().then(setProjects).catch(()=>{});
 },[logged]);
 function onRunDone(res,run){

@@ -1045,6 +1045,7 @@ class SessionSummary(BaseModel):
     id: str
     title: str = ""
     agent_id: str = ""
+    agent_name: str = ""  # the agent that answered (shown above each reply after a reload); "" = the default Medisense
     updated_at: Any = None
     created_at: Any = None
     message_count: int = 0

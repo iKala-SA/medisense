@@ -115,6 +115,7 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
     # A run that stopped at an approval node parks its state on the session; a new message discards it.
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None
+    sess["agent_name"] = agent.name  # so a reloaded conversation still shows which agent answered
     sess.update(session_extra or {})
     if runenv.is_sandbox():
         sess["env"] = runenv.SANDBOX  # kept out of 最近項目; counted separately
