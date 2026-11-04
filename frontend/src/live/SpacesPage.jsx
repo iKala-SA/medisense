@@ -39,13 +39,13 @@ function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc})
     <p className="subtitle">{s.description||'（無說明）'}</p>
     <div className="lv-w-meta"><span className="badge">{TYPE[s.type]||s.type}</span><span className="lv-w-role">{ROLE_LABEL[s.my_role]||s.my_role}</span><span className="muted small">擁有者 {s.owner_email||'—'} · 更新 {fmtDate(s.updated_at)}</span></div>
     <div className="page-heading" style={{marginTop:16,alignItems:'flex-start'}}><h3 style={{margin:0,paddingTop:6}}>文件（{s.documents_count??(ids||[]).length}）</h3>
-      {edit&&builder&&<span className="bk"><DocUploader bare buttonLabel="加入文件" defaultCategory="other" defaultDepartment={me.department||''} onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}>
+      {edit&&builder&&<span className="bk"><DocUploader bare buttonLabel="加入文件" defaultCategory="other" onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}>
       </DocUploader></span>}</div>
     {edit&&builder&&<p className="muted small" style={{margin:'-4px 0 14px',lineHeight:1.7}}>支援 PDF、DOCX、PPTX、TXT、Markdown、HTML、CSV、JSON，單檔上限 25 MB。上傳後自動執行：Sensitive Data Protection 去識別化 → 文字擷取與分塊 → Vertex AI 向量嵌入 (text-multilingual-embedding-002)。原檔保留於 CMEK 加密儲存桶。</p>}
-    <div className="lt" style={{'--cols':'1fr 130px 44px'}}>
-      <div className="lt-head"><span>文件</span><span>部門</span><span/></div>
-      {(ids||[]).map(id=>{const d=(docs||[]).find(x=>x.id===id);return <div className="lt-row" key={id}><span><FileText size={15}/> {names[id]||<span className="muted">{id}</span>}</span><span className="muted small">{d?.department||'—'}</span>
-        {edit?<button className="icon-btn" aria-label={'移除 '+(names[id]||id)} onClick={async()=>{await run(()=>api.removeSpaceDoc(s.id,id),'已移除文件','移除失敗：')&&refetch()}}><Trash/></button>:<span/>}</div>})}
+    <div className="lt" style={{'--cols':'1fr 44px'}}>
+      <div className="lt-head"><span>文件</span><span/></div>
+      {(ids||[]).map(id=><div className="lt-row" key={id}><span><FileText size={15}/> {names[id]||<span className="muted">{id}</span>}</span>
+        {edit?<button className="icon-btn" aria-label={'移除 '+(names[id]||id)} onClick={async()=>{await run(()=>api.removeSpaceDoc(s.id,id),'已移除文件','移除失敗：')&&refetch()}}><Trash/></button>:<span/>}</div>)}
       {!(ids||[]).length&&<Empty text={ids===null&&s.documents_count?`此空間共有 ${s.documents_count} 份文件（無法顯示清單）`:'尚無文件'}/>}
     </div>
     {!builder&&<p className="lv-w-note">你的角色無法瀏覽文件庫，僅顯示文件編號與數量；加入文件需要建構者權限。</p>}
