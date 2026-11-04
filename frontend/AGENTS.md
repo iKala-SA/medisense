@@ -150,7 +150,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 ## Connector writes confirmed in chat (2026-11-03)
 - A connector write that an agent capability marks 需核准 now pauses the chat turn with `pending_approval.approver === 'user'`. `ChatAnswer` renders `ApprovalCard` (message, argument preview, 確認執行 / 取消) inside the same answer bubble; `App.decideLive` calls `api.chatApprove(session_id, approve)` and replaces that bubble with the outcome, appending the approval and tool steps to its trace. Reopened sessions get `pending_approval` from `GET /api/sessions/{id}` and show the card on the last entry.
 - `approver === 'owner'` (a canvas approval node) keeps the old text: the agent owner or an admin decides in the Agent page; no buttons in chat.
-- Connectors page: the Google Calendar 寫入動作 checkboxes are live (`write_actions`); 我的連線 shows 可寫入 actions and a 重新授權 hint when the grant lacks a newly required scope (`missing_scopes`).
+- Connectors page: the Google Calendar 寫入動作 checkboxes are live (`write_actions`); 我的連線 shows a 重新授權 hint when the grant lacks a newly required scope (`missing_scopes`).
 - The + menu's connector rows (general chat) run the OAuth popup in place (`connectAccount`): 連接 when not connected, 重新授權 when the grant lacks a newly required scope, and a quiet 重新授權 beside the check of a connected account so the user can refresh their token without leaving the chat (2026-11-04).
 
 ## Read-only permission for groups (2026-11-03)
