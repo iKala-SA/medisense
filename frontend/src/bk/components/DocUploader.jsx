@@ -3,10 +3,14 @@ import { api } from "../api";
 import { DEPARTMENTS, DOC_CATEGORIES } from "../types";
 import { ErrorBox, Icon, Spinner } from "./ui";
 const ACCEPT = ".pdf,.txt,.md,.docx,.pptx,.html,.csv,.json";
-function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focusSignal = 0 }) {
-  const [category, setCategory] = useState("");
+/* `bare`: just a primary button (labelled `buttonLabel`) that opens the file picker — no drop zone, no text, no selects:
+   the document gets `defaultCategory` and `defaultDepartment` — with status and errors beneath; `children` are rendered
+   after the button (e.g. a secondary action). The space page composes it into its own heading row. */
+function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded, compact = false, focusSignal = 0, bare = false, buttonLabel = "選擇本機文獻檔案", children = null }) {
+  const [category, setCategory] = useState(defaultCategory);
   const [department, setDepartment] = useState(defaultDepartment);
   const [busy, setBusy] = useState("");
+  const [prog, setProg] = useState(null); // {pct: 0-100 while uploading, stage: "upload" | "index", done, total}
   const [over, setOver] = useState(false);
   const [err, setErr] = useState("");
   const [needCategory, setNeedCategory] = useState(false);
@@ -25,6 +29,49 @@ function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focu
     return () => window.clearTimeout(t);
   }, [focusSignal]);
   const choose = () => category ? input.current?.click() : askCategory();
+  const categorySelect = <select
+    ref={categoryRef}
+    className={`w-auto py-1.5 text-sm ${needCategory && !category ? "border-error ring-2 ring-error/30" : ""}`}
+    value={category}
+    onChange={(e) => {
+      setCategory(e.target.value);
+      setNeedCategory(false);
+    }}
+  >
+    <option value="">選擇文件類別（必填）</option>{DOC_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+  </select>;
+  const departmentSelect = <select className="w-auto py-1.5 text-sm" value={department} onChange={(e) => setDepartment(e.target.value)}>
+    <option value="">所屬科別（選填）</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+  </select>;
+  const fileInput = <input ref={input} type="file" multiple hidden accept={ACCEPT} onChange={(e) => {
+    upload(e.target.files);
+    e.target.value = "";
+  }} />;
+  const messages = <>
+    {needCategory && !category && <p className="mt-2 flex items-center gap-1 text-xs text-error"><Icon name="error" className="text-[14px]" />請先選擇文件類別，再選擇檔案。</p>}
+    {busy && <div className="mt-2 w-full min-w-[280px] max-w-xl">
+      <p className="flex items-center gap-2 text-xs text-on-surface-variant"><Spinner />
+        {prog?.stage === "upload" ? `上傳中 ${prog.pct}%：${busy}` : `去識別化並建立索引中：${busy}（大型檔案約需 30 秒以上）`}
+        {prog && prog.total > 1 && <span className="ml-auto">{prog.done + 1} / {prog.total}</span>}</p>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high" role="progressbar" aria-label="上傳進度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog?.stage === "upload" ? prog.pct : undefined}>
+        {prog?.stage === "upload"
+          ? <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${prog.pct}%` }} />
+          : <div className="bar-indeterminate h-full rounded-full bg-primary" />}
+      </div>
+    </div>}
+    {err && <div className="mt-2"><ErrorBox msg={err} /></div>}
+  </>;
+  if (bare) {
+    return <div className="flex flex-col items-end gap-0.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {fileInput}
+        <button className="btn-primary" disabled={!!busy} onClick={choose}>
+          {busy ? <Spinner /> : <Icon name="upload_file" className="text-[18px]" />}{buttonLabel}</button>
+        {children}
+      </div>
+      {messages}
+    </div>;
+  }
   const upload = async (list) => {
     if (!list?.length) return;
     if (!category) {
@@ -32,15 +79,21 @@ function DocUploader({ defaultDepartment = "", onUploaded, compact = false, focu
       return;
     }
     setErr("");
-    for (const f of Array.from(list)) {
+    const files = Array.from(list);
+    for (const [i, f] of files.entries()) {
       setBusy(f.name);
+      setProg({ pct: 0, stage: "upload", done: i, total: files.length });
       try {
-        onUploaded(await api.uploadDoc(f, category, department));
+        onUploaded(await api.uploadDocProgress(f, category, department, (sent, size) => {
+          const pct = size ? Math.round((sent / size) * 100) : 100;
+          setProg({ pct, stage: pct >= 100 ? "index" : "upload", done: i, total: files.length });
+        }));
       } catch (e) {
         setErr(`${f.name}: ${String(e)}`);
       }
     }
     setBusy("");
+    setProg(null);
   };
   return <div
     onDragOver={(e) => {

@@ -42,7 +42,7 @@ function NameInput({value,onDone}){
   return <input className="rc-rename" autoFocus value={v} maxLength={80} onChange={e=>setV(e.target.value)} onFocus={e=>e.target.select()} onBlur={()=>onDone(v)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape')onDone(null)}}/>;
 }
 
-export function useRecents({MOCK,chats,setChats,projects,setProjects,notify,onDeleted,onProjectDeleted}){
+export function useRecents({MOCK,chats,setChats,projects,setProjects,notify,onDeleted,onDeletedAll,onProjectDeleted}){
   /* shared actions for the sidebar and the project page */
   const [busy,setBusy]=useState(false);
   const run=async(fn)=>{if(busy)return;setBusy(true);try{await fn()}catch(e){notify?.(e.message)}finally{setBusy(false)}};
@@ -52,6 +52,8 @@ export function useRecents({MOCK,chats,setChats,projects,setProjects,notify,onDe
     patchChat:(id,patch)=>run(async()=>{if(!MOCK)await api.updateSession(id,patch);setChats(l=>l.map(c=>c.id===id?{...c,...patch}:c))}),
     moveChat:(id,pid)=>run(async()=>{if(!MOCK)await api.moveSession(id,pid||'');setChats(l=>l.map(c=>c.id===id?{...c,project_id:pid||''}:c))}),
     deleteChat:id=>run(async()=>{if(!MOCK)await api.deleteSession(id);setChats(l=>l.filter(c=>c.id!==id));onDeleted?.(id)}),
+    // every conversation of mine (recent, archived, in projects); locked ones stay, and the server says how many
+    deleteAllChats:()=>run(async()=>{const r=MOCK?{deleted:chats.filter(c=>!c.locked).length,kept_locked:chats.filter(c=>c.locked).length}:await api.deleteAllSessions();setChats(l=>l.filter(c=>c.locked));onDeletedAll?.();notify?.(r.kept_locked?`已刪除 ${r.deleted} 則對話，${r.kept_locked} 則已鎖定的對話保留`:`已刪除 ${r.deleted} 則對話`)}),
     createProject:name=>run(async()=>{name=(name||'').trim();if(!name)return;const p=MOCK?{id:'p'+Date.now(),name}:await api.createProject(name);setProjects(l=>[...l,p]);return p}),
     renameProject:(id,name)=>run(async()=>{name=(name||'').trim();if(!name)return;if(!MOCK)await api.renameProject(id,name);setProjects(l=>l.map(p=>p.id===id?{...p,name}:p))}),
     deleteProject:id=>run(async()=>{if(!MOCK)await api.deleteProject(id);setProjects(l=>l.filter(p=>p.id!==id));setChats(l=>l.map(c=>c.project_id===id?{...c,project_id:''}:c));onProjectDeleted?.(id)}),
@@ -127,6 +129,7 @@ export function Recents({chats,projects,actions,activeId,activeProject,onOpen,on
       <Fly icon={ArrowsDownUp} label="排序對話依據"><Item check={pref.sort==='updated'} onClick={()=>{set({sort:'updated'});setMenu(null)}}>更新時間</Item><Item check={pref.sort==='created'} onClick={()=>{set({sort:'created'});setMenu(null)}}>建立時間</Item></Fly>
       <hr/><p className="rc-cap">顯示</p>
       <Item check={pref.projects} onClick={()=>set({projects:!pref.projects})}>專案</Item>
+      <hr/><Item icon={Trash} danger onClick={()=>{setAsk({kind:'all'});setMenu(null)}}>刪除所有對話歷史</Item>
     </Pop>}
     {menu==='filter'&&filt.current&&<Pop anchor={filt.current} onClose={()=>setMenu(null)} width={190}>
       {RANGES.map(([k,n])=><Item key={k} check={pref.range===k} onClick={()=>{set({range:k});setMenu(null)}}>{n}</Item>)}<hr/><Item icon={Archive} check={pref.range==='archived'} onClick={()=>{set({range:pref.range==='archived'?'all':'archived'});setMenu(null)}}>已封存對話</Item>
@@ -138,6 +141,7 @@ export function Recents({chats,projects,actions,activeId,activeProject,onOpen,on
     {naming&&createPortal(<div className="rc-modal" onClick={()=>setNaming(null)}><form className="rc-dialog" onClick={e=>e.stopPropagation()} onSubmit={e=>{e.preventDefault();newProject(naming.chat)}}><h3>新專案</h3><p>把相關的對話放在一起。</p><input autoFocus maxLength={60} placeholder="專案名稱" value={naming.name} onChange={e=>setNaming({...naming,name:e.target.value})}/><div><button type="button" className="ghost" onClick={()=>setNaming(null)}>取消</button><button type="submit" className="primary" disabled={!naming.name.trim()}>建立專案</button></div></form></div>,document.body)}
     {ask?.kind==='chat'&&<Confirm title="刪除對話？" body={`這會刪除「${ask.chat.title}」，無法復原。`} action="刪除" onCancel={()=>setAsk(null)} onOk={()=>{actions.deleteChat(ask.chat.id);setAsk(null)}}/>}
     {ask?.kind==='project'&&<Confirm title="刪除專案？" body={`「${ask.project.name}」會被刪除，其中的對話會回到最近項目，不會被刪除。`} action="刪除專案" onCancel={()=>setAsk(null)} onOk={()=>{actions.deleteProject(ask.project.id);setAsk(null)}}/>}
+    {ask?.kind==='all'&&<Confirm title="刪除所有對話歷史？" body="這會刪除你所有的對話（包括已封存與專案中的），無法復原。已鎖定的對話會保留；專案本身不會被刪除。" action="全部刪除" onCancel={()=>setAsk(null)} onOk={()=>{actions.deleteAllChats();setAsk(null)}}/>}
   </div>;
 }
 

@@ -112,3 +112,62 @@ def test_chat_endpoint_forwards_the_header(fs, as_user, monkeypatch):
     monkeypatch.setattr("app.routers.chat.execute_run", fake_run)
     as_user(BUILDER).post("/api/chat", json={"message": "hi"}, headers={"X-BigQuery-Auth": "Bearer t0k"})
     assert seen["tok"] == "t0k" and bigquery.current_token() == ""
+
+
+# ------------------------------------------------------------------ the long-lived path: the user's gateway grant
+@pytest.fixture
+def linked_gateway(monkeypatch):
+    """The user has connected Google BigQuery in 我的連線: the gateway holds (and refreshes) the grant."""
+    from app.engine import open_connector as oc
+
+    calls = []
+    monkeypatch.setattr(oc, "configured", lambda: True)
+    monkeypatch.setattr(oc, "connection", lambda service, uid: {"service": service, "status": "active"} if uid == BUILDER.uid else None)
+
+    def execute(action, input_, uid=None, *, connection=None):
+        calls.append((action, input_, uid))
+        if action.endswith("start_query_job"):
+            return {"job": {"jobReference": {"projectId": "proj-1", "jobId": "job-9", "location": "asia-east1"}}}
+        return {"jobComplete": True, "rows": [{"values": ["王小明 內科", "12"]}, {"values": ["外科", "3"]}, {"values": ["眼科", "1"]}],
+                "schema": {"fields": ROWS["schema"]["fields"]}, "raw": ROWS}
+    monkeypatch.setattr(oc, "execute", execute)
+    bigquery.reset_link_cache()
+    yield calls
+    bigquery.reset_link_cache()
+
+
+def test_a_connected_user_queries_through_the_gateway_without_any_browser_token(bq, linked_gateway):
+    cid, sent, _, audit = bq
+    text, summary = db_tools.execute(spec(cid, "sql")["meta"], {"sql": SQL}, user_id=BUILDER.uid, email=BUILDER.email, agent_id="a")
+    assert "[PERSON_NAME]" in text and summary == "門診統計 · 2 筆" and not sent  # no direct REST call: the gateway did it
+    start, results = linked_gateway
+    assert start[0] == "google_bigquery.start_query_job" and start[2] == BUILDER.uid
+    assert start[1]["projectId"] == "proj-1" and start[1]["query"].startswith(SQL) and start[1]["maximumBytesBilled"] == str(10 * 1024**3)
+    assert start[1]["defaultDataset"] == {"projectId": "proj-1", "datasetId": "clinic"} and start[1]["useLegacySql"] is False
+    assert results[0] == "google_bigquery.get_query_results" and results[1] == {"projectId": "proj-1", "jobId": "job-9", "location": "asia-east1", "maxResults": 2, "timeoutMs": 30000}
+
+
+def test_someone_without_a_grant_still_uses_the_hourly_token_or_is_told_both_ways(bq, linked_gateway):
+    cid, sent, _, _ = bq
+    with bigquery.user_token("ya29.short"):  # ADMIN has no gateway grant: the browser token is used
+        text, _ = db_tools.execute(spec(cid, "sql")["meta"], {"sql": SQL}, user_id=ADMIN.uid, email=ADMIN.email, agent_id="a")
+    assert "[PERSON_NAME]" in text and sent and sent[0]["auth"] == "Bearer ya29.short"
+    text, summary = db_tools.execute(spec(cid, "sql")["meta"], {"sql": SQL}, user_id=ADMIN.uid, email=ADMIN.email, agent_id="a")
+    assert "需要 BigQuery 授權" in summary and "我的連線" in text and "授權 BigQuery" in text
+
+
+def test_a_revoked_grant_asks_for_reauthorization_and_drops_the_cache(bq, linked_gateway, monkeypatch):
+    from app.engine import open_connector as oc
+
+    cid = bq[0]
+    monkeypatch.setattr(oc, "execute", lambda *a, **k: (_ for _ in ()).throw(oc.OpenConnectorError("gone", "reauth_required", 403)))
+    text, summary = db_tools.execute(spec(cid, "sql")["meta"], {"sql": SQL}, user_id=BUILDER.uid, email=BUILDER.email, agent_id="a")
+    assert "重新授權" in text and "需要 BigQuery 授權" in summary and not bigquery._linked_cache
+
+
+def test_bigquery_is_not_offered_as_a_plain_chat_tool(fs):
+    from app.routers.chat import my_connector_caps
+
+    fs.put("connectors/bq", {"type": "gateway", "label": "Google BigQuery", "owner_uid": "admin", "share": {"access": "account", "role": "use", "members": []},
+                             "config": {"service": "google_bigquery", "auth_mode": "oauth2", "allowed_actions": ["google_bigquery.query", "google_bigquery.start_query_job"]}})
+    assert my_connector_caps(BUILDER) == []

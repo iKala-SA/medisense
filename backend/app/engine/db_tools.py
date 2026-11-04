@@ -77,7 +77,7 @@ def execute(meta: dict, args: dict, *, user_id: str, email: str, agent_id: str) 
         if kind == "tables":
             match = str(args.get("table") or "").strip()
             detail = f"列出資料表{('：' + match) if match else ''}"
-            text = bigquery.schema(conn, match) if ctype == "bigquery" else db_direct.schema(ctype, conn, *_login(c), match=match)
+            text = bigquery.schema(conn, match, uid=user_id) if ctype == "bigquery" else db_direct.schema(ctype, conn, *_login(c), match=match)
             ok = True
             return text, f"{name} · 資料表"
         try:
@@ -86,7 +86,7 @@ def execute(meta: dict, args: dict, *, user_id: str, email: str, agent_id: str) 
             raise DbError(f"SQL 未通過檢查：{e}") from e
         detail = checked["sql"]
         if ctype == "bigquery":
-            text = bigquery.run(conn, checked["sql"], max_rows=max_rows)
+            text = bigquery.run(conn, checked["sql"], max_rows=max_rows, uid=user_id)
         else:
             text = db_direct.run(ctype, conn, *_login(c), checked["sql"], max_rows)
         text = _cut(text, max_rows)

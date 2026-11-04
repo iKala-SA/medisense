@@ -14,11 +14,11 @@ export default function PickData({live,picked,onSave,onClose}){
     if(!live){setRows([{t:'space',id:'s1',name:'院內指引',sub:'12 份文件',at:Date.now()-864e5},{t:'db',id:'d1',name:'藥局資料庫',sub:'PostgreSQL · 2 個查詢 · 1 個檢視表'}]);return}
     Promise.all([api.listSpaces().catch(()=>[]),api.myDbConnectors().catch(()=>[])]).then(([sp,db])=>setRows([
       ...(sp||[]).map(s=>({t:'space',id:s.id,name:s.name,sub:`${s.documents_count||0} 份文件`,at:s.updated_at,owner:s.owner_email})),
-      ...(db||[]).map(d=>({t:'db',id:d.id,name:d.name,sub:[KIND_LABEL[d.kind]||d.kind,d.queries?.length&&`${d.queries.length} 個查詢`,d.views?.length&&`${d.views.length} 個檢視表`].filter(Boolean).join(' · ')}))]));
+      ...(db||[]).map(d=>({t:'db',id:d.id,name:d.name,kind:d.kind,sub:[KIND_LABEL[d.kind]||d.kind,d.queries?.length&&`${d.queries.length} 個查詢`,d.views?.length&&`${d.views.length} 個檢視表`].filter(Boolean).join(' · ')}))]));
   });
   const list=useMemo(()=>(rows||[]).filter(r=>(tab==='all'||r.t===tab)&&(!q.trim()||(r.name+r.sub).toLowerCase().includes(q.trim().toLowerCase()))),[rows,tab,q]);
   const key=r=>r.t+':'+r.id,flip=r=>setSel(s=>{const n=new Set(s);n.has(key(r))?n.delete(key(r)):n.add(key(r));return n});
-  const save=()=>onSave((rows||[]).filter(r=>sel.has(key(r))).map(r=>({t:r.t,id:r.id,name:r.name})));
+  const save=()=>onSave((rows||[]).filter(r=>sel.has(key(r))).map(r=>({t:r.t,id:r.id,name:r.name,...(r.kind?{kind:r.kind}:{})})));
   return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="modal pd-dialog" role="dialog" aria-modal="true" aria-label="新增資料">
     <header><h2>新增資料</h2><button type="button" className="icon-btn" aria-label="關閉" onClick={onClose}><X size={16}/></button></header>
     <p className="pd-sub">選擇這次對話要讓 AI 參考的空間與資料庫。資料庫為唯讀查詢；BigQuery 以你自己的 Google 帳號查詢。</p>

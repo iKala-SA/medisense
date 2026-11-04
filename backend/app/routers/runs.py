@@ -152,9 +152,12 @@ def can_decide(agent_data: dict, sess: dict, user: User) -> bool:
     return can_edit(agent_data, user) or (pending.get("approver") == "user" and sess.get("uid") == user.uid)
 
 
-def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: bool, x_bigquery_auth: str | None = None) -> RunResponse:
+def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: bool, x_bigquery_auth: str | None = None,
+                   agent_def: tuple[AgentIn, list[str]] | None = None) -> RunResponse:
     """Approve (resume the run with the saved context: the paused call executes, then the model continues) or reject
-    (the run stops) the step this session is waiting on. Permission is the caller's job (`can_decide`)."""
+    (the run stops) the step this session is waiting on. Permission is the caller's job (`can_decide`). `agent_def` replaces
+    the stored definition when the run was built on the fly (general chat: the built-in assistant plus the user's connectors);
+    it must rebuild the same tools, otherwise the paused call's tool name is unknown."""
     pending = sess.get("pending")
     if not pending:
         raise HTTPException(409, "nothing is waiting for approval in this session")
@@ -170,7 +173,7 @@ def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: boo
         return RunResponse(session_id=sess_ref.id, reply=reply, latency_ms=0, message_index=len(sess["messages"]) - 1,
                            trace=[StepTrace(node_id=pending["node_id"], type="approval", summary="使用者取消，流程停止" if by_user else "負責人拒絕，流程停止")])
 
-    agent, rag_files = _agent_def(agent_id, user, bool(pending.get("use_published")), pending.get("version"))
+    agent, rag_files = agent_def or _agent_def(agent_id, user, bool(pending.get("use_published")), pending.get("version"))
     with runenv.use(runenv.of(bool(pending.get("use_published")))), bigquery.user_token(x_bigquery_auth):
         history = [{"role": m["role"], "content": m["content"]} for m in sess["messages"][-2 * HISTORY_TURNS:]]
         t0 = time.perf_counter()

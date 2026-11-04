@@ -68,5 +68,10 @@
 .shell .bk nav button:hover{background:transparent}
 .shell .bk nav button>svg{width:auto;height:auto}
 
+/* Indeterminate stage of the document uploader (de-identification + indexing): a bar sweeping left to right. */
+.bk .bar-indeterminate{width:40%;animation:bk-sweep 1.4s ease-in-out infinite}
+@keyframes bk-sweep{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+@media(prefers-reduced-motion:reduce){.bk .bar-indeterminate{animation:none;width:100%;opacity:.5}}
+
 /* Bumped on 2026-10-31: a browser cached a bad copy of this stylesheet under its old hashed URL (see main.jsx); changing the content gives it a new URL. */
 .bk-cache-v2{--bk-cache:2}

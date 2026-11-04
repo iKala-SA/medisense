@@ -162,6 +162,11 @@ Prices in the registry are used for cost when a served model is not in the built
   reject = "已取消此動作，流程停止。"). `approver: "owner"`: a canvas approval node; only the agent owner / an admin may decide (`POST /api/agents/{id}/approve`; `/api/chat/approve` returns 403).
   Audit `agent.approve` / `agent.reject` carry `by_user: true` for user confirmations. Draft (sandbox) runs never pause: writes are simulated there.
 
+## Sessions: delete all
+
+- `DELETE /api/sessions` -> `{deleted, kept_locked}`: every conversation of the caller (recent, archived, in projects, sandbox tests) with its images
+  and share links; locked conversations are kept (unlock first). Audit `session.delete_all`. Projects are untouched.
+
 ## Calendar
 
 `GET /api/calendar/status` -> `{ "connected": false, "reason": "Google Calendar OAuth consent screen not approved yet" }`.
@@ -175,6 +180,9 @@ Prices in the registry are used for cost when a served model is not in the built
 - **Google Docs and any other service**: enable it from the service catalog (`POST /api/gateway-connectors`, service `googledocs`, allow e.g.
   `googledocs.create_document` `{title, text}` or `googledocs.insert_text_action`). The agent tool now receives the action's real input schema (nested objects
   and arrays included), so the model fills `event`-style objects directly; `GET /api/connectors/{id}/actions` marks such arguments `kind: "textarea"` with a `schema`.
+- **Google BigQuery, long-lived**: enable the gateway service `google_bigquery` (oauth2; allow `query`, `start_query_job`, `get_query_results`, `list_datasets`, `list_tables`)
+  and share it; a user who connected it in `/api/my-connectors` runs 資料庫連接器 BigQuery queries through that grant (the gateway refreshes it) and needs no
+  `X-BigQuery-Auth` header. The header remains the hourly fallback. `google_bigquery` actions are never offered as plain chat tools (`DB_SERVICES`).
 - Writes only happen in production runs (chat on a published agent, schedules) and, when the capability says 需核准 (the default), after the user confirms.
 - General chat (no `agent_id`, or the default Medisense agent) offers every gateway-backed connector shared with the caller, with no cap on the number of actions (the same list as
   `GET /api/my-connectors`) as tools: all allowed read actions plus the admin-opened write actions, every write confirmed by the user. A picked agent
