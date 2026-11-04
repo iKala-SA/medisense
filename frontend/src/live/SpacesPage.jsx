@@ -20,19 +20,9 @@ function SpaceForm({initial,admin,onClose,onSubmit}){
   </AddModal>;
 }
 
-function Picker({docs,have,onClose,onAdd}){
-  const [sel,setSel]=useState(new Set()),[q,setQ]=useState('');
-  const list=docs.filter(d=>!have.has(d.id)&&match(d.name||'',q));
-  const flip=id=>setSel(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n});
-  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section className="modal" role="dialog" aria-modal="true" aria-label="加入文件">
-    <h2>加入文件</h2><input aria-label="搜尋文件" placeholder="搜尋文件" value={q} onChange={e=>setQ(e.target.value)} style={{width:'100%',marginBottom:10}}/>
-    <div className="lv-w-docs">{list.map(d=><label className="lv-w-doc" key={d.id}><input type="checkbox" checked={sel.has(d.id)} onChange={()=>flip(d.id)}/><FileText size={16}/>{d.name}<small>{d.department||''}</small></label>)}{!list.length&&<p className="muted small">沒有可加入的文件</p>}</div>
-    <div className="modal-actions"><button type="button" className="btn" onClick={onClose}>取消</button><button type="button" className="btn primary" disabled={!sel.size} onClick={()=>onAdd([...sel])}>加入 {sel.size||''} 份</button></div>
-  </section></div>;
-}
 
 function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc}){
-  const [s,setS]=useState(space),[editing,setEditing]=useState(false),[sharing,setSharing]=useState(false),[picking,setPicking]=useState(false);
+  const [s,setS]=useState(space),[editing,setEditing]=useState(false),[sharing,setSharing]=useState(false);
   const builder=isBuilder(me),edit=canEdit(s);
   const names=Object.fromEntries((docs||[]).map(d=>[d.id,d.name]));
   const ids=s.document_ids||null;
@@ -50,7 +40,6 @@ function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc})
     <div className="lv-w-meta"><span className="badge">{TYPE[s.type]||s.type}</span><span className="lv-w-role">{ROLE_LABEL[s.my_role]||s.my_role}</span><span className="muted small">擁有者 {s.owner_email||'—'} · 更新 {fmtDate(s.updated_at)}</span></div>
     <div className="page-heading" style={{marginTop:16,alignItems:'flex-start'}}><h3 style={{margin:0,paddingTop:6}}>文件（{s.documents_count??(ids||[]).length}）</h3>
       {edit&&builder&&<span className="bk"><DocUploader bare buttonLabel="加入文件" defaultCategory="other" defaultDepartment={me.department||''} onUploaded={async doc=>{const r=await run(()=>api.addSpaceDocs(s.id,[doc.id]),'已上傳並加入空間','加入空間失敗：');if(r){apply(r);onUploadedDoc&&onUploadedDoc(doc)}}}>
-        <button type="button" className="btn-ghost" disabled={docs===null} title="把文件庫裡已有的文件加進這個空間" onClick={()=>setPicking(true)}>從文件庫加入</button>
       </DocUploader></span>}</div>
     {edit&&builder&&<p className="muted small" style={{margin:'-4px 0 14px',lineHeight:1.7}}>支援 PDF、DOCX、PPTX、TXT、Markdown、HTML、CSV、JSON，單檔上限 25 MB。上傳後自動執行：Sensitive Data Protection 去識別化 → 文字擷取與分塊 → Vertex AI 向量嵌入 (text-multilingual-embedding-002)。原檔保留於 CMEK 加密儲存桶。</p>}
     <div className="lt" style={{'--cols':'1fr 130px 44px'}}>
@@ -61,7 +50,6 @@ function Detail({space,me,notify,docs,onBack,onChanged,onDeleted,onUploadedDoc})
     </div>
     {!builder&&<p className="lv-w-note">你的角色無法瀏覽文件庫，僅顯示文件編號與數量；加入文件需要建構者權限。</p>}
     {editing&&<SpaceForm initial={s} onClose={()=>setEditing(false)} onSubmit={async v=>{const r=await run(()=>api.updateSpace(s.id,{...v,document_ids:s.document_ids||[]}),'已更新空間','儲存失敗：');if(r){apply(r);setEditing(false)}}}/>}
-    {picking&&<Picker docs={docs||[]} have={new Set(ids||[])} onClose={()=>setPicking(false)} onAdd={async sel=>{const r=await run(()=>api.addSpaceDocs(s.id,sel),'已加入文件','加入失敗：');if(r){apply(r);setPicking(false)}}}/>}
     {sharing&&<ShareDialog title={s.name} value={s.share} owner={s.owner_email||me.email} onClose={()=>setSharing(false)} onDone={async v=>{
       if(!canOwn(s)){notify('只有擁有者或管理員可以變更分享設定');setSharing(false);return}
       const r=await run(()=>api.shareSpace(s.id,v),'已更新分享設定','分享設定失敗：');if(r){apply(r);setSharing(false)}}}/>}
