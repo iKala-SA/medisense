@@ -526,7 +526,8 @@ class UserOut(BaseModel):
     # Assigned role ids (roles/{id}). Record only: access still follows `role` (2026-11-02 decision).
     roles: list[str] = Field(default_factory=list)
     status: AccountStatus = "active"
-    department: str = ""
+    department: str = ""  # legacy fixed list; the UI now shows real group membership (`groups`)
+    groups: list[str] = Field(default_factory=list)  # ids of the 群組管理 groups this person belongs to
     bootstrap_admin: bool = False  # listed in ADMIN_EMAILS: role/status are not editable here
     original_view: bool = False  # may open original library files that contain personal data (with a stated purpose)
     created_at: Any = None

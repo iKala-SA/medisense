@@ -2,7 +2,8 @@ import React,{useEffect,useMemo,useState,useCallback} from 'react';
 import {UserPlus,DownloadSimple,ArrowClockwise,ArrowLeft,ClockCounterClockwise,Lock,Warning,Info,Trash,CaretRight} from '@phosphor-icons/react';
 import {api,saveBlob} from '../api';
 import {ListToolbar,AddModal,Field,Empty} from '../ListKit';
-import {DEPARTMENTS,ROLES,ROLE_LABEL,STATUSES,fmtDateTime,errText} from './constants';
+import {ROLES,ROLE_LABEL,STATUSES,fmtDateTime,errText} from './constants';
+import {useOrgGroups,groupName} from './orgGroups';
 import {Loading,Notice} from './shared';
 import './admin.css';
 
@@ -20,6 +21,7 @@ export default function UsersPage({me,notify,goAudit}){
   const [search,setSearch]=useState('');
   const [page,setPage]=useState(1);
   const [adding,setAdding]=useState(false);
+  const orgGroups=useOrgGroups();
   const [editing,setEditing]=useState(null);
   const [exporting,setExporting]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -54,7 +56,11 @@ export default function UsersPage({me,notify,goAudit}){
   async function preregister(fd){
     const email=String(fd.get('email')||'').trim().toLowerCase();
     if(!email||!email.includes('@')){notify?.('請輸入有效的電子郵件');return}
-    try{await api.preregisterUser(email,fd.get('role'),fd.get('department')||'');setAdding(false);notify?.(`已預先登錄 ${email}`);load()}
+    try{
+      await api.preregisterUser(email,fd.get('role'),'');
+      const gid=fd.get('group')||'';
+      if(gid){try{await api.addGroupMembers(gid,[email])}catch(e){notify?.('已預先登錄，但加入群組失敗：'+errText(e))}}
+      setAdding(false);notify?.(`已預先登錄 ${email}`);load()}
     catch(e){notify?.('預先登錄失敗：'+errText(e))}
   }
 
@@ -76,7 +82,7 @@ export default function UsersPage({me,notify,goAudit}){
       <div className="lt-head" style={{'--cols':'1.6fr 1fr 1fr .9fr 1fr 24px'}}><span>姓名</span><span>群組</span><span>角色</span><span>狀態</span><span>最近登入</span><span/></div>
       {rows.map(u=><div key={u.email} className="lt-row" style={{'--cols':'1.6fr 1fr 1fr .9fr 1fr 24px',cursor:'pointer'}} onClick={()=>setEditing(u.email)}>
         <span className="lv-name"><Avatar u={u}/><span><b>{u.name||'（尚未登入）'}</b><small style={{display:'block',overflow:'hidden',textOverflow:'ellipsis'}}>{u.email}</small></span></span>
-        <span>{u.department||'—'}</span>
+        <span title={(u.groups||[]).map(id=>groupName(orgGroups,id)).join('、')}>{(u.groups||[]).length?(u.groups||[]).map(id=>groupName(orgGroups,id)).join('、'):'—'}</span>
         <span><RoleBadge role={u.role}/></span>
         <span><StatusBadge u={u}/></span>
         <span className="muted small">{u.last_seen_at?fmtDateTime(u.last_seen_at):'—'}</span>
@@ -88,7 +94,7 @@ export default function UsersPage({me,notify,goAudit}){
     {adding&&<AddModal title="預先註冊使用者" hint="同仁首次以院內 Google 帳號登入時，會套用此角色與群組。" submitLabel="預先註冊" onClose={()=>setAdding(false)} onSubmit={preregister}>
       <Field label="電子郵件"><input name="email" type="email" required placeholder="name@example.org" autoFocus/></Field>
       <Field label="角色"><select name="role" defaultValue="user">{ROLES.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></Field>
-      <Field label="群組"><select name="department" defaultValue=""><option value="">未設定</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></Field>
+      <Field label="群組"><select name="group" defaultValue=""><option value="">不加入群組</option>{(orgGroups||[]).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
     </AddModal>}
   </div>;
 }
@@ -102,13 +108,14 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
   const [u,setU]=useState(null);
   const [role,setRole]=useState('user');
   const [status,setStatus]=useState('active');
-  const [department,setDepartment]=useState('');
+  const [memberOf,setMemberOf]=useState([]);  // group ids, from 群組管理
+  const orgGroups=useOrgGroups();
   const [origView,setOrigView]=useState(false);
   const [reason,setReason]=useState('');
   const [busy,setBusy]=useState(false);
   const [saved,setSaved]=useState(false);
 
-  const reset=x=>{setU(x);setRole(x.role);setStatus(x.status);setDepartment(x.department||'');setOrigView(!!x.original_view);setReason('')};
+  const reset=x=>{setU(x);setRole(x.role);setStatus(x.status);setMemberOf(x.groups||[]);setOrigView(!!x.original_view);setReason('')};
   useEffect(()=>{api.getUser(email).then(reset).catch(e=>{notify?.('載入使用者失敗：'+errText(e));onBack()})},[email]);// eslint-disable-line react-hooks/exhaustive-deps
 
   if(!u)return <div className="card-page lv-page"><Loading/></div>;
@@ -117,7 +124,10 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
   const locked=self||u.bootstrap_admin||readOnly;  // roles and status cannot be changed
   const viewChanged=origView!==!!u.original_view;
   const accessChanged=role!==u.role||status!==u.status||viewChanged;
-  const dirty=accessChanged||department!==(u.department||'');
+  const had=new Set(u.groups||[]),now=new Set(memberOf);
+  const joined=memberOf.filter(g=>!had.has(g)),left=(u.groups||[]).filter(g=>!now.has(g));
+  const groupsChanged=joined.length+left.length>0;
+  const dirty=accessChanged||groupsChanged;
   const needReason=accessChanged&&!reason.trim();
   const owned=u.owned||{agents:0,published_agents:0,connectors:0,documents:0};
   const ownsSomething=owned.agents+owned.connectors+owned.documents>0;
@@ -127,8 +137,11 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
   async function save(){
     setBusy(true);setSaved(false);
     try{
-      const patch={...(role!==u.role?{role}:{}),...(status!==u.status?{status}:{}),...(viewChanged?{original_view:origView}:{}),...(department!==(u.department||'')?{department}:{}),reason:reason.trim()};
-      reset(await api.updateUser(u.email,patch));setSaved(true);notify?.('已儲存並寫入稽核記錄');
+      // group membership lives in 群組管理: one add / remove per change (each is audited there)
+      for(const g of joined)await api.addGroupMembers(g,[u.email]);
+      for(const g of left)await api.removeGroupMember(g,u.email);
+      const patch={...(role!==u.role?{role}:{}),...(status!==u.status?{status}:{}),...(viewChanged?{original_view:origView}:{}),reason:reason.trim()};
+      reset(accessChanged?await api.updateUser(u.email,patch):await api.getUser(u.email));setSaved(true);notify?.('已儲存並寫入稽核記錄');
     }catch(e){notify?.('儲存失敗：'+errText(e))}finally{setBusy(false)}
   }
   async function cancelPrereg(){
@@ -137,7 +150,7 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
     catch(e){notify?.('取消失敗：'+errText(e))}
   }
 
-  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),viewChanged&&(origView?'授予原始檔檢視':'撤銷原始檔檢視'),department!==(u.department||'')&&`群組 → ${department||'未設定'}`].filter(Boolean).join('、');
+  const summary=[role!==u.role&&`角色 ${ROLE_LABEL[u.role]} → ${ROLE_LABEL[role]}`,status!==u.status&&(suspending?'停用帳號':'恢復帳號'),viewChanged&&(origView?'授予原始檔檢視':'撤銷原始檔檢視'),joined.length>0&&`加入群組 ${joined.map(g=>groupName(orgGroups,g)).join('、')}`,left.length>0&&`移出群組 ${left.map(g=>groupName(orgGroups,g)).join('、')}`].filter(Boolean).join('、');
 
   return <div className="card-page lv-page">
     <button className="lv-back" onClick={onBack}><ArrowLeft/>返回使用者列表</button>
@@ -149,8 +162,11 @@ function UserEdit({email,me,readOnly,notify,goAudit,onBack}){
       <div style={{flex:1,minWidth:240}}>
         <h2>{u.name||'（尚未登入）'}<RoleBadge role={u.role}/><StatusBadge u={u}/>{u.bootstrap_admin&&<span className="lv-chip">固定管理員（部署設定）</span>}{self&&<span className="lv-chip">這是您自己的帳號</span>}</h2>
         <p className="muted small" style={{margin:'4px 0 12px'}}>{u.email}</p>
-        <div className="lv-actions"><span className="small muted">所屬群組</span>
-          <select className="lv-select" value={department} disabled={readOnly} onChange={e=>setDepartment(e.target.value)}><option value="">未設定</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></div>
+        <div className="lv-actions lv-groups"><span className="small muted">所屬群組</span>
+          {orgGroups===null?<span className="small muted">載入中…</span>
+            :!orgGroups.length?<span className="small muted">沒有可用的群組（尚未建立，或你沒有檢視群組的權限）</span>
+            :orgGroups.map(g=><label key={g.id} className={'lv-group-opt'+(memberOf.includes(g.id)?' on':'')}><input type="checkbox" disabled={readOnly||busy} checked={memberOf.includes(g.id)}
+                onChange={e=>setMemberOf(m=>e.target.checked?[...m,g.id]:m.filter(x=>x!==g.id))}/>{g.name}</label>)}</div>
         <div className="lv-actions" style={{marginTop:12}}><span className="lv-chip">{owned.agents} 個 Agent（{owned.published_agents} 個已發布）</span><span className="lv-chip">{owned.connectors} 個連接器</span><span className="lv-chip">{owned.documents} 份知識文件</span></div>
       </div>
       <dl className="lv-dl"><dt>帳號建立</dt><dd>{fmtDateTime(u.created_at)}{u.created_by&&`（${u.created_by==='migrate_users'?'既有建置者移轉':u.created_by+' 預先註冊'}）`}</dd><dt>首次登入</dt><dd>{u.first_login_at?fmtDateTime(u.first_login_at):'尚未登入'}</dd><dt>最後活動</dt><dd>{fmtDateTime(u.last_seen_at)}</dd></dl>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api";
-import { DEPARTMENTS } from "../types";
+import { useOrgGroups } from "../../live/orgGroups";
 import { Empty, ErrorBox, Icon, Spinner } from "../components/ui";
 import { Delta, Kpi, Row } from "../components/Kpi";
 const RANGES = [
@@ -43,7 +43,9 @@ function Monitoring() {
   const nav = useNavigate();
   const [range, setRange] = useState("7d");
   const [custom, setCustom] = useState(rangeDates("7d"));
-  const [department, setDepartment] = useState("");
+  const [group, setGroup] = useState("");
+  const orgGroups = useOrgGroups();
+  const groupLabel = (orgGroups || []).find((g) => g.id === group)?.name || group;
   const [env, setEnv] = useState("production"); // 正式 vs 沙盒: the sandbox is counted apart
   const [sort, setSort] = useState("requests");
   const [summary, setSummary] = useState(null);
@@ -53,7 +55,7 @@ function Monitoring() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), department, env }), [range, custom, department, env]);
+  const query = useMemo(() => ({ ...range === "custom" ? custom : rangeDates(range), group, env }), [range, custom, group, env]);
   const load = useCallback(() => {
     setBusy(true);
     setErr("");
@@ -119,12 +121,12 @@ function Monitoring() {
           {[["production", "正式環境"], ["sandbox", "沙盒"]].map(([k, l]) => <button key={k} role="tab" aria-selected={env === k} onClick={() => setEnv(k)} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${env === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
         </div>
         <span className="hidden flex-1 md:block" />
-        <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">臨床部門過濾：
-          <button onClick={() => setDepartment("")} className={`pill px-3 py-1 ${!department ? "bg-primary-tint font-medium text-primary-dark" : "bg-surface-container hover:bg-surface-container-high"}`}>全部科別 (全院)</button>
-          <select className="w-auto py-1 text-xs" value={department} onChange={(e) => setDepartment(e.target.value)}>
-            <option value="">選擇科別…</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">群組過濾：
+          <button onClick={() => setGroup("")} className={`pill px-3 py-1 ${!group ? "bg-primary-tint font-medium text-primary-dark" : "bg-surface-container hover:bg-surface-container-high"}`}>全部（全院）</button>
+          <select className="w-auto py-1 text-xs" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="群組">
+            <option value="">選擇群組…</option>{(orgGroups || []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
-          {department && <span className="chip">{department}<button className="ml-1" onClick={() => setDepartment("")}><Icon name="close" className="text-[12px]" /></button></span>}
+          {group && <span className="chip">{groupLabel}<button className="ml-1" onClick={() => setGroup("")}><Icon name="close" className="text-[12px]" /></button></span>}
         </div>
       </section>
 

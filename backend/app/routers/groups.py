@@ -57,6 +57,18 @@ def _member_emails(group_id: str) -> list[str]:
     return sorted(d.id for d in q.stream())
 
 
+def members_of(group_id: str) -> tuple[set[str], set[str]]:
+    """(lower-case e-mails, uids) of a group's members, for filtering audit entries and usage by the people in a group.
+    Unknown group -> 404, so a stale filter is an error rather than silently "everyone"."""
+    _load(group_id)
+    emails, uids = set(), set()
+    for d in _users().where(filter=firestore.FieldFilter("groups", "array_contains", group_id)).stream():
+        emails.add(d.id.lower())
+        if (uid := (d.to_dict() or {}).get("uid")):
+            uids.add(uid)
+    return emails, uids
+
+
 def _member_map() -> dict[str, list[str]]:
     """Every group id -> member e-mails, from one pass over users."""
     out: dict[str, list[str]] = {}

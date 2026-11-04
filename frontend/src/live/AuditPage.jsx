@@ -2,7 +2,8 @@ import React,{Fragment,useCallback,useEffect,useMemo,useState} from 'react';
 import {DownloadSimple,ArrowClockwise,MagnifyingGlass,CaretDown,CaretUp,Copy,Check} from '@phosphor-icons/react';
 import {api,saveBlob} from '../api';
 import {Empty} from '../ListKit';
-import {DEPARTMENTS,ACTION_LABEL,AUDIT_CATEGORIES,ROLE_LABEL,fmtInt,fmtDateTime,ymd,daysAgo,errText} from './constants';
+import {ACTION_LABEL,AUDIT_CATEGORIES,ROLE_LABEL,fmtInt,fmtDateTime,ymd,daysAgo,errText} from './constants';
+import {useOrgGroups} from './orgGroups';
 import {Loading,Kpi,Delta} from './shared';
 import './admin.css';
 
@@ -60,7 +61,8 @@ export default function AuditPage({me,notify,initialQuery}){
   const [tab,setTab]=useState(iq.category||'');
   const [range,setRange]=useState(()=>iq.from&&iq.to?'custom':RANGES.some(r=>r[0]===iq.range)?iq.range:'7d');
   const [custom,setCustom]=useState(()=>iq.from&&iq.to?{from:iq.from,to:iq.to}:rangeDates('7d'));
-  const [department,setDepartment]=useState(iq.department||'');
+  const [group,setGroup]=useState(iq.group||'');
+  const orgGroups=useOrgGroups();
   const [severity,setSeverity]=useState(iq.severity||'');
   const [qInput,setQInput]=useState(iq.q||'');
   const [q,setQ]=useState(iq.q||'');
@@ -77,12 +79,12 @@ export default function AuditPage({me,notify,initialQuery}){
   const iqKey=JSON.stringify(iq);
   useEffect(()=>{
     if(!initialQuery)return;
-    setTab(iq.category||'');setDepartment(iq.department||'');setSeverity(iq.severity||'');setQInput(iq.q||'');setQ(iq.q||'');
+    setTab(iq.category||'');setGroup(iq.group||'');setSeverity(iq.severity||'');setQInput(iq.q||'');setQ(iq.q||'');
     if(iq.from&&iq.to){setRange('custom');setCustom({from:iq.from,to:iq.to})}else if(iq.range)setRange(RANGES.some(r=>r[0]===iq.range)?iq.range:'7d');
   },[iqKey]);// eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(()=>{const t=setTimeout(()=>setQ(qInput.trim()),350);return ()=>clearTimeout(t)},[qInput]);
-  const query=useMemo(()=>({...(range==='custom'?custom:rangeDates(range)),category:tab,severity,department,q}),[range,custom,tab,severity,department,q]);
+  const query=useMemo(()=>({...(range==='custom'?custom:rangeDates(range)),category:tab,severity,group,q}),[range,custom,tab,severity,group,q]);
   useEffect(()=>{setCursors([null]);setPageIdx(0);setOpen(null)},[query]);
 
   useEffect(()=>{
@@ -139,12 +141,12 @@ export default function AuditPage({me,notify,initialQuery}){
     <div className="lv-filters"><div className="lv-seg">{TABS.map(([id,l])=><button key={id||'all'} className={(tab===id?'on ':'')+(id==='alerts'?'alert':'')} onClick={()=>setTab(id)}>{l}</button>)}</div></div>
     <div className="lv-filters">
       <label className="search" style={{display:'flex',alignItems:'center',gap:6,border:'1px solid #e3ebe7',borderRadius:7,padding:'0 10px',height:36,background:'#fff'}}><MagnifyingGlass size={15}/><input aria-label="搜尋稽核記錄" style={{border:0,outline:0,flex:1,padding:0}} value={qInput} onChange={e=>setQInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&setQ(qInput.trim())} placeholder="搜尋操作者 e-mail、Agent、連接器、事件 ID 或內容"/></label>
-      <select aria-label="科別" value={department} onChange={e=>setDepartment(e.target.value)}><option value="">全院所有科別</option>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select>
+      <select aria-label="群組" value={group} onChange={e=>setGroup(e.target.value)}><option value="">所有群組</option>{(orgGroups||[]).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select>
       <select aria-label="狀態" value={severity} onChange={e=>setSeverity(e.target.value)}>{SEVERITIES.map(([id,l])=><option key={id} value={id}>{l}</option>)}</select>
       <select aria-label="日期區間" value={range} onChange={e=>setRange(e.target.value)}>{RANGES.map(([id,l])=><option key={id} value={id}>{l}</option>)}</select>
       {range==='custom'&&<><input type="date" aria-label="開始日期" value={custom.from} max={custom.to} onChange={e=>setCustom(c=>({...c,from:e.target.value}))}/><span className="muted">～</span><input type="date" aria-label="結束日期" value={custom.to} min={custom.from} max={daysAgo(0)} onChange={e=>setCustom(c=>({...c,to:e.target.value}))}/></>}
     </div>
-    {department&&<p className="lv-hint" style={{marginTop:-8,marginBottom:12}}>科別依事件所屬 Agent 的科別判斷；與 Agent 無關的事件（如匯出）不會出現在科別篩選結果中。</p>}
+    {group&&<p className="lv-hint" style={{marginTop:-8,marginBottom:12}}>只顯示這個群組成員（群組管理中的成員名單）所做的事件。</p>}
 
     <div className="lv-card" style={{padding:'14px 8px 12px'}}>
       {page===null?<Loading/>:items.length===0?<Empty text={page.truncated?'已掃描的紀錄中沒有符合項目，可按「下一頁」繼續往更早的紀錄搜尋。':'此條件下沒有稽核記錄。調整日期、類別或搜尋字詞後再試一次。'}/>:

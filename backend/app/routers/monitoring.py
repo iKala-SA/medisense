@@ -42,7 +42,38 @@ def _env(value: str) -> str:
     return value
 
 
-def _rollups(d_from: date, d_to: date, department: str, env: str = "production") -> list[dict]:
+def _group_rollups(d_from: date, d_to: date, group: str, env: str) -> list[dict]:
+    """Usage of the members of one group (群組管理). The daily rollups are per agent, not per person, so this reads the raw
+    `usage` ledger for the window and turns each row into a rollup-shaped dict the summary / leaderboard code already sums."""
+    from ..engine.usage import model_key
+    from .groups import members_of
+
+    _, uids = members_of(group)
+    if not uids:
+        return []
+    q = (db.client().collection("usage")
+         .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
+         .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
+    out = []
+    for d in q.stream():
+        r = d.to_dict() or {}
+        if r.get("uid") not in uids or (r.get("env") or "production") != env:
+            continue
+        tokens = int(r.get("prompt_tokens", 0) or 0) + int(r.get("completion_tokens", 0) or 0)
+        out.append({"day": r.get("day", ""), "env": env, "agent_id": r.get("agent_id", ""), "agent_name": r.get("agent_name", ""),
+                    "department": r.get("department", ""), "requests": 1, "failed": 0 if r.get("ok", True) else 1,
+                    "fallbacks": 1 if r.get("fallback") else 0, "prompt_tokens": int(r.get("prompt_tokens", 0) or 0),
+                    "completion_tokens": int(r.get("completion_tokens", 0) or 0), "cost_usd": float(r.get("cost_usd", 0) or 0),
+                    "ms_total": int(r.get("ms", 0) or 0),
+                    "by_model": {model_key(r.get("model", "")): {"label": r.get("model", ""), "requests": 1, "tokens": tokens,
+                                                                 "cost_usd": float(r.get("cost_usd", 0) or 0)}},
+                    "by_group": {r.get("group", ""): 1} if r.get("group") else {}})
+    return out
+
+
+def _rollups(d_from: date, d_to: date, department: str, env: str = "production", group: str = "") -> list[dict]:
+    if group:
+        return _group_rollups(d_from, d_to, group, env)
     q = (db.client().collection("usage_daily")
          .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
          .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
@@ -62,12 +93,13 @@ def departments():
 
 
 @router.get("/summary", response_model=MonitoringSummary)
-def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production"):
+def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production",
+            group: str = ""):
     d_from, d_to = _parse_range(frm, to)
     env = _env(env)
-    rows = _rollups(d_from, d_to, department, env)
+    rows = _rollups(d_from, d_to, department, env, group)
     span = (d_to - d_from).days + 1
-    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department, env)
+    prev = _rollups(d_from - timedelta(days=span), d_from - timedelta(days=1), department, env, group)
 
     by_day: dict[str, DailyPoint] = {}
     for i in range(span):
@@ -125,9 +157,9 @@ def summary(frm: str | None = Query(None, alias="from"), to: str | None = None, 
     )
 
 
-def _agent_rows(d_from: date, d_to: date, department: str, env: str = "production") -> list[AgentUsageRow]:
+def _agent_rows(d_from: date, d_to: date, department: str, env: str = "production", group: str = "") -> list[AgentUsageRow]:
     acc: dict[str, dict] = {}
-    for r in _rollups(d_from, d_to, department, env):
+    for r in _rollups(d_from, d_to, department, env, group):
         a = acc.setdefault(r.get("agent_id", ""), {"name": r.get("agent_name", ""), "department": r.get("department", ""),
                                                    "requests": 0, "failed": 0, "fallbacks": 0, "tokens": 0, "cost": 0.0, "ms": 0,
                                                    "models": defaultdict(int), "groups": defaultdict(int)})
@@ -173,16 +205,16 @@ def _sorted(rows: list[AgentUsageRow], sort: str) -> list[AgentUsageRow]:
 
 @router.get("/agents", response_model=list[AgentUsageRow])
 def agents(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", sort: str = "requests",
-           env: str = "production"):
+           env: str = "production", group: str = ""):
     d_from, d_to = _parse_range(frm, to)
-    return _sorted(_agent_rows(d_from, d_to, department, _env(env)), sort)
+    return _sorted(_agent_rows(d_from, d_to, department, _env(env), group), sort)
 
 
 @router.get("/export.csv")
 def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = None, department: str = "", env: str = "production",
-               user: User = Depends(require_admin)):
+               group: str = "", user: User = Depends(require_admin)):
     d_from, d_to = _parse_range(frm, to)
-    rows = _sorted(_agent_rows(d_from, d_to, department, _env(env)), "cost_usd")
+    rows = _sorted(_agent_rows(d_from, d_to, department, _env(env), group), "cost_usd")
     buf = io.StringIO()
     buf.write("﻿")  # BOM so Excel opens Chinese headers correctly
     w = csv.writer(buf)
@@ -193,7 +225,7 @@ def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = Non
         w.writerow([r.agent_id, r.name, r.department, r.owner_email, r.status, r.main_group, r.main_model, r.requests, r.failed,
                     r.fallbacks, r.tokens, f"{r.cost_usd:.4f}", f"{r.cost_usd * rate:.0f}", r.avg_latency_ms])
     db.audit(user.uid, "monitoring.export", user.email, range_from=d_from.isoformat(), range_to=d_to.isoformat(),
-             department=department, rows=len(rows))
+             department=department, group=group, rows=len(rows))
     name = f"tcvgh-agent-cost{'' if env == 'production' else '-' + env}_{d_from.isoformat()}_{d_to.isoformat()}.csv"
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{name}"'})
