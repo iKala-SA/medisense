@@ -29,6 +29,30 @@ function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded,
     return () => window.clearTimeout(t);
   }, [focusSignal]);
   const choose = () => category ? input.current?.click() : askCategory();
+  // Defined before the `bare` early return below: the file input of both layouts calls it.
+  const upload = async (list) => {
+    if (!list?.length) return;
+    if (!category) {
+      askCategory();
+      return;
+    }
+    setErr("");
+    const files = Array.from(list);
+    for (const [i, f] of files.entries()) {
+      setBusy(f.name);
+      setProg({ pct: 0, stage: "upload", done: i, total: files.length });
+      try {
+        onUploaded(await api.uploadDocProgress(f, category, department, (sent, size) => {
+          const pct = size ? Math.round((sent / size) * 100) : 100;
+          setProg({ pct, stage: pct >= 100 ? "index" : "upload", done: i, total: files.length });
+        }));
+      } catch (e) {
+        setErr(`${f.name}: ${String(e)}`);
+      }
+    }
+    setBusy("");
+    setProg(null);
+  };
   const categorySelect = <select
     ref={categoryRef}
     className={`w-auto py-1.5 text-sm ${needCategory && !category ? "border-error ring-2 ring-error/30" : ""}`}
@@ -72,29 +96,6 @@ function DocUploader({ defaultDepartment = "", defaultCategory = "", onUploaded,
       {messages}
     </div>;
   }
-  const upload = async (list) => {
-    if (!list?.length) return;
-    if (!category) {
-      askCategory();
-      return;
-    }
-    setErr("");
-    const files = Array.from(list);
-    for (const [i, f] of files.entries()) {
-      setBusy(f.name);
-      setProg({ pct: 0, stage: "upload", done: i, total: files.length });
-      try {
-        onUploaded(await api.uploadDocProgress(f, category, department, (sent, size) => {
-          const pct = size ? Math.round((sent / size) * 100) : 100;
-          setProg({ pct, stage: pct >= 100 ? "index" : "upload", done: i, total: files.length });
-        }));
-      } catch (e) {
-        setErr(`${f.name}: ${String(e)}`);
-      }
-    }
-    setBusy("");
-    setProg(null);
-  };
   return <div
     onDragOver={(e) => {
       e.preventDefault();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api";
@@ -253,38 +253,56 @@ function Monitoring() {
 }
 
 /* 使用者用量排行榜 / 群組使用量排行榜: who, and which group, used the models in the selected window (same filters). */
+const RANK_PAGE = 20;
+/* 使用者用量排行榜 / 群組使用量排行榜: a fixed-height card holding two separate panels, the top-10 chart and the full table
+   (scrolls inside, 20 rows per page). */
 function UsageRanking({ kind, query }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
+  const [page, setPage] = useState(1);
+  const scrollRef = useRef(null);
   useEffect(() => {
     if (!api.monitoringUsers) { setRows([]); return; }
     let live = true;
     setRows(null);
     setErr("");
+    setPage(1);
     (kind === "users" ? api.monitoringUsers(query) : api.monitoringGroups(query))
       .then((r) => live && setRows(r || [])).catch((e) => live && setErr(String(e)));
     return () => { live = false; };
   }, [kind, query]);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [page]);
   const title = kind === "users" ? "使用者用量排行榜" : "群組使用量排行榜";
-  return <section className="card mt-3 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
+  const pages = Math.max(1, Math.ceil((rows?.length || 0) / RANK_PAGE));
+  const pageRows = (rows || []).slice((page - 1) * RANK_PAGE, page * RANK_PAGE);
+  return <section className="card mt-3 overflow-hidden mon-rank">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 pt-4">
         <h2 className="section-title"><Icon name={kind === "users" ? "person" : "groups"} className="text-primary" />{title} {rows && <span className="chip">{rows.length}</span>}</h2>
       </div>
       <ErrorBox msg={err} />
       {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon={kind === "users" ? "person" : "groups"} title="這段期間沒有用量" hint="調整日期範圍、環境或篩選後再試" /> :
-      <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <RankingChart rows={rows.slice(0, 10)} />
-        <div className="mon-scroll border-t border-hairline lg:border-l lg:border-t-0"><table className="w-full">
-          <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant"><tr>
-            <Th>#</Th><Th>{kind === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th></tr></thead>
-          <tbody>{rows.map((r, i) => <tr key={r.id} className="border-t border-hairline">
-            <td className="px-4 py-2.5 font-mono text-on-surface-variant">{i + 1}</td>
-            <td className="px-4 py-2.5"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-on-surface-variant mon-sub">{kind === "users" ? r.email : `${r.members} 位成員`}</p></td>
-            <td className="px-4 py-2.5 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-error mon-sub">({r.failed} 失敗)</span>}</td>
-            <td className="px-4 py-2.5 text-right font-mono">{fmtTokens(r.tokens)}</td>
-            <td className="px-4 py-2.5 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
-            <td className="px-4 py-2.5">{r.main_model || "—"}</td>
-          </tr>)}</tbody></table></div>
+      <div className="mon-rank-body">
+        <div className="mon-pane"><RankingChart rows={rows.slice(0, 10)} /></div>
+        <div className="mon-pane">
+          <div ref={scrollRef} className="mon-pane-scroll"><table className="w-full">
+            <thead className="sticky top-0 z-[1] bg-surface-container-low text-on-surface-variant"><tr>
+              <Th>#</Th><Th>{kind === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th></tr></thead>
+            <tbody>{pageRows.map((r, i) => <tr key={r.id} className="border-t border-hairline">
+              <td className="px-4 py-2.5 font-mono text-on-surface-variant">{(page - 1) * RANK_PAGE + i + 1}</td>
+              <td className="px-4 py-2.5"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-on-surface-variant mon-sub">{kind === "users" ? r.email : `${r.members} 位成員`}</p></td>
+              <td className="px-4 py-2.5 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-error mon-sub">({r.failed} 失敗)</span>}</td>
+              <td className="px-4 py-2.5 text-right font-mono">{fmtTokens(r.tokens)}</td>
+              <td className="px-4 py-2.5 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
+              <td className="px-4 py-2.5">{r.main_model || "—"}</td>
+            </tr>)}</tbody></table></div>
+          {pages > 1 && <div className="mon-pager">
+            <span>第 {(page - 1) * RANK_PAGE + 1}–{Math.min(page * RANK_PAGE, rows.length)} 筆，共 {rows.length} 筆</span>
+            <span className="flex items-center gap-1">
+              <button className="btn-soft py-1" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>上一頁</button>
+              <span className="px-2 font-mono">{page} / {pages}</span>
+              <button className="btn-soft py-1" disabled={page === pages} onClick={() => setPage((p) => p + 1)}>下一頁</button>
+            </span></div>}
+        </div>
       </div>}
     </section>;
 }
@@ -298,9 +316,9 @@ const BLANK = { scope: "group", target: "", period: "month", metric: "cost_usd",
 function RankingChart({ rows }) {
   const data = rows.map((r) => ({ ...r, label: r.name || r.email || r.id }));
   const short = (v) => v.length > 10 ? `${v.slice(0, 10)}…` : v;
-  return <div className="px-4 py-4">
+  return <div className="flex h-full min-h-0 flex-col px-4 py-4">
       <p className="mb-2 text-xs font-semibold text-on-surface-variant">費用前 {data.length} 名 (USD)</p>
-      <div style={{ height: Math.max(120, data.length * 36 + 24) }}>
+      <div className="min-h-0 flex-1" style={{ maxHeight: Math.max(140, data.length * 40 + 30) }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }} barCategoryGap="28%">
             <CartesianGrid horizontal={false} stroke="#eef2f0" />

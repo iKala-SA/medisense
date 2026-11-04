@@ -21,3 +21,14 @@
 .bk .mon .mon-scroll::-webkit-scrollbar{width:8px}
 .bk .mon .mon-scroll::-webkit-scrollbar-thumb{background:#c9ced6;border-radius:8px}
 .bk .mon .mon-scroll::-webkit-scrollbar-track{background:transparent}
+
+/* 使用者 / 群組 排行榜 (2026-11-04): fixed-height card, the chart and the table are two separate panels; the table scrolls
+   inside its panel and pages 20 rows at a time. Stacked below lg. */
+.bk .mon .mon-rank-body{height:480px;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;padding:0 20px 20px}
+.bk .mon .mon-pane{min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#fff;border:1px solid #e6e8eb;border-radius:12px}
+.bk .mon .mon-pane-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c9ced6 transparent}
+.bk .mon .mon-pane-scroll::-webkit-scrollbar{width:8px;height:8px}
+.bk .mon .mon-pane-scroll::-webkit-scrollbar-thumb{background:#c9ced6;border-radius:8px}
+.bk .mon .mon-pane thead tr th:first-child{border-top-left-radius:0}
+.bk .mon .mon-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid #f0f1f3;font-size:12.5px;color:#5d6068}
+@media(max-width:1023px){.bk .mon .mon-rank-body{height:auto;grid-template-columns:1fr}.bk .mon .mon-rank-body>.mon-pane:first-child{height:340px}.bk .mon .mon-rank-body>.mon-pane:last-child{height:440px}}
