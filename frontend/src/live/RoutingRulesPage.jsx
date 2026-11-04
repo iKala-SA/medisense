@@ -58,7 +58,7 @@ export default function RoutingRulesPage({me,notify}){
   const dirty=draft.sovereign_only!==base.sovereign_only||draft.model_armor!==base.model_armor;
   const edit=patch=>{setDraft(d=>({...d,...patch}));setSaved(false)};
   const sovMissing=groups!==null&&!gfail&&!(groups||[]).find(g=>g.id==='sovereign')?.configured;
-  const featBody=f=>({web_search:!!f?.web_search,voice_input:!!f?.voice_input,rag_keep_distance:f?.rag_keep_distance??0.34,rag_max_distance:f?.rag_max_distance??0.40});
+  const featBody=f=>({web_search:!!f?.web_search,voice_input:!!f?.voice_input,rag_keep_distance:f?.rag_keep_distance??0.42,rag_max_distance:f?.rag_max_distance??0.50});
   const ragNum=v=>Number.isFinite(parseFloat(v))?parseFloat(v):NaN;
   const ragValid=!!rag&&ragNum(rag.keep)>=0.05&&ragNum(rag.max)<=1&&ragNum(rag.keep)<=ragNum(rag.max);
   const ragDirty=!!rag&&!!feat&&(ragNum(rag.keep)!==feat.rag_keep_distance||ragNum(rag.max)!==feat.rag_max_distance);

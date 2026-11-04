@@ -291,13 +291,13 @@ def test_features_carry_validated_rag_distance_thresholds(fs, as_user):
 
     c = as_user(ADMIN)
     got = as_user(PLAIN).get("/api/features").json()
-    assert got["rag_keep_distance"] == 0.34 and got["rag_max_distance"] == 0.40 and features.rag_thresholds() == (0.34, 0.40)
+    assert got["rag_keep_distance"] == 0.42 and got["rag_max_distance"] == 0.50 and features.rag_thresholds() == (0.42, 0.50)
     assert c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.45, "rag_max_distance": 0.30}).status_code == 422  # keep must not exceed max
     assert c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.01, "rag_max_distance": 0.30}).status_code == 422
     ok = c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.30, "rag_max_distance": 0.45})
     assert ok.status_code == 200 and features.rag_thresholds() == (0.30, 0.45)
     ev = [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == "features.update"][-1]
-    assert ev["rag_distance_old"] == [0.34, 0.4] and ev["rag_distance_new"] == [0.3, 0.45]
+    assert ev["rag_distance_old"] == [0.42, 0.5] and ev["rag_distance_new"] == [0.3, 0.45]
 
 
 # ---- 👍 / 👎
