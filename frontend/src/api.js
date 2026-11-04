@@ -108,6 +108,12 @@ export const api={
   monitoringSummary:q=>call(`/api/monitoring/summary?${query(q)}`),
   monitoringAgents:(q,sort)=>call(`/api/monitoring/agents?${query({...q,sort})}`),
   monitoringCsv:q=>blob(`/api/monitoring/export.csv?${query(q)}`),
+  monitoringUsers:q=>call(`/api/monitoring/users?${query(q)}`),
+  monitoringGroups:q=>call(`/api/monitoring/groups?${query(q)}`),
+  listUsageLimits:()=>call('/api/monitoring/limits'),
+  createUsageLimit:b=>call('/api/monitoring/limits',{method:'POST',body:body(b)}),
+  updateUsageLimit:(id,b)=>call(`/api/monitoring/limits/${id}`,{method:'PUT',body:body(b)}),
+  deleteUsageLimit:id=>call(`/api/monitoring/limits/${id}`,{method:'DELETE'}),
   // users (admin)
   listUsers:()=>call('/api/users'),
   getUser:email=>call(`/api/users/${encodeURIComponent(email)}`),

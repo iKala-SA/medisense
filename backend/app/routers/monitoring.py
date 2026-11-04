@@ -13,7 +13,8 @@ from .. import db
 from ..auth import User, require_admin
 from ..config import settings
 from ..engine.usage import day_key
-from ..schemas import DEPARTMENTS, AgentUsageRow, DailyPoint, ModelSlice, MonitoringSummary
+from ..engine import limits as limits_engine
+from ..schemas import DEPARTMENTS, AgentUsageRow, DailyPoint, ModelSlice, MonitoringSummary, UsageByRow, UsageLimitIn, UsageLimitOut
 
 router = APIRouter(prefix="/api/monitoring", tags=["monitoring"], dependencies=[Depends(require_admin)])
 SORTS = {"requests", "tokens", "cost_usd", "cost_per_call", "avg_latency_ms", "fallbacks"}
@@ -229,3 +230,144 @@ def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = Non
     name = f"tcvgh-agent-cost{'' if env == 'production' else '-' + env}_{d_from.isoformat()}_{d_to.isoformat()}.csv"
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+# ------------------------------------------------------------------ usage by person / by group (raw ledger for the window)
+def _raw(d_from: date, d_to: date, env: str) -> list[dict]:
+    q = (db.client().collection("usage")
+         .where(filter=firestore.FieldFilter("day", ">=", d_from.isoformat()))
+         .where(filter=firestore.FieldFilter("day", "<=", d_to.isoformat())))
+    return [r for r in (d.to_dict() or {} for d in q.stream()) if (r.get("env") or "production") == env]
+
+
+def _acc(rows: list[dict]) -> dict:
+    a = {"requests": 0, "tokens": 0, "cost": 0.0, "failed": 0, "models": defaultdict(int)}
+    for r in rows:
+        a["requests"] += 1
+        a["tokens"] += int(r.get("prompt_tokens", 0) or 0) + int(r.get("completion_tokens", 0) or 0)
+        a["cost"] += float(r.get("cost_usd", 0) or 0)
+        a["failed"] += 0 if r.get("ok", True) else 1
+        a["models"][str(r.get("model", ""))] += 1
+    return a
+
+
+def _row(id_: str, a: dict, **extra) -> UsageByRow:
+    return UsageByRow(id=id_, requests=a["requests"], tokens=a["tokens"], cost_usd=round(a["cost"], 4), failed=a["failed"],
+                      main_model=max(a["models"], key=a["models"].get) if a["models"] else "", **extra)
+
+
+def _people() -> tuple[dict[str, dict], dict[str, list[str]]]:
+    """uid -> {email, name, groups}; group id -> member uids (one pass over users)."""
+    by_uid, members = {}, defaultdict(list)
+    for d in db.client().collection("users").stream():
+        u = d.to_dict() or {}
+        if u.get("uid"):
+            by_uid[u["uid"]] = {"email": d.id, "name": u.get("name", ""), "groups": u.get("groups") or []}
+            for g in u.get("groups") or []:
+                members[g].append(u["uid"])
+    return by_uid, members
+
+
+@router.get("/users", response_model=list[UsageByRow])
+def usage_by_user(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production", group: str = ""):
+    """One row per person who used a model in the window, most expensive first. `group`: only that group's members."""
+    d_from, d_to = _parse_range(frm, to)
+    rows = _raw(d_from, d_to, _env(env))
+    people, members = _people()
+    if group:
+        from .groups import members_of
+        members_of(group)  # 404 for an unknown group
+        keep = set(members.get(group, []))
+        rows = [r for r in rows if r.get("uid") in keep]
+    by: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        by[r.get("uid") or ""].append(r)
+    out = [_row(uid, _acc(rs), email=people.get(uid, {}).get("email", ""), name=people.get(uid, {}).get("name", "") or ("（排程或系統）" if not uid else uid))
+           for uid, rs in by.items()]
+    return sorted(out, key=lambda r: (-r.cost_usd, -r.requests))
+
+
+@router.get("/groups", response_model=list[UsageByRow])
+def usage_by_group(frm: str | None = Query(None, alias="from"), to: str | None = None, env: str = "production"):
+    """One row per group (群組管理): the usage of its members. A person in several groups counts in each of them."""
+    d_from, d_to = _parse_range(frm, to)
+    rows = _raw(d_from, d_to, _env(env))
+    _, members = _people()
+    by_uid: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        by_uid[r.get("uid") or ""].append(r)
+    out = []
+    for g in db.client().collection("groups").stream():
+        uids = members.get(g.id, [])
+        out.append(_row(g.id, _acc([r for u in uids for r in by_uid.get(u, [])]), name=(g.to_dict() or {}).get("name", g.id), members=len(uids)))
+    return sorted(out, key=lambda r: (-r.cost_usd, -r.requests, r.name))
+
+
+# ------------------------------------------------------------------ usage limits (用量上限)
+def _limit_out(doc_id: str, d: dict, names: dict[str, str]) -> UsageLimitOut:
+    lim = {**d, "id": doc_id}
+    try:
+        spent = limits_engine.used(lim)
+    except Exception:  # noqa: BLE001 - a rollup read problem shows as 0, never breaks the page
+        spent = 0.0
+    cap = float(d.get("limit", 0) or 0)
+    return UsageLimitOut(id=doc_id, **{k: d[k] for k in ("scope", "target", "period", "metric", "limit", "enabled", "note") if k in d},
+                         target_label=names.get(d.get("target", ""), d.get("target", "")) if d.get("scope") == "group" else d.get("target", ""),
+                         used=round(spent, 4), pct=round(spent / cap * 100, 1) if cap else 0.0, exceeded=cap > 0 and spent >= cap,
+                         created_by=d.get("created_by", ""), updated_at=d.get("updated_at"))
+
+
+def _group_names() -> dict[str, str]:
+    return {g.id: (g.to_dict() or {}).get("name", g.id) for g in db.client().collection("groups").stream()}
+
+
+def _check_target(body: UsageLimitIn) -> str:
+    if body.scope == "group":
+        names = _group_names()
+        if body.target not in names:
+            raise HTTPException(422, "unknown group")
+        return names[body.target]
+    return body.target
+
+
+@router.get("/limits", response_model=list[UsageLimitOut])
+def list_limits():
+    names = _group_names()
+    rows = [_limit_out(d.id, d.to_dict() or {}, names) for d in db.client().collection(limits_engine.COLL).stream()]
+    return sorted(rows, key=lambda r: (not r.exceeded, -r.pct, r.target_label))
+
+
+@router.post("/limits", response_model=UsageLimitOut, status_code=201)
+def create_limit(body: UsageLimitIn, user: User = Depends(require_admin)):
+    label = _check_target(body)
+    ref = db.client().collection(limits_engine.COLL).document()
+    data = {**body.model_dump(), "target_label": label, "created_by": user.email, "created_at": db.now(), "updated_at": db.now()}
+    ref.set(data)
+    limits_engine.reset_cache()
+    db.audit(user.uid, "usage_limit.create", user.email, limit_id=ref.id, scope=body.scope, target=body.target, period=body.period,
+             metric=body.metric, limit=body.limit)
+    return _limit_out(ref.id, data, _group_names())
+
+
+@router.put("/limits/{limit_id}", response_model=UsageLimitOut)
+def update_limit(limit_id: str, body: UsageLimitIn, user: User = Depends(require_admin)):
+    snap = db.client().collection(limits_engine.COLL).document(limit_id).get()
+    if not snap.exists:
+        raise HTTPException(404, "limit not found")
+    label = _check_target(body)
+    data = {**(snap.to_dict() or {}), **body.model_dump(), "target_label": label, "updated_at": db.now()}
+    snap.reference.set(data)
+    limits_engine.reset_cache()
+    db.audit(user.uid, "usage_limit.update", user.email, limit_id=limit_id, scope=body.scope, target=body.target, period=body.period,
+             metric=body.metric, limit=body.limit, enabled=body.enabled)
+    return _limit_out(limit_id, data, _group_names())
+
+
+@router.delete("/limits/{limit_id}", status_code=204)
+def delete_limit(limit_id: str, user: User = Depends(require_admin)):
+    snap = db.client().collection(limits_engine.COLL).document(limit_id).get()
+    if not snap.exists:
+        raise HTTPException(404, "limit not found")
+    snap.reference.delete()
+    limits_engine.reset_cache()
+    db.audit(user.uid, "usage_limit.delete", user.email, limit_id=limit_id, target=(snap.to_dict() or {}).get("target", ""))

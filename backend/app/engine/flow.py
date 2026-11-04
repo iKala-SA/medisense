@@ -115,7 +115,11 @@ def invoke_connector(connector_id: str, action: str, args: dict, *, agent_id: st
 
 
 def _complete(agent: AgentIn, agent_id: str, user_id: str, group: str, **kw) -> llm.Completion:
-    """LLM call + usage ledger. Failures are recorded (ok=false) and re-raised so the run still errors."""
+    """LLM call + usage ledger. Failures are recorded (ok=false) and re-raised so the run still errors.
+    A used-up usage limit (engine/limits.py) stops the call before it is made: LimitExceeded, nothing recorded."""
+    from . import limits
+
+    limits.check(user_id, kw.get("model") or group)
     try:
         c = llm.complete(group=group, agent_id=agent_id, user_id=user_id, **kw)
     except Exception:

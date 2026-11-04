@@ -475,6 +475,38 @@ class DailyPoint(BaseModel):
     by_model: list[ModelSlice] = Field(default_factory=list)
 
 
+class UsageLimitIn(BaseModel):
+    scope: Literal["group", "model"]
+    target: str = Field(min_length=1, max_length=120)  # group id, or a model id / routing group
+    period: Literal["day", "month"] = "month"
+    metric: Literal["cost_usd", "tokens", "requests"] = "cost_usd"
+    limit: float = Field(gt=0, le=1e12)
+    enabled: bool = True
+    note: str = Field(default="", max_length=200)
+
+
+class UsageLimitOut(UsageLimitIn):
+    id: str
+    target_label: str = ""  # group name (group scope) or the model id
+    used: float = 0.0  # in the limit's metric, current period
+    pct: float = 0.0  # used / limit * 100
+    exceeded: bool = False
+    created_by: str = ""
+    updated_at: Any = None
+
+
+class UsageByRow(BaseModel):
+    id: str  # uid (users) or group id (groups)
+    name: str = ""
+    email: str = ""  # users
+    members: int = 0  # groups
+    requests: int = 0
+    tokens: int = 0
+    cost_usd: float = 0.0
+    failed: int = 0
+    main_model: str = ""
+
+
 class MonitoringSummary(BaseModel):
     range_from: str
     range_to: str

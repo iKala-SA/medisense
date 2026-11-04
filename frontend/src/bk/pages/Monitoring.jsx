@@ -246,8 +246,141 @@ function Monitoring() {
                 </div>
               </div>}
           </section>
+
+          <UsageBreakdown query={query} />
+          <UsageLimits orgGroups={orgGroups} />
         </>}
     </div>;
+}
+
+/* 依使用者 / 依群組: who (and which group) used the models in the selected window. */
+function UsageBreakdown({ query }) {
+  const [view, setView] = useState("users");
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!api.monitoringUsers) { setRows([]); return; }
+    let live = true;
+    setRows(null);
+    setErr("");
+    (view === "users" ? api.monitoringUsers(query) : api.monitoringGroups({ from: query.from, to: query.to, env: query.env }))
+      .then((r) => live && setRows(r || [])).catch((e) => live && setErr(String(e)));
+    return () => { live = false; };
+  }, [view, query]);
+  const max = Math.max(0.0001, ...(rows || []).map((r) => r.cost_usd));
+  return <section className="card mt-3 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
+        <h2 className="section-title"><Icon name="group" className="text-primary" />用量分布 {rows && <span className="chip">{rows.length}</span>}</h2>
+        <div className="flex items-center gap-1 rounded-lg bg-surface-container-low p-1" role="tablist" aria-label="檢視">
+          {[["users", "依使用者"], ["groups", "依群組"]].map(([k, l]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${view === k ? "bg-primary-dark text-white" : "text-on-surface-variant hover:bg-surface-container-high"}`}>{l}</button>)}
+        </div>
+      </div>
+      <ErrorBox msg={err} />
+      {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon="group" title="這段期間沒有用量" hint="調整日期範圍或環境後再試" /> :
+      <div className="max-h-[420px] overflow-auto"><table className="w-full text-sm">
+        <thead className="sticky top-0 bg-surface-container-low text-xs text-on-surface-variant"><tr>
+          <Th>{view === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th><Th>占比</Th></tr></thead>
+        <tbody>{rows.map((r) => <tr key={r.id} className="border-t border-hairline">
+          <td className="px-4 py-2"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-xs text-on-surface-variant">{view === "users" ? r.email : `${r.members} 位成員`}</p></td>
+          <td className="px-4 py-2 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-xs text-error">({r.failed} 失敗)</span>}</td>
+          <td className="px-4 py-2 text-right font-mono">{fmtTokens(r.tokens)}</td>
+          <td className="px-4 py-2 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
+          <td className="px-4 py-2 text-xs">{r.main_model || "—"}</td>
+          <td className="px-4 py-2"><div className="h-2 w-28 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, r.cost_usd / max * 100)}%` }} /></div></td>
+        </tr>)}</tbody></table></div>}
+    </section>;
+}
+
+const METRICS = [["cost_usd", "費用（USD）"], ["tokens", "Tokens"], ["requests", "呼叫次數"]];
+const PERIODS = [["day", "每日"], ["month", "每月"]];
+const fmtMetric = (v, m) => m === "cost_usd" ? fmtUsd(v) : m === "tokens" ? fmtTokens(v) : fmtInt(Math.round(v));
+const BLANK = { scope: "group", target: "", period: "month", metric: "cost_usd", limit: "", enabled: true, note: "" };
+
+/* 用量上限: per group or per model, daily or monthly. A used-up limit stops new model calls for it. */
+function UsageLimits({ orgGroups }) {
+  const [items, setItems] = useState(null);
+  const [models, setModels] = useState([]);
+  const [form, setForm] = useState(null); // {id?, ...fields}
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const supported = !!api.listUsageLimits;
+  const load = useCallback(() => {
+    if (!supported) { setItems([]); return; }
+    api.listUsageLimits().then((r) => setItems(r || [])).catch((e) => { setItems([]); setErr(String(e)); });
+  }, [supported]);
+  useEffect(load, [load]);
+  useEffect(() => {
+    api.modelGroups?.().then((r) => setModels([
+      ...(r?.groups || []).map((g) => ({ id: g.id, name: `路由群組 · ${g.id}` })),
+      ...(r?.models || []).map((m) => ({ id: m.id, name: m.name || m.id }))])).catch(() => setModels([]));
+  }, []);
+  const save = async () => {
+    const body = { ...form, limit: Number(form.limit) };
+    delete body.id;
+    setBusy(true);
+    setErr("");
+    try {
+      if (form.id) await api.updateUsageLimit(form.id, body); else await api.createUsageLimit(body);
+      setForm(null);
+      load();
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  };
+  const toggle = async (l) => {
+    try { await api.updateUsageLimit(l.id, { scope: l.scope, target: l.target, period: l.period, metric: l.metric, limit: l.limit, note: l.note, enabled: !l.enabled }); load(); }
+    catch (e) { setErr(String(e)); }
+  };
+  const remove = async (l) => {
+    if (!window.confirm(`刪除「${l.target_label}」的用量上限？`)) return;
+    try { await api.deleteUsageLimit(l.id); load(); } catch (e) { setErr(String(e)); }
+  };
+  const targets = form?.scope === "group" ? (orgGroups || []).map((g) => ({ id: g.id, name: g.name })) : models;
+  const valid = form && form.target && Number(form.limit) > 0;
+  return <section className="card mt-3 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
+        <div><h2 className="section-title"><Icon name="speed" className="text-primary" />用量上限</h2>
+          <p className="mt-0.5 text-xs text-on-surface-variant">超過上限後，該群組成員或該模型的新呼叫會被拒絕，直到下一個期間或調高上限。</p></div>
+        {supported && <button className="btn-primary" onClick={() => setForm({ ...BLANK })}><Icon name="add" className="text-[18px]" />新增上限</button>}
+      </div>
+      <ErrorBox msg={err} />
+      {form && <div className="grid gap-3 border-b border-hairline bg-primary-tint/40 px-5 py-4 md:grid-cols-6">
+        <label className="text-xs font-semibold md:col-span-1">對象
+          <select className="mt-1 w-full" value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value, target: "" })}><option value="group">群組</option><option value="model">模型</option></select></label>
+        <label className="text-xs font-semibold md:col-span-2">{form.scope === "group" ? "群組" : "模型"}
+          <select className="mt-1 w-full" value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })}>
+            <option value="">選擇…</option>{targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {form.target && !targets.some((t) => t.id === form.target) && <option value={form.target}>{form.target}</option>}</select></label>
+        <label className="text-xs font-semibold">期間
+          <select className="mt-1 w-full" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label className="text-xs font-semibold">指標
+          <select className="mt-1 w-full" value={form.metric} onChange={(e) => setForm({ ...form, metric: e.target.value })}>{METRICS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <label className="text-xs font-semibold">上限
+          <input className="mt-1 w-full" type="number" min="0" step={form.metric === "cost_usd" ? "0.01" : "1"} value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} placeholder={form.metric === "cost_usd" ? "例如 50" : "例如 100000"} /></label>
+        <label className="text-xs font-semibold md:col-span-4">備註
+          <input className="mt-1 w-full" maxLength={200} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="例如：試辦期間每月預算" /></label>
+        <div className="flex items-end justify-end gap-2 md:col-span-2">
+          <button className="btn-soft" onClick={() => setForm(null)}>取消</button>
+          <button className="btn-primary" disabled={!valid || busy} onClick={save}>{busy ? <Spinner /> : null}{form.id ? "儲存" : "新增"}</button></div>
+      </div>}
+      {items === null ? <div className="grid place-items-center py-8"><Spinner /></div> : !items.length ? <Empty icon="speed" title={supported ? "尚未設定用量上限" : "預覽模式不支援用量上限"} hint={supported ? "可依群組或模型設定每日或每月的費用、Tokens 或呼叫次數上限" : ""} /> :
+      <div className="divide-y divide-hairline">{items.map((l) => {
+        const pct = Math.min(100, l.pct || 0), tone = l.exceeded ? "bg-error" : pct >= 85 ? "bg-warning" : "bg-primary";
+        return <div key={l.id} className={`flex flex-wrap items-center gap-4 px-5 py-3 ${l.enabled ? "" : "opacity-60"}`}>
+          <div className="min-w-[200px] flex-1">
+            <p className="font-semibold">{l.scope === "group" ? "群組" : "模型"} · {l.target_label}{l.exceeded && l.enabled && <span className="ml-2 rounded-full bg-error/10 px-2 py-0.5 text-xs font-semibold text-error">已達上限</span>}{!l.enabled && <span className="ml-2 chip">已停用</span>}</p>
+            <p className="text-xs text-on-surface-variant">{PERIODS.find(([k]) => k === l.period)?.[1]} · {METRICS.find(([k]) => k === l.metric)?.[1]}{l.note ? ` · ${l.note}` : ""}</p>
+          </div>
+          <div className="w-64">
+            <div className="flex justify-between text-xs"><span className="font-mono">{fmtMetric(l.used, l.metric)} / {fmtMetric(l.limit, l.metric)}</span><span className={`font-semibold ${l.exceeded ? "text-error" : "text-primary-dark"}`}>{(l.pct || 0).toFixed(0)}%</span></div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-container-high"><div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} /></div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button className="btn-ghost" onClick={() => toggle(l)}>{l.enabled ? "停用" : "啟用"}</button>
+            <button className="btn-ghost" onClick={() => setForm({ id: l.id, scope: l.scope, target: l.target, period: l.period, metric: l.metric, limit: String(l.limit), enabled: l.enabled, note: l.note || "" })}>編輯</button>
+            <button className="btn-ghost text-error" onClick={() => remove(l)}>刪除</button>
+          </div>
+        </div>;
+      })}</div>}
+    </section>;
 }
 const Th = ({ children, right = false }) => <th className={`px-4 py-2 ${right ? "text-right" : "text-left"}`}>{children}</th>;
 function ChartTip({ active, payload, label }) {

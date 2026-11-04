@@ -162,6 +162,14 @@ Prices in the registry are used for cost when a served model is not in the built
   reject = "已取消此動作，流程停止。"). `approver: "owner"`: a canvas approval node; only the agent owner / an admin may decide (`POST /api/agents/{id}/approve`; `/api/chat/approve` returns 403).
   Audit `agent.approve` / `agent.reject` carry `by_user: true` for user confirmations. Draft (sandbox) runs never pause: writes are simulated there.
 
+## 用量與成本: usage limits and usage by person / group (admin)
+
+- `GET /api/monitoring/users?from&to&env&group` -> `[{id: uid, name, email, requests, tokens, cost_usd, failed, main_model}]`, most expensive first (raw ledger for the window).
+- `GET /api/monitoring/groups?from&to&env` -> `[{id, name, members, requests, tokens, cost_usd, failed, main_model}]`; a person in several groups counts in each.
+- `GET /api/monitoring/limits` -> `[{id, scope: group|model, target, target_label, period: day|month, metric: cost_usd|tokens|requests, limit, enabled, note, used, pct, exceeded}]`
+- `POST /api/monitoring/limits`, `PUT /api/monitoring/limits/{id}` `{scope, target, period, metric, limit>0, enabled, note}`; `DELETE /api/monitoring/limits/{id}`. Audit `usage_limit.create|update|delete`.
+- Enforcement: before every model call (`flow._complete`) the limits of the caller's groups and of the requested model / routing group are checked; a used-up one refuses the call with **429** and a message naming the limit (chat stream: an `error` event with status 429). Usage comes from the daily rollups `usage_user_daily` and `usage_target_daily` (all environments); reads are cached 30 s, so a burst at the limit may pass a few calls.
+
 ## Sessions: delete all
 
 - `DELETE /api/sessions` -> `{deleted, kept_locked}`: every conversation of the caller (recent, archived, in projects, sandbox tests) with its images

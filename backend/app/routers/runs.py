@@ -11,6 +11,7 @@ from ..auth import User, current_user
 from ..config import settings
 from ..engine import agent as agent_runtime
 from ..engine import bigquery, deid, llm, runenv, skills
+from ..engine.limits import LimitExceeded
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -105,6 +106,8 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
         if exc.status_code == 401:
             llm.reset_client_cache()
         raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
+    except LimitExceeded as exc:
+        raise HTTPException(429, str(exc)) from exc
     latency = int((time.perf_counter() - t0) * 1000)
 
     if not sess.get("title"):  # auto title on the first run
@@ -191,6 +194,8 @@ def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: boo
             raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
+        except LimitExceeded as exc:
+            raise HTTPException(429, str(exc)) from exc
         latency = int((time.perf_counter() - t0) * 1000)
         sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
         sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),
