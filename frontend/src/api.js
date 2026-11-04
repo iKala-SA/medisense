@@ -36,6 +36,15 @@ export const api={
   enableService:b=>call('/api/gateway-connectors',{method:'POST',body:body(b)}),
   updateEnabledService:(id,b)=>call(`/api/gateway-connectors/${id}`,{method:'PUT',body:body(b)}),
   me:()=>call('/api/me'),
+  // 登入與 SSO. authProviders needs no sign-in (the login page asks it which buttons to show).
+  authProviders:()=>fetch('/api/auth/providers').then(r=>r.ok?r.json():null).catch(()=>null),
+  sso:()=>call('/api/sso'),
+  saveSsoGoogle:b=>call('/api/sso/google',{method:'PUT',body:body(b)}),
+  saveSsoEntra:b=>call('/api/sso/entra',{method:'PUT',body:body(b)}),
+  deleteSsoEntra:()=>call('/api/sso/entra',{method:'DELETE'}),
+  saveSsoLdap:b=>call('/api/sso/ldap',{method:'PUT',body:body(b)}),
+  deleteSsoLdap:()=>call('/api/sso/ldap',{method:'DELETE'}),
+  testSsoLdap:b=>call('/api/sso/ldap/test',{method:'POST',body:body(b)}),
   modelGroups:()=>call('/api/models'),
   // agents
   stats:()=>call('/api/agents/stats'),
@@ -108,6 +117,12 @@ export const api={
   monitoringSummary:q=>call(`/api/monitoring/summary?${query(q)}`),
   monitoringAgents:(q,sort)=>call(`/api/monitoring/agents?${query({...q,sort})}`),
   monitoringCsv:q=>blob(`/api/monitoring/export.csv?${query(q)}`),
+  monitoringUsers:q=>call(`/api/monitoring/users?${query(q)}`),
+  monitoringGroups:q=>call(`/api/monitoring/groups?${query(q)}`),
+  listUsageLimits:()=>call('/api/monitoring/limits'),
+  createUsageLimit:b=>call('/api/monitoring/limits',{method:'POST',body:body(b)}),
+  updateUsageLimit:(id,b)=>call(`/api/monitoring/limits/${id}`,{method:'PUT',body:body(b)}),
+  deleteUsageLimit:id=>call(`/api/monitoring/limits/${id}`,{method:'DELETE'}),
   // users (admin)
   listUsers:()=>call('/api/users'),
   getUser:email=>call(`/api/users/${encodeURIComponent(email)}`),
@@ -223,6 +238,12 @@ export const api={
   chatImage:(sid,aid)=>blob(`/api/chat/attachments/${sid}/${aid}/image`), // the stored (redacted) copy; 410 once expired
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
+  workbenchBrief:now=>call('/api/workbench/brief',{method:'POST',body:body({now})}),
+  workbenchSources:()=>call('/api/workbench/sources'),
+  todos:()=>call('/api/workbench/todos'),
+  addTodo:t=>call('/api/workbench/todos',{method:'POST',body:body(t)}),
+  updateTodo:(id,patch)=>call(`/api/workbench/todos/${id}`,{method:'PATCH',body:body(patch)}),
+  deleteTodo:id=>call(`/api/workbench/todos/${id}`,{method:'DELETE'}),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
   calendarFreebusy:(from,to)=>call(`/api/calendar/freebusy?${query({from,to})}`),
   // database connectors (admin)

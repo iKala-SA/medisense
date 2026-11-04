@@ -17,6 +17,9 @@ from ..schemas import AgentIn
 from . import runenv
 
 TZ = ZoneInfo("Asia/Taipei")
+# Daily rollups for usage limits and the per-person / per-group views (engine/limits.py, routers/monitoring.py):
+USER_DAILY = "usage_user_daily"      # {day}_{uid}{suffix}: one person's calls that day
+TARGET_DAILY = "usage_target_daily"  # {day}_{target}{suffix}: calls that asked for one model id or one routing group
 log = logging.getLogger(__name__)
 
 
@@ -27,6 +30,11 @@ def day_key(at: datetime | None = None) -> str:
 def model_key(model: str) -> str:
     """Firestore map keys may not contain '.', so 'gemini-3.1-pro' is stored under 'gemini-3_1-pro'."""
     return model.replace(".", "_")
+
+
+def _doc_key(v: str) -> str:
+    """A safe Firestore document id fragment (no '/')."""
+    return v.replace("/", "_")[:200]
 
 
 def record(*, agent: AgentIn, agent_id: str, user_id: str, group: str, model: str, prompt_tokens: int,
@@ -52,5 +60,12 @@ def record(*, agent: AgentIn, agent_id: str, user_id: str, group: str, model: st
             "by_group": {group: inc(1)},
             "updated_at": at,
         }, merge=True)
+        counters = {"requests": inc(1), "tokens": inc(prompt_tokens + completion_tokens), "cost_usd": inc(cost_usd), "updated_at": at}
+        if user_id:
+            c.collection(USER_DAILY).document(f"{day_key(at)}_{_doc_key(user_id)}{suffix}").set(
+                {"day": day_key(at), "env": env, "uid": user_id, **counters}, merge=True)
+        for target in dict.fromkeys(t for t in (group, model) if t):  # the requested group / pinned id, and the model that answered
+            c.collection(TARGET_DAILY).document(f"{day_key(at)}_{_doc_key(target)}{suffix}").set(
+                {"day": day_key(at), "env": env, "target": target, **counters}, merge=True)
     except Exception:  # noqa: BLE001 - ledger is observability, never a reason to fail a clinical reply
         log.exception("usage ledger write failed for agent %s", agent_id)

@@ -70,6 +70,19 @@ class Settings(BaseSettings):
     litellm_apply_workflow: str = "litellm-apply.yml"
     github_dispatch_token: str = ""
 
+    # Enterprise SSO (routers/sso.py, engine/keycloak.py). Keycloak (open source, infra/15-keycloak.sh) brokers Microsoft Entra
+    # ID and LDAP / AD; Identity Platform trusts it as one OIDC provider, so Firebase stays the only session layer. The
+    # backend configures Keycloak through its admin REST API with a service-account client (manage-identity-providers,
+    # manage-realm). Empty URL or secret = Entra / LDAP cannot be configured (Google sign-in still works).
+    keycloak_url: str = ""  # public base URL, e.g. https://medisense-keycloak-xxxx.a.run.app (browsers reach it too)
+    keycloak_realm: str = "medisense"
+    keycloak_client_id: str = "medisense-backend"
+    keycloak_client_secret: str = ""
+    sso_oidc_provider_id: str = "oidc.medisense-sso"  # Identity Platform provider that trusts the Keycloak realm
+    # Firestore config/{doc} holding the sign-in settings. Local development against the shared sandbox database sets
+    # SSO_CONFIG_DOC=sso-local so testing with a local Keycloak never changes what the deployed login page shows.
+    sso_config_doc: str = "sso"
+
     @property
     def allowed_domain_list(self) -> list[str]:
         return [d.strip().lower() for d in self.allowed_domains.split(",") if d.strip()]

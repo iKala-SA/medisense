@@ -15,7 +15,7 @@ function Ref({c,i,active,refEl,onOpen}){
   useEffect(()=>{if(active)setOpen(true)},[active]);
   const ps=passagesOf(c),web=!c.doc_id&&/^https?:/.test(c.uri||''),long=ps.length>1||(ps[0].text||'').length>140,pages=pagesLabel(ps);
   return <article ref={refEl} className={'cx-ref'+(active?' active':'')}>
-    <header><span className="n">{i}</span><b title={c.source}>{c.source}</b>{pages&&<em>{pages}</em>}{c.low&&<em className="low" title="與問題的相關度較低，僅供參考">低相關</em>}</header>
+    <header><span className="n">{i}</span><b title={c.source}>{c.source}</b>{pages&&<em>{pages}</em>}{c.kind==='database'&&<em className="db" title="回答引用了這個資料庫查詢的結果">資料庫</em>}{c.low&&<em className="low" title={`與問題的相關度較低，僅供參考${c.score!=null?`（距離 ${Number(c.score).toFixed(2)}，越小越相關）`:''}`}>低相關</em>}{c.score!=null&&c.kind!=='database'&&!/^https?:/.test(c.uri||'')&&<em className="dist" title="檢索距離：越小越相關；超過「路由 → 文件檢索門檻」的保留線就標為低相關">{Number(c.score).toFixed(2)}</em>}{c.cited===false&&<em className="unused" title="有檢索到這份文件，但回答沒有引用它">未引用</em>}</header>
     {web?<p className="host">{host(c.uri)}</p>
       :open&&ps.length>1?ps.map((p,k)=><p key={k} className="psg">{p.page!=null&&<small>第 {p.page} 頁{p.low?' · 低相關':''}</small>}{p.text||'（無內容片段）'}</p>)
       :<p className={open?'':'clamp'}>{ps[0].text||'（無內容片段）'}</p>}

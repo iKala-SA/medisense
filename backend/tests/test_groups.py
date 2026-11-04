@@ -12,7 +12,7 @@ from .conftest import ADMIN, PLAIN
 @pytest.fixture(autouse=True)
 def any_domain(monkeypatch):
     """Tests must not depend on the local .env ALLOWED_DOMAINS; an empty list allows every domain."""
-    monkeypatch.setattr(groups_router, "settings", lambda: SimpleNamespace(allowed_domain_list=[]))
+    monkeypatch.setattr(groups_router.sso, "allowed_domains", lambda cfg=None: [])
 
 
 def seed_group(fs, gid="g1", name="護理部", members=()):
@@ -78,7 +78,7 @@ def test_add_members_reports_added_skipped_and_rejected(fs, as_user, audit_log):
 
 
 def test_add_members_rejects_domain_outside_allowed_list(fs, as_user, monkeypatch):
-    monkeypatch.setattr(groups_router, "settings", lambda: SimpleNamespace(allowed_domain_list=["hospital.test"]))
+    monkeypatch.setattr(groups_router.sso, "allowed_domains", lambda cfg=None: ["hospital.test"])
     seed_group(fs)
     seed_user(fs, "outsider@example.test")
     r = as_user(ADMIN).post("/api/groups/g1/members", json={"emails": ["outsider@example.test"]})

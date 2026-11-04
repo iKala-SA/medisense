@@ -67,7 +67,6 @@ function MyConnections({notify,onChanged,reloadKey,query=''}){
         {c.description&&<p>{c.description}</p>}
         {c.problem&&c.state!=='connected'&&c.state!=='shared'&&<p style={{color:'#8a5a00'}}>{c.problem}</p>}
         {c.state==='reauth_required'&&c.missing_scopes?.length>0&&<p style={{color:'#8a5a00'}}>管理員開放了新的動作（{(c.write_actions||[]).join('、')||'寫入'}），需要重新授權一次才能使用。</p>}
-        {c.write_actions?.length>0&&c.state!=='reauth_required'&&<p className="lv-p-meta">可寫入：{c.write_actions.join('、')}</p>}
         <div className="lv-p-card-foot"><span className={'lv-p-status '+cls}><i/>{txt}{ok&&c.account_label?' · '+c.account_label:''}</span>
           {ok&&c.mode!=='shared'&&c.mode!=='none'?<button className="btn sm" disabled={working} onClick={()=>disconnect(c)}>中斷連線</button>
             :!actionable?null

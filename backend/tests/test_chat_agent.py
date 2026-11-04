@@ -65,6 +65,7 @@ def test_capabilities_drive_web_search_connectors_and_spaces(fs, as_user, monkey
     assert r.status_code == 200, r.text
     names = [t["function"]["name"] for t in seen["tools"]]
     assert "web_search" in names and "search_knowledge" in names and any(n.startswith("webhook_") for n in names)
+    assert "一定要先呼叫 search_knowledge" in seen["system"]  # an agent built on its spaces searches them first, not only "when needed"
 
 
 def test_the_person_chatting_confirms_a_connector_write_in_place(fs, as_user, monkeypatch, audit_log):
@@ -217,3 +218,22 @@ def test_general_chat_approval_works_without_a_stored_agent(fs, as_user, monkeyp
     r2 = me.post("/api/chat/approve", json={"session_id": r["session_id"], "approve": True})
     assert r2.status_code == 200, r2.text
     assert r2.json()["reply"] == "已建立" and ran == [("docs", "googledocs.create_document", {"title": "test", "text": "test"})]
+
+
+def test_a_conversation_remembers_its_agent_and_data_sources(fs, as_user, monkeypatch):
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr(llm, "complete", lambda **kw: llm.Completion("ok", "gemini-3-flash", 1, 1, 0.0, 1))
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    monkeypatch.setattr(llm, "model_catalog", lambda: [{"id": "gemini-3-flash", "model": "gemini-3-flash"}])
+    fs.put("db_connectors/bq1", {"name": "門診統計", "kind": "bigquery", "connection": {"project": "p-1", "datasets": "d"}})
+    fs.put("spaces/sp1", {"name": "衛教宣傳", "type": "org", "document_ids": []})
+    me = as_user(BUILDER)
+    r = me.post("/api/chat", json={"message": "hi", "knowledge_scope": "selected", "db_connectors": ["bq1", "gone"], "space_ids": ["sp1"],
+                                   "web_search": True, "model_group": "auto", "model": "gemini-3-flash"})
+    assert r.status_code == 200, r.text
+    sid = r.json()["session_id"]
+    ctx = me.get(f"/api/sessions/{sid}").json()["context"]
+    assert ctx["knowledge_scope"] == "selected" and ctx["web_search"] is True and ctx["model"] == "gemini-3-flash"
+    assert ctx["picked"] == [{"t": "space", "id": "sp1", "name": "衛教宣傳"}, {"t": "db", "id": "bq1", "name": "門診統計", "kind": "bigquery"}]
+    item = next(i for i in me.get("/api/sessions").json()["items"] if i["id"] == sid)
+    assert item["context"]["picked"][1]["name"] == "門診統計" and item["agent_name"] == "Medisense"

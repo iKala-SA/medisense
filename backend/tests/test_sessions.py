@@ -291,13 +291,13 @@ def test_features_carry_validated_rag_distance_thresholds(fs, as_user):
 
     c = as_user(ADMIN)
     got = as_user(PLAIN).get("/api/features").json()
-    assert got["rag_keep_distance"] == 0.34 and got["rag_max_distance"] == 0.40 and features.rag_thresholds() == (0.34, 0.40)
+    assert got["rag_keep_distance"] == 0.42 and got["rag_max_distance"] == 0.50 and features.rag_thresholds() == (0.42, 0.50)
     assert c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.45, "rag_max_distance": 0.30}).status_code == 422  # keep must not exceed max
     assert c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.01, "rag_max_distance": 0.30}).status_code == 422
     ok = c.put("/api/features", json={"web_search": False, "rag_keep_distance": 0.30, "rag_max_distance": 0.45})
     assert ok.status_code == 200 and features.rag_thresholds() == (0.30, 0.45)
     ev = [d for p, d in fs.store.items() if p.startswith("audit/") and d["action"] == "features.update"][-1]
-    assert ev["rag_distance_old"] == [0.34, 0.4] and ev["rag_distance_new"] == [0.3, 0.45]
+    assert ev["rag_distance_old"] == [0.42, 0.5] and ev["rag_distance_new"] == [0.3, 0.45]
 
 
 # ---- 👍 / 👎
@@ -378,3 +378,17 @@ def test_delete_all_removes_my_conversations_but_keeps_locked_ones_and_other_peo
     assert "sessions/kept" in fs.store and "sessions/theirs" in fs.store
     assert any(a["action"] == "session.delete_all" and a.get("deleted") == 2 for a in audit_log())
     assert as_user(BUILDER).delete("/api/sessions").json() == {"deleted": 0, "kept_locked": 1}
+
+
+def test_sessions_report_which_agent_answered(fs, as_user):
+    seed(fs, "new", BUILDER.uid, 2, 2, title="n")
+    fs.store["sessions/new"].update({"agent_id": "a1", "agent_name": "病患衛教助理"})
+    seed(fs, "old", BUILDER.uid, 2, 1, title="o")
+    fs.store["sessions/old"]["agent_id"] = "a2"  # saved before agent_name existed: looked up
+    fs.put("agents/a2", {"name": "藥劑部助理"})
+    seed(fs, "chat", BUILDER.uid, 2, 0, title="c")
+    fs.store["sessions/chat"]["agent_id"] = "general-chat"
+    c = as_user(BUILDER)
+    names = {i["id"]: i["agent_name"] for i in c.get("/api/sessions").json()["items"]}
+    assert names == {"new": "病患衛教助理", "old": "藥劑部助理", "chat": ""}
+    assert c.get("/api/sessions/old").json()["agent_name"] == "藥劑部助理"

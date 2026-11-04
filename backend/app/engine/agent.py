@@ -44,7 +44,8 @@ LANG_GUIDE = ("Language: always answer in the language of the user's latest mess
               "results are in another language: translate what you use. Keep citation numbers and code unchanged. The `reason` you write for each tool call is shown to the user too, so write it in that same language.")
 REASON = {"type": "string", "description": "One short sentence explaining why you take this step, in the USER's language (it is shown to them as written)."}
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
-         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
+         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]，"
+         "也不要用檔名代替編號（不要寫「資料來源：[某某.pdf]」）。"
          "呼叫工具時務必填寫 reason。"
          "若有連接器工具（例如 Google 日曆、Google 文件、Slack）而使用者要求建立、修改或傳送外部資料，請直接呼叫對應的工具，"
          "不要回答你做不到；寫入動作會先請使用者確認後才真正執行。")
@@ -54,9 +55,13 @@ NO_DOCS_GUIDE = ("搜尋院內文件若沒有找到足夠相關的內容，你�
                  "且不要標註來源編號。標示「低相關」的段落只供參考，引用時要用使用者的語言說明相關度較低。")
 FORMAT_GUIDE = ("輸出格式：任何程式碼（含 HTML、CSS、SQL 等網頁或標記語言）、指令、資料（CSV/JSON）一律放進三個反引號的 Markdown 程式碼區塊並標註語言，例如 ```html、```python，"
                 "絕對不要把程式碼放進 ~~~document。"
-                "只有當你產出的是使用者要拿去使用的完整『文字文件』（報告、信件、衛教單張、表單、會議紀錄、SOP 等純文字內容，不是程式碼）時，"
+                "只有當使用者明確要你「產出、撰寫、建立」一份要另外拿去使用的文件（例如「幫我寫一封信」「做一份會議紀錄」「產生一份報告」），"
                 "才用波浪線區塊包起來：第一行寫 ~~~document 加上文件標題，最後一行寫 ~~~，區塊內用 Markdown 排版。"
-                "一般對話、說明與簡短回答不要放進區塊。")
+                "回答問題、解釋、衛教說明、條列注意事項都是一般回答，即使內容很長、有標題或固定格式，也直接用 Markdown 寫在回答裡，不要放進區塊；"
+                "技能（## Skill）只規定回答的寫法與格式，不代表要產出文件。")
+KNOWLEDGE_FIRST_GUIDE = ("這個 Agent 連結了院內知識來源（知識空間或附加文件），它的用途就是依據這些文件回答。凡是與其主題相關的問題，"
+                         "回答前一定要先呼叫 search_knowledge（可換不同關鍵字多搜一次），以檢索結果為準並附上來源編號；"
+                         "只有寒暄或明顯與主題無關的問題才直接回答。")
 WEB_GUIDE = ("web_search 只用於需要即時或院外公開資訊的問題（天氣、新聞、公開統計等），不要用它查病人資料；"
              "搜尋詞不得包含姓名、病歷號等個人識別資訊。引用網路結果時同樣標註來源編號。")
 WEB_SYSTEM = "You are a web research assistant. Summarise the facts found briefly, in the language of the search query, keeping numbers, dates and units; add no opinion or guesswork."
@@ -65,20 +70,48 @@ WEB_SYSTEM = "You are a web research assistant. Summarise the facts found briefl
 _CITE = re.compile(r"\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})*)\](?!\()")  # [1] / [1, 2] (not a markdown link)
 _CODE = re.compile(r"(```.*?```|`[^`\n]*`)", re.S)  # code is left alone: [1, 2, 3] there is a list, not a citation
 _SPLIT = re.compile(r"\s*[,，、]\s*")
+_NAMED = re.compile(r"\[([^\[\]\n]{2,160})\](?!\()")  # [胃鏡檢查前後注意事項.pdf] — a source cited by name (not a link)
+_EXT = re.compile(r"\.(pdf|docx?|pptx?|txt|md|html?|csv|json)$", re.I)
+
+
+def _norm_source(name: str) -> str:
+    return _EXT.sub("", re.sub(r"\s+", "", name or "")).casefold()
+
+
+def _name_markers(text: str, citations: list[Citation]) -> str:
+    """Models sometimes cite by file name ("資料來源：[電腦斷層與顯影劑注意事項.pdf]") instead of by number. Turn such a
+    bracketed name into that source's [n] so it counts as cited and renders as a chip. Code spans are left alone."""
+    by_name = {_norm_source(c.source): i for i, c in enumerate(citations, 1) if c.source}
+    if not by_name:
+        return text
+
+    def repl(m):
+        key = _norm_source(m.group(1))
+        n = by_name.get(key) or next((i for k, i in by_name.items() if len(key) >= 4 and (k.startswith(key) or key.startswith(k))), None)
+        return f"[{n}]" if n else m.group(0)
+    parts = _CODE.split(text)
+    return "".join(p if i % 2 else _NAMED.sub(repl, p) for i, p in enumerate(parts))
 
 
 def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Citation]]:
-    """Keep only the sources the answer really cites, renumbered 1..k in their original order, and rewrite the [n]
-    markers to match. A marker that points at no source is removed. No sources at all: the text is left untouched."""
+    """Order the sources for the 參考文件 tab: the ones the answer cites first, renumbered 1..k in their original order
+    (the [n] markers are rewritten to match; a marker pointing at no source is removed), then database results, then
+    every retrieved document the answer did not cite, marked `cited=False`. Nothing the answer drew on is hidden.
+    No sources at all: the text is left untouched."""
     if not citations:
         return text, citations
+    text = _name_markers(text, citations)
     nums = lambda m: [int(n) for n in _SPLIT.split(m.group(1))]  # noqa: E731
     parts = _CODE.split(text)  # odd items are code
     used = sorted({n for i, p in enumerate(parts) if i % 2 == 0 for m in _CITE.finditer(p) for n in nums(m) if 1 <= n <= len(citations)})
     remap = {old: new for new, old in enumerate(used, 1)}
     rewrite = lambda m: "".join(f"[{n}]" for n in dict.fromkeys(remap[x] for x in nums(m) if x in remap))  # noqa: E731
     out = "".join(p if i % 2 else _CITE.sub(rewrite, p) for i, p in enumerate(parts))
-    return out, [citations[o - 1] for o in used]
+    cited = [citations[o - 1].model_copy(update={"cited": True}) for o in used]
+    rest = [c for i, c in enumerate(citations, 1) if i not in remap]
+    dbs = [c for c in rest if c.kind == "database"]
+    unused = [c.model_copy(update={"cited": False}) for c in rest if c.kind != "database"]
+    return out, [*cited, *dbs, *unused]
 
 
 class _Trace(list):
@@ -214,6 +247,9 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     flow = agent.flow
     rag_files = rag_files or []
     res = RunResult(reply="", trace=_Trace(emit))
+    pinned_by = "使用者指定模型"
+    if not pin_model and agent.model and agent.model in {m["id"] for m in llm.model_catalog()}:
+        pin_model, pinned_by = agent.model, "Agent 指定模型"  # the agent's own model; a model gone from the gateway falls back to routing
     if pin_model and (agent.routing.sovereign_only or routing.sovereign_only()):
         pin_model = None  # data-residency policy outranks a model pick
     base = agent.instructions or f"You are {agent.name}. {agent.description}".strip()
@@ -229,7 +265,7 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     group, note = pick_group(agent, llm_node, user_message)
     think = THINK.get(group)
     if pin_model:
-        group, note, think = pin_model, "使用者指定模型", ("medium" if "pro" in pin_model else None)
+        group, note, think = pin_model, pinned_by, ("medium" if "pro" in pin_model else None)
     web_blocked = ""
     if web_search and (agent.routing.sovereign_only or routing.sovereign_only()):
         web_blocked = "僅本地模型已啟用，網路搜尋已停用"
@@ -242,7 +278,9 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
     specs = [t.spec for t in tools.values()]
     system = f"{system}\n\n{LANG_GUIDE}\n{FORMAT_GUIDE}"
     if specs:
-        system = f"{system}\n\n{GUIDE}" + (f"\n{NO_DOCS_GUIDE}" if rag_files else "") + (f"\n{WEB_GUIDE}" if web_on else "")
+        own_knowledge = bool(rag_files) and bool(agent.capabilities.spaces or agent.knowledge_doc_ids)  # a picked agent built around its documents
+        system = (f"{system}\n\n{GUIDE}" + (f"\n{KNOWLEDGE_FIRST_GUIDE}" if own_knowledge else "") + (f"\n{NO_DOCS_GUIDE}" if rag_files else "")
+                  + (f"\n{WEB_GUIDE}" if web_on else ""))
     approval = next((n for n in flow.nodes if n.type == "approval"), None)
     structured_node = next((n for n in flow.nodes if n.type == "structured_output"), None)
 
@@ -336,7 +374,13 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
                 q = str(args.get("query", ""))
                 return f"[HIS/EMR 尚未串接] 查詢條件：{q}", "HIS/EMR 閘道未啟用（stub）"
             if tool.db:
-                return db_tools.execute(tool.db, args, user_id=user_id, email=user_email, agent_id=agent_id)
+                text, facts = db_tools.execute(tool.db, args, user_id=user_id, email=user_email, agent_id=agent_id)
+                if not text.startswith("["):  # a query result (de-identified rows), not an error: it is a source of the answer
+                    res.citations.append(Citation(kind="database", source=tool.label, text=text[:600], cited=True,
+                                                  passages=[CitationPassage(text=text[:600])]))
+                    if emit:
+                        emit({"event": "citations", "citations": [x.model_dump() for x in res.citations]})
+                return text, facts
             call_args = {**tool.fixed}
             if tool.raw_args:
                 try:
@@ -437,9 +481,11 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         if not text:  # some models return nothing after a tool result: ask once more without tools
             c2 = _complete(agent, agent_id, user_id, group, system=system, messages=messages, think=think, model=pin_model)
             text = c2.text.strip() or "（模型沒有產生回覆，請重新提問。）"
-        retrieved = len(res.citations)
-        text, res.citations = prune_citations(text, res.citations)  # the references tab shows what the answer used, not everything found
-        cited = f"，引用 {len(res.citations)}/{retrieved} 個來源" if retrieved else ""
+        text, res.citations = prune_citations(text, res.citations)  # cited first; everything retrieved or queried stays listed
+        docs = [c for c in res.citations if c.kind != "database"]
+        cited = f"，引用 {sum(c.cited for c in docs)}/{len(docs)} 個來源" if docs else ""
+        if (n_db := sum(c.kind == "database" for c in res.citations)):
+            cited += f"，{n_db} 次資料庫查詢"
         res.trace.append(StepTrace(node_id=node_id, type="llm", model=c.model, group=group, ms=c.ms, prompt_tokens=c.prompt_tokens,
                                    completion_tokens=c.completion_tokens, cost_usd=c.cost_usd, thinking=c.reasoning or None,
                                    summary=f"{len(text)} 字{cited}" + (f"（{note}）" if note else "") + ("（已達工具呼叫上限）" if turn == MAX_ROUNDS else "")))

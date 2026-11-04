@@ -15,9 +15,7 @@ import '../live/agents.css';
 
 const clock=d=>d?new Date(d).toLocaleTimeString('zh-TW',{hour:'numeric',minute:'2-digit',hour12:true}):'';
 const download=(name,obj)=>{const u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));const x=document.createElement('a');x.href=u;x.download=name;x.click();URL.revokeObjectURL(u)};
-const DEPTS=['內科部','外科部','急診醫學部','心臟血管中心','神經醫學中心','新陳代謝科','放射線部','護理部','藥劑部','感染管制中心','臨床試驗與轉譯研究中心','智慧醫療組 (IT)'];
 const Switch=({on,onChange,disabled,label})=><button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} className={'ag-switch'+(on?' on':'')} onClick={()=>onChange(!on)}><span/></button>;
-const Seg=({value,onChange,options,disabled})=><div className="ag-seg" role="radiogroup">{options.map(([v,l])=><button key={v} type="button" role="radio" aria-checked={value===v} disabled={disabled} className={value===v?'on':''} onClick={()=>onChange(v)}>{l}</button>)}</div>;
 
 /* markdown toolbar over a plain textarea: the instructions stay plain text the model reads as-is */
 function Instructions({value,onChange,disabled,onImprove,improving}){
@@ -140,14 +138,17 @@ export default function AgentDetail({id,me,notify,onBack,onChat,onDeleted}){
           <div className="ag-chips">{(cap.db_connectors||[]).map(s=>{const it=(lib.dbs||[]).find(x=>x.id===s);return <span className="ag-chip big" key={s}><Database size={13}/>{it?.name||'（已不存在）'}{!dis&&<button aria-label="移除" onClick={()=>setCap({db_connectors:cap.db_connectors.filter(x=>x!==s)})}><X size={11}/></button>}</span>})}{!(cap.db_connectors||[]).length&&<span className="ag-muted">沒有連結資料庫。</span>}</div>
           {pick==='db'&&<div className="ag-pop static">{(lib.dbs||[]).filter(x=>!(cap.db_connectors||[]).includes(x.id)).map(x=><button key={x.id} onClick={()=>{setCap({db_connectors:[...(cap.db_connectors||[]),x.id]});setPick(null)}}><Database size={15}/>{x.name}</button>)}{!(lib.dbs||[]).filter(x=>!(cap.db_connectors||[]).includes(x.id)).length&&<p className="ag-muted">沒有可連結的資料庫（管理員需先在「連接器 → Database」建立）</p>}</div>}
         </Section>
-        <Section title="自訂" sub="協助識別這個 Agent 的詳細資訊" open={open.custom} onToggle={()=>tog('custom')}>
-          <div className="ag-row"><div className="ag-field narrow"><label>圖示</label><input className="ag-emoji" maxLength={4} value={a.icon||''} placeholder="🩺" disabled={dis} onChange={e=>e2({icon:e.target.value})}/></div>
-            <div className="ag-field grow"><label>部門</label><select value={a.department||''} disabled={dis} onChange={e=>e2({department:e.target.value})}><option value="">（不指定）</option>{DEPTS.map(d=><option key={d}>{d}</option>)}</select></div></div>
+        <Section title="自訂" sub="開場訊息、模型與網路搜尋等設定" open={open.custom} onToggle={()=>tog('custom')}>
           <div className="ag-field"><label>開場訊息／範例問題 <small>最多 4 則，顯示在對話起始畫面</small></label>
             <div className="ag-list">{a.opening_questions.map((q,i)=><div key={i} className="ag-li"><input value={q} maxLength={120} disabled={dis} onChange={e=>e2({opening_questions:a.opening_questions.map((x,j)=>j===i?e.target.value:x)})}/>{!dis&&<button className="ag-icon" aria-label="刪除" onClick={()=>e2({opening_questions:a.opening_questions.filter((_,j)=>j!==i)})}><X size={14}/></button>}</div>)}
               {!dis&&a.opening_questions.length<4&&<button type="button" className="ag-add" onClick={()=>e2({opening_questions:[...a.opening_questions,'']})}><Plus size={13}/>新增範例問題</button>}</div></div>
-          <div className="ag-field"><label>模型偏好</label><Seg value={cap.model_pref} disabled={dis} onChange={v=>setCap({model_pref:v})} options={[['fast','快速'],['balanced','平衡'],['quality','高品質']]}/></div>
-          <div className="ag-field"><label>思考深度</label><Seg value={cap.thinking} disabled={dis} onChange={v=>setCap({thinking:v})} options={[['off','關'],['low','低'],['medium','中'],['high','高']]}/></div>
+          <div className="ag-field"><label>模型 <small>對話時使用者沒有另外指定模型，就用這個模型回答</small></label>
+            <select value={a.model||''} disabled={dis||!!a.routing?.sovereign_only} onChange={e=>e2({model:e.target.value})} aria-label="模型">
+              <option value="">自動（智慧路由）</option>
+              {(lib.models||[]).map(m=><option key={m.id} value={m.id}>{m.name}{m.note?` · ${m.note}`:m.provider?` · ${m.provider}`:''}</option>)}
+              {a.model&&!(lib.models||[]).some(m=>m.id===a.model)&&<option value={a.model}>{a.model}（目前無法使用，將改用自動路由）</option>}
+            </select>
+            {a.routing?.sovereign_only&&<small className="ag-muted">已開啟「僅院內模型」，一律使用院內模型。</small>}</div>
           <div className="ag-cap"><Globe size={18}/><div><b>網路搜尋</b><small>{lib.features?.web_search===false?'管理員尚未開放網路搜尋':'需要即時或院外公開資訊時使用'}</small></div><Switch on={cap.web_search&&lib.features?.web_search!==false} disabled={dis||lib.features?.web_search===false} label="網路搜尋" onChange={v=>setCap({web_search:v})}/></div>
           <div className="ag-cap"><Lock size={18}/><div><b>僅院內模型</b><small>開啟後只使用院內模型，不回退雲端；圖片與網路搜尋無法使用</small></div><Switch on={!!a.routing?.sovereign_only} disabled={dis} label="僅院內模型" onChange={v=>e2({routing:{...a.routing,sovereign_only:v}})}/></div>
         </Section>

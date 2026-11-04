@@ -29,12 +29,16 @@ bash infra/02-foundation.sh         # Firestore, GCS bucket, Artifact Registry, 
 bash infra/03-deploy-litellm.sh     # build LiteLLM image with config, deploy to Cloud Run (internal ingress)
 bash infra/04-deploy-backend.sh     # deploy FastAPI from source, wire it to LiteLLM + Firestore + GCS
 bash infra/05-firebase.sh           # add Firebase to the project, create web app, print config for frontend/.env
+bash infra/15-keycloak.sh           # optional: enterprise SSO (Microsoft Entra ID, LDAP / AD) through Keycloak; re-run 04 after
 ```
 
 Console steps:
 1. Firebase console → Authentication → Sign-in method → enable **Google** (already on in the sandbox; the Hosting site
    `tcvgh-agent-builder.web.app` was added to authorized domains via the Identity Toolkit API).
-2. (Later, Gmail/Calendar connectors) Google Cloud console → APIs & Services → OAuth consent
+2. (Enterprise SSO) Firebase console → Authentication → Settings → upgrade to **Identity Platform** before
+   `infra/15-keycloak.sh` (it registers the OIDC provider `oidc.medisense-sso`). Then 管理帳戶 → 登入與 SSO configures
+   Entra ID / LDAP; hospital IT steps are in `docs/SSO-SETUP.md`.
+3. (Later, Gmail/Calendar connectors) Google Cloud console → APIs & Services → OAuth consent
    screen → **Internal**, add scopes `gmail.send`, `calendar.events`, `drive.readonly`.
 
 Finally build and deploy the frontend:
@@ -153,6 +157,12 @@ cd frontend && npm run dev
 # frontend only, no backend / sign-in (mock data)
 cd frontend && VITE_MOCK_API=1 npm run dev
 ```
+
+登入與 SSO locally (Docker): `bash scripts/sso-local.sh` starts Keycloak (:8180, admin / admin) and a test OpenLDAP, creates
+realm `medisense` with the backend's admin client and writes `backend/.env.sso-local` (`SSO_CONFIG_DOC=sso-local`, so the
+deployed login page is untouched). Then `set -a; source .env.sso-local; set +a; .venv/bin/uvicorn app.main:app --port 8080`
+and `cd frontend && API_PROXY_TARGET=http://localhost:8080 npm run dev:live`. The settings page and LDAP tests work end to
+end; signing in with Microsoft / LDAP needs the deployed Keycloak (Identity Platform must reach it publicly).
 
 ## 3b. Upgrading the deployed sandbox to this version
 

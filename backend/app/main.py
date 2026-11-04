@@ -35,7 +35,9 @@ from .routers import (
     step_runs,
     skills,
     spaces,
+    sso,
     users,
+    workbench,
 )
 
 app = FastAPI(title="TCVGH Agent Platform API", version="0.2.0")
@@ -75,6 +77,9 @@ app.include_router(my_connectors.router)
 app.include_router(gateway_catalog.router)
 app.include_router(gateway_connectors.router)
 app.include_router(oauth_proxy.router)
+app.include_router(sso.router)
+app.include_router(sso.public_router)
+app.include_router(workbench.router)
 
 
 @app.get("/api/health")

@@ -11,6 +11,7 @@ from ..auth import User, current_user
 from ..config import settings
 from ..engine import agent as agent_runtime
 from ..engine import bigquery, deid, llm, runenv, skills
+from ..engine.limits import LimitExceeded
 from ..schemas import AgentIn, ApproveRequest, RunRequest, RunResponse, StepTrace
 from .agents import can_edit
 from .knowledge import resolve_rag_files
@@ -78,7 +79,8 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
                 use_published: bool = False, version: int | None = None, audit_action: str = "agent.run",
                 audit_extra: dict | None = None, title: str | None = None, extra_context: str = "",
                 session_extra: dict | None = None, pin_model: str | None = None, emit=None,
-                web_search: bool = False, images: list[dict] | None = None, message_images: list[str] | None = None) -> RunResponse:
+                web_search: bool = False, images: list[dict] | None = None, message_images: list[str] | None = None,
+                message_skills: list[str] | None = None) -> RunResponse:
     """The shared pipeline behind /run, /api/chat and schedules: de-identify -> flow -> save session -> audit."""
     session_id = session_id or uuid.uuid4().hex
     sess_ref = db.client().collection("sessions").document(session_id)
@@ -104,6 +106,8 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
         if exc.status_code == 401:
             llm.reset_client_cache()
         raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
+    except LimitExceeded as exc:
+        raise HTTPException(429, str(exc)) from exc
     latency = int((time.perf_counter() - t0) * 1000)
 
     if not sess.get("title"):  # auto title on the first run
@@ -111,10 +115,13 @@ def _execute_run(agent: AgentIn, rag_files: list[str], agent_id: str, user: User
     user_msg = {"role": "user", "content": safe_message}
     if message_images:  # ids of the (redacted) images sent with this message, so a reopened chat shows them again
         user_msg["images"] = list(message_images)
+    if message_skills:  # names of the skills invoked with / for this message, shown as "/名稱" when the chat is reopened
+        user_msg["skills"] = list(message_skills)
     sess["messages"] = [*sess["messages"], user_msg, {"role": "assistant", "content": r.reply, "meta": {**_meta(r), **({"stopped": True} if stopped else {})}}]
     # A run that stopped at an approval node parks its state on the session; a new message discards it.
     sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": use_published,
                        "version": version, "at": db.now()} if r.pending else None
+    sess["agent_name"] = agent.name  # so a reloaded conversation still shows which agent answered
     sess.update(session_extra or {})
     if runenv.is_sandbox():
         sess["env"] = runenv.SANDBOX  # kept out of 最近項目; counted separately
@@ -187,6 +194,8 @@ def decide_pending(agent_id: str, sess_ref, sess: dict, user: User, approve: boo
             raise HTTPException(502, f"model gateway error {exc.status_code}: {exc.message}") from exc
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
+        except LimitExceeded as exc:
+            raise HTTPException(429, str(exc)) from exc
         latency = int((time.perf_counter() - t0) * 1000)
         sess["messages"] = [*sess["messages"], {"role": "assistant", "content": r.reply, "meta": _meta(r)}]
         sess["pending"] = {**r.pending, "agent_id": agent_id, "requested_by": user.uid, "use_published": pending.get("use_published"),

@@ -15,7 +15,7 @@ from .. import db
 # RAG relevance, as DISTANCE (smaller = more similar; Vertex RAG's `score`). Measured on the sandbox corpus 2026-10-28:
 # passages that really answer the question sit around 0.26-0.31 (up to ~0.38), while "nothing matches" results sit at
 # 0.36-0.49 and often repeat the same filler value. Tune on the real corpus with scripts/calibrate_rag.py.
-DEFAULTS = {"web_search": False, "voice_input": False, "rag_keep_distance": 0.34, "rag_max_distance": 0.40}
+DEFAULTS = {"web_search": False, "voice_input": False, "rag_keep_distance": 0.42, "rag_max_distance": 0.50}  # relaxed 2026-11-04: Chinese PDFs landed at 0.34-0.40 and were never cited
 _TTL = 30.0
 _cache: tuple[float, dict] | None = None
 
@@ -46,5 +46,5 @@ def web_search_enabled() -> bool:
 def rag_thresholds() -> tuple[float, float]:
     """(keep, max): a passage at distance <= keep is relevant, <= max is kept but flagged 低相關, above max is dropped."""
     cfg = load()
-    keep, mx = float(cfg.get("rag_keep_distance", 0.34)), float(cfg.get("rag_max_distance", 0.40))
+    keep, mx = float(cfg.get("rag_keep_distance", 0.42)), float(cfg.get("rag_max_distance", 0.50))
     return (keep, max(keep, mx))

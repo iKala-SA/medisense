@@ -11,6 +11,12 @@ an admin may pre-register an e-mail with a role, and the uid is filled in on fir
 ADMIN_EMAILS are always admin and can never be suspended, so the platform cannot lock itself out.
 Records are cached per instance for CACHE_TTL seconds, so a change reaches other instances
 within that time (suspension also disables the Firebase user, see routers/users.py).
+
+SSO (2026-11-04): besides Google, Microsoft Entra ID and LDAP sign in through Keycloak, which Identity Platform trusts as
+the OIDC provider settings().sso_oidc_provider_id. The token is still a Firebase ID token. Allowed domains are
+ALLOWED_DOMAINS plus the ones an admin adds on 登入與 SSO (engine/sso.py); a switched-off provider is refused (bootstrap
+admins excepted). The Firebase uid keys every user's data, so a second provider must be LINKED to the existing Firebase
+user (same uid), never sign in as a new one: a different uid for an e-mail whose user still exists is refused (409).
 """
 import threading
 import time
@@ -23,6 +29,7 @@ from google.api_core.exceptions import AlreadyExists
 
 from . import db
 from .config import settings
+from .engine import sso
 from .permissions import RESOURCES
 
 if not firebase_admin._apps:  # documented firebase-admin idiom
@@ -69,7 +76,14 @@ def forget(email: str) -> None:
         _cache.pop(email.lower(), None)
 
 
-def _account(uid: str, email: str, name: str) -> dict:
+def _other_user_exists(uid: str) -> bool:
+    try:
+        return not fb_auth.get_user(uid).disabled
+    except Exception:  # noqa: BLE001 - not found (or lookup failed): nothing left to protect
+        return False
+
+
+def _account(uid: str, email: str, name: str, provider: str = "") -> dict:
     with _lock:
         hit = _cache.get(email)
     if hit and hit[0] > time.monotonic():
@@ -81,7 +95,7 @@ def _account(uid: str, email: str, name: str) -> dict:
     if not snap.exists:
         data = {"email": email, "uid": uid, "name": name, "role": "admin" if is_bootstrap_admin(email) else DEFAULT_ROLE,
                 "status": "active", "department": "", "created_at": at, "created_by": "",
-                "first_login_at": at, "last_seen_at": at}
+                "first_login_at": at, "last_seen_at": at, "login_provider": provider}
         try:  # create() fails if a parallel first request (any instance) got there first
             ref.create(data)
             created = True
@@ -92,10 +106,15 @@ def _account(uid: str, email: str, name: str) -> dict:
         data = snap.to_dict() or {}
         patch: dict = {}
         if data.get("uid") != uid:  # pre-registered (no uid yet) or the Google account was re-created
+            if data.get("uid") and provider and provider != sso.GOOGLE_PROVIDER and _other_user_exists(data["uid"]):
+                # an SSO sign-in that was not linked: taking over the record would orphan every session and file
+                raise HTTPException(409, "此 email 已用其他方式登入過。請先用原本的方式登入，再連結這個登入方式。")
             patch["uid"] = uid
             if not data.get("first_login_at"):
                 patch["first_login_at"] = at
                 db.audit(uid, "user.first_login", email, target_email=email, role=effective_role(data), preregistered=True)
+        if provider and data.get("login_provider") != provider:
+            patch["login_provider"] = provider
         if name and data.get("name") != name:
             patch["name"] = name
         last = data.get("last_seen_at")
@@ -126,14 +145,19 @@ def current_user(token: str = Depends(_bearer)) -> User:
     if not email or not claims.get("email_verified", False):
         raise HTTPException(403, "verified e-mail required")
 
-    allowed = settings().allowed_domain_list
+    cfg = sso.load()
+    allowed = sso.allowed_domains(cfg)
     domain = email.rsplit("@", 1)[-1]
-    hd = (claims.get("firebase", {}).get("sign_in_attributes", {}) or {}).get("hd") or claims.get("hd")
+    fb = claims.get("firebase", {}) or {}
+    hd = (fb.get("sign_in_attributes", {}) or {}).get("hd") or claims.get("hd")
     if allowed and domain not in allowed and (hd or "").lower() not in allowed:
         raise HTTPException(403, f"domain {domain} is not allowed on this platform")
+    provider = str(fb.get("sign_in_provider") or "")
+    if provider and not sso.provider_allowed(provider, cfg) and not is_bootstrap_admin(email):
+        raise HTTPException(403, "這個登入方式已被管理員關閉")
 
     name = claims.get("name") or email
-    account = _account(claims["uid"], email, name)
+    account = _account(claims["uid"], email, name, provider)
     if account.get("status") == "suspended" and not is_bootstrap_admin(email):
         raise HTTPException(403, "account suspended")
     return User(uid=claims["uid"], email=email, name=name, role=effective_role(account),

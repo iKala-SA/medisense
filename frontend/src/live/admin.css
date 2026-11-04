@@ -72,3 +72,50 @@ tr.lv-warnrow{background:#fff8f7}
 @media(max-width:800px){.lv-stats{grid-template-columns:1fr}}
 @media(max-width:1100px){.lv-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.lv-kpis{grid-template-columns:1fr}.lv-detail{grid-template-columns:1fr}.lv-savebar{margin:20px -16px -40px;padding:12px 16px}}
+/* 使用者管理 → 編輯使用者: membership of the real groups from 群組管理 */
+.lv-groups{flex-wrap:wrap;gap:6px 8px}
+.lv-group-opt{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid #e6e8eb;border-radius:999px;font-size:13px;color:#5d6068;cursor:pointer}
+.lv-group-opt.on{border-color:#239660;color:#17623f;background:#f4faf7}
+.lv-group-opt input{width:14px;height:14px;margin:0}
+
+/* ---- 編輯使用者 (2026-11-04 redesign): one centred column, saturated brand colour, two rows of compact panels ---- */
+.ue{max-width:980px;margin:0 auto}
+.ue-head{display:flex;gap:16px;align-items:center;padding:18px 20px;margin:6px 0 16px;border-radius:16px;background:linear-gradient(135deg,#e3f6ec,#f3fbf7);border:1px solid #bfe6d0}
+.ue-head .lv-avatar{width:56px;height:56px;font-size:22px;border-radius:14px;background:#1e9a5f;color:#fff}
+.ue-who{flex:1;min-width:0}
+.ue-who h1{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:22px;margin:0}
+.ue-who p{margin:2px 0 6px;color:#3b5a4b;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ue-tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#fff;color:#17623f;border:1px solid #bfe6d0}
+.ue-facts{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:12px;color:#4d6a5c}
+.ue-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ue-panel{background:#fff;border:1px solid #e2e6ea;border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;min-width:0}
+.ue-panel-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.ue-panel-h h2{font-size:15px;font-weight:700;margin:0;color:#14231b}
+.ue-panel-h span{font-size:12px;color:#1e9a5f;font-weight:600}
+.ue-panel-h .req{color:#c62828}
+.ue-sub{font-size:12px;color:#6b7280;margin:3px 0 10px;line-height:1.55}
+.ue-search{height:32px;border-radius:9px;padding:0 10px;margin-bottom:8px;font-size:13px}
+.ue-list{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;padding-right:2px}
+.ue-item{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:9px 11px;border:1px solid #e2e6ea;border-radius:10px;background:#fff;cursor:pointer;font:inherit}
+.ue-item:hover:not(:disabled){border-color:#9fd8b8;background:#f6fcf9}
+.ue-item.on{border-color:#1e9a5f;background:#e6f6ed;box-shadow:inset 0 0 0 1px #1e9a5f}
+.ue-item:disabled{opacity:.5;cursor:not-allowed}
+.ue-radio{width:16px;height:16px;border-radius:50%;border:2px solid #b8c0ca;flex-shrink:0;margin-top:2px;background:#fff}
+.ue-item.on .ue-radio{border:5px solid #1e9a5f}
+.ue-check{width:16px;height:16px;margin:2px 0 0;flex-shrink:0;accent-color:#1e9a5f}
+.ue-item-t{display:flex;flex-direction:column;min-width:0;gap:1px}
+.ue-item-t b{font-size:13.5px;font-weight:600;color:#14231b;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ue-item-t b em{font-style:normal;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:#e8f0fb;color:#1f4e8c}
+.ue-item-t b em.cur{background:#1e9a5f;color:#fff}
+.ue-item-t b em.off{background:#f0f1f3;color:#6b7280}
+.ue-item-t small{font-size:12px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.ue-empty{font-size:12.5px;color:#6b7280;margin:6px 2px}
+.ue-seg{display:flex;gap:4px;padding:4px;border-radius:11px;background:#eef2f0}
+.ue-seg button{flex:1;height:34px;border-radius:8px;font-size:13px;font-weight:600;color:#4b5563;background:none;border:0}
+.ue-seg button.on{background:#1e9a5f;color:#fff;box-shadow:0 1px 3px #0b3b2433}
+.ue-seg button.on.bad{background:#c62828}
+.ue-seg button:disabled{opacity:.55;cursor:not-allowed}
+.ue-reason{margin-top:14px}.ue-reason textarea{width:100%;min-height:72px;margin-top:8px}
+.ue-prereg{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding:12px 16px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;font-size:13px;color:#7c4a03}
+.ue .lv-notice{margin:0 0 14px}
+@media(max-width:860px){.ue-grid{grid-template-columns:1fr}.ue-head{flex-wrap:wrap}}

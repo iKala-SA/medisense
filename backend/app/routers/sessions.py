@@ -24,8 +24,19 @@ def _title(d: dict) -> str:
     return " ".join(str(first).split())[:30]
 
 
-def _summary(doc_id: str, d: dict) -> SessionSummary:
-    return SessionSummary(id=doc_id, title=_title(d), agent_id=d.get("agent_id", ""), updated_at=d.get("updated_at"),
+def _agent_names(docs: list[dict]) -> dict[str, str]:
+    """agent_id -> name for conversations saved before `agent_name` was recorded (one batched read)."""
+    ids = sorted({d.get("agent_id") for d in docs if d.get("agent_id") and not d.get("agent_name")} - {"general-chat"})
+    if not ids:
+        return {}
+    snaps = db.client().get_all([db.client().collection("agents").document(i) for i in ids])
+    return {s.id: (s.to_dict() or {}).get("name", "") for s in snaps if s.exists}
+
+
+def _summary(doc_id: str, d: dict, names: dict[str, str] | None = None) -> SessionSummary:
+    return SessionSummary(id=doc_id, title=_title(d), agent_id=d.get("agent_id", ""),
+                          agent_name=d.get("agent_name") or (names or {}).get(d.get("agent_id", ""), ""), context=d.get("context") or {},
+                          updated_at=d.get("updated_at"),
                           created_at=d.get("created_at"), project_id=d.get("project_id", ""),
                           pinned=bool(d.get("pinned")), locked=bool(d.get("locked")), archived=bool(d.get("archived")), message_count=len(d.get("messages") or []))
 
@@ -55,7 +66,8 @@ def list_sessions(limit: int = Query(30, ge=1, le=100), cursor: str | None = Non
     if len(docs) > limit and page:
         last = (page[-1].to_dict() or {}).get("updated_at")
         nxt = last.isoformat() if isinstance(last, datetime) else None
-    return SessionPage(items=[_summary(d.id, d.to_dict() or {}) for d in page], next_cursor=nxt)
+    names = _agent_names([d.to_dict() or {} for d in page])
+    return SessionPage(items=[_summary(d.id, d.to_dict() or {}, names) for d in page], next_cursor=nxt)
 
 
 @router.get("/{session_id}", response_model=SessionDetail)
@@ -65,8 +77,9 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     from ..engine import chat_images
     from .runs import _public_pending
     imgs = chat_images.message_images(d)
-    return SessionDetail(**_summary(snap.id, d).model_dump(),
-                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []))
+    return SessionDetail(**_summary(snap.id, d, _agent_names([d])).model_dump(),
+                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []),
+                                                  skills=m.get("skills") or [])
                                    for i, m in enumerate(d.get("messages") or [])],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],

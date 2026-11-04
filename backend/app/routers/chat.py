@@ -129,6 +129,34 @@ def general_agent(user: User) -> tuple[AgentIn, str, list[str]]:
     return agent, agent_id, rag_files
 
 
+def _skill_names(ids: list[str], user: User) -> list[str]:
+    """Names of the skills picked with / that exist, are enabled and the caller may see (the ones that really apply)."""
+    from .. import sharing
+
+    out = []
+    for i in dict.fromkeys(ids or []):
+        snap = db.client().collection("skills").document(i).get()
+        d = snap.to_dict() if snap.exists else None
+        if d and d.get("enabled", True) and sharing.can_view(user, d):
+            out.append(d.get("name", ""))
+    return [n for n in out if n]
+
+
+def _chat_context(body: ChatRequest, chosen: bool) -> dict:
+    """The composer settings of this turn, kept on the session so reopening it (even after a reload) shows the same agent,
+    data scope, picked spaces / databases (with their names), web search and model. Names are looked up once here."""
+    picked: list[dict] = []
+    if not chosen and body.knowledge_scope == "selected":
+        for coll, kind, ids in (("spaces", "space", body.space_ids), ("db_connectors", "db", body.db_connectors)):
+            for i in dict.fromkeys(ids):
+                snap = db.client().collection(coll).document(i).get()
+                if snap.exists:
+                    d = snap.to_dict() or {}
+                    picked.append({"t": kind, "id": i, "name": d.get("name", ""), **({"kind": d.get("kind", "")} if kind == "db" else {})})
+    return {"knowledge_scope": body.knowledge_scope, "picked": picked, "web_search": bool(body.web_search),
+            "model": body.model or "", "model_group": body.model_group}
+
+
 def _prepare(body: ChatRequest, user: User) -> dict:
     """Resolve agent, knowledge scope, model pin and session for one chat turn -> execute_run keyword arguments."""
     if body.model and body.model not in {m["id"] for m in llm.model_catalog()}:
@@ -173,7 +201,8 @@ def _prepare(body: ChatRequest, user: User) -> dict:
     images = chat_images.parts_for(existing.get("attachments") or [])
     if images and (agent.routing.sovereign_only or routing.sovereign_only()):
         raise HTTPException(409, "僅院內模型不支援圖片，請移除圖片或關閉「僅院內模型」")
-    extra = {"kind": "chat", "agent_id": agent_id, "general": not chosen}  # general: rebuilt by general_agent() on approval
+    extra = {"kind": "chat", "agent_id": agent_id, "general": not chosen,  # general: rebuilt by general_agent() on approval
+             "context": _chat_context(body, chosen)}  # what this conversation was set to, restored when it is reopened
     if body.project_id and not existing.get("project_id"):  # only a conversation without a project can be filed
         own_project(body.project_id, user)
         extra["project_id"] = body.project_id
@@ -185,7 +214,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
                 pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None,
-                message_images=chat_images.unsent_ids(existing))
+                message_images=chat_images.unsent_ids(existing), message_skills=_skill_names(body.skill_ids, user))
 
 
 @router.get("/agents/{agent_id}")

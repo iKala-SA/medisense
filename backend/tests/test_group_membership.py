@@ -1,6 +1,4 @@
 """Membership lives on users/{email}.groups (2026-11-02 decision); groups/{id} no longer stores member_emails."""
-from types import SimpleNamespace
-
 import pytest
 
 from app.routers import groups as groups_router
@@ -11,7 +9,7 @@ from .conftest import ADMIN
 
 @pytest.fixture(autouse=True)
 def any_domain(monkeypatch):
-    monkeypatch.setattr(groups_router, "settings", lambda: SimpleNamespace(allowed_domain_list=[]))
+    monkeypatch.setattr(groups_router.sso, "allowed_domains", lambda cfg=None: [])
 
 
 def user(fs, email, groups=()):

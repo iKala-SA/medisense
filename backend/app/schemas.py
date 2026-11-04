@@ -178,6 +178,9 @@ class AgentIn(BaseModel):
     department: str = ""  # one of DEPARTMENTS or "" (legacy free-text values read back as "")
     code: str = ""  # short specialty code shown on hub cards, e.g. CARD-801
     model_group: ModelGroup = "fast"
+    # One exact model the agent answers with (an id from GET /api/models `models`); "" = automatic routing. A model the person
+    # picks in the chat box still wins, and 僅院內模型 / a model no longer served falls back to routing.
+    model: str = Field(default="", max_length=120)
     temperature: float = Field(default=0.3, ge=0, le=2)
     top_p: float = Field(default=0.95, ge=0, le=1)
     routing: RoutingPolicy = Field(default_factory=RoutingPolicy)
@@ -328,6 +331,8 @@ class Citation(BaseModel):
     text: str = ""  # chunk excerpt
     doc_id: str = ""  # library document this chunk came from (opens the viewer); empty when it cannot be resolved
     page: int | None = None  # first page of the chunk for paged files (PDF), when the retriever reports it
+    kind: str = "document"  # document | web | database: what the answer drew on
+    cited: bool = True  # False = retrieved (or queried) but the answer never cited it; still listed under 參考文件
     # One Citation per FILE: every retrieved passage of that file, best (smallest distance) first. The fields above
     # mirror passages[0], so older readers and saved conversations keep working.
     passages: list[CitationPassage] = Field(default_factory=list)
@@ -470,6 +475,38 @@ class DailyPoint(BaseModel):
     by_model: list[ModelSlice] = Field(default_factory=list)
 
 
+class UsageLimitIn(BaseModel):
+    scope: Literal["group", "model"]
+    target: str = Field(min_length=1, max_length=120)  # group id, or a model id / routing group
+    period: Literal["day", "month"] = "month"
+    metric: Literal["cost_usd", "tokens", "requests"] = "cost_usd"
+    limit: float = Field(gt=0, le=1e12)
+    enabled: bool = True
+    note: str = Field(default="", max_length=200)
+
+
+class UsageLimitOut(UsageLimitIn):
+    id: str
+    target_label: str = ""  # group name (group scope) or the model id
+    used: float = 0.0  # in the limit's metric, current period
+    pct: float = 0.0  # used / limit * 100
+    exceeded: bool = False
+    created_by: str = ""
+    updated_at: Any = None
+
+
+class UsageByRow(BaseModel):
+    id: str  # uid (users) or group id (groups)
+    name: str = ""
+    email: str = ""  # users
+    members: int = 0  # groups
+    requests: int = 0
+    tokens: int = 0
+    cost_usd: float = 0.0
+    failed: int = 0
+    main_model: str = ""
+
+
 class MonitoringSummary(BaseModel):
     range_from: str
     range_to: str
@@ -524,13 +561,15 @@ class UserOut(BaseModel):
     # Assigned role ids (roles/{id}). Record only: access still follows `role` (2026-11-02 decision).
     roles: list[str] = Field(default_factory=list)
     status: AccountStatus = "active"
-    department: str = ""
+    department: str = ""  # legacy fixed list; the UI now shows real group membership (`groups`)
+    groups: list[str] = Field(default_factory=list)  # ids of the 群組管理 groups this person belongs to
     bootstrap_admin: bool = False  # listed in ADMIN_EMAILS: role/status are not editable here
     original_view: bool = False  # may open original library files that contain personal data (with a stated purpose)
     created_at: Any = None
     created_by: str = ""  # admin who pre-registered the account; "" when created by signing in
     first_login_at: Any = None
     last_seen_at: Any = None  # last API call, written at most every 10 minutes
+    login_provider: str = ""  # Firebase sign_in_provider of the last sign-in: google.com | oidc.medisense-sso (Entra / LDAP)
     status_reason: str = ""
     status_changed_at: Any = None
     status_changed_by: str = ""
@@ -928,8 +967,8 @@ class FeaturesIn(BaseModel):
     web_search: bool = False  # admin: allow users to switch 網路搜尋 on (off by default)
     voice_input: bool = False  # admin: show the microphone (browser speech recognition; audio goes to the browser vendor)
     # Retrieval relevance as DISTANCE (smaller = more similar). <= keep: relevant; <= max: kept but flagged 低相關; above: dropped.
-    rag_keep_distance: float = Field(default=0.34, ge=0.05, le=1.0)
-    rag_max_distance: float = Field(default=0.40, ge=0.05, le=1.0)
+    rag_keep_distance: float = Field(default=0.42, ge=0.05, le=1.0)
+    rag_max_distance: float = Field(default=0.50, ge=0.05, le=1.0)
 
     @model_validator(mode="after")
     def _ordered(self) -> "FeaturesIn":
@@ -1043,6 +1082,8 @@ class SessionSummary(BaseModel):
     id: str
     title: str = ""
     agent_id: str = ""
+    agent_name: str = ""  # the agent that answered (shown above each reply after a reload); "" = the default Medisense
+    context: dict[str, Any] = Field(default_factory=dict)  # {knowledge_scope, picked:[{t, id, name, kind?}], web_search, model, model_group} of the last turn
     updated_at: Any = None
     created_at: Any = None
     message_count: int = 0
@@ -1062,6 +1103,7 @@ class SessionMessage(BaseModel):
     content: str
     meta: dict[str, Any] | None = None  # assistant turns: {trace, citations, model} so a reopened chat shows its steps and sources
     images: list[dict[str, Any]] = Field(default_factory=list)  # user turns: [{id, name, mime, available}] -> GET /api/chat/attachments/{sid}/{id}/image
+    skills: list[str] = Field(default_factory=list)  # user turns: names of the skills invoked with /
 
 
 class SessionDetail(SessionSummary):
@@ -1223,3 +1265,73 @@ class DbConnectorOut(BaseModel):
     created_by: str = ""
     created_at: Any = None
     updated_at: Any = None
+
+
+# --- 登入與 SSO (routers/sso.py) ------------------------------------------------------------------------------------
+_DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+class SsoGoogleIn(BaseModel):
+    enabled: bool = True
+    allowed_domains: list[str] = Field(default_factory=list, max_length=50)  # added to ALLOWED_DOMAINS; empty + no env = any
+    hd: str = Field("", max_length=253)  # Workspace domain hint for the Google account chooser ("" = none)
+
+    @field_validator("allowed_domains", mode="before")
+    @classmethod
+    def _domains(cls, v: object) -> list[str]:
+        out: list[str] = []
+        for d in v or []:
+            d = str(d).strip().lower().lstrip("@")
+            if not d:
+                continue
+            if not _DOMAIN.match(d):
+                raise ValueError(f"不是有效的網域：{d}")
+            if d not in out:
+                out.append(d)
+        return out
+
+    @field_validator("hd")
+    @classmethod
+    def _hd(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v and not _DOMAIN.match(v):
+            raise ValueError("hd 必須是網域，例如 hospital.org.tw")
+        return v
+
+
+class SsoEntraIn(BaseModel):
+    enabled: bool = True
+    tenant_id: str = Field(min_length=3, max_length=100, pattern=r"^[A-Za-z0-9.-]+$")  # directory (tenant) id or primary domain
+    client_id: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9-]+$")  # application (client) id
+    client_secret: str = Field("", max_length=500)  # "" = keep the one Keycloak holds; never returned
+    display_name: str = Field("Microsoft", max_length=40)
+
+
+class SsoLdapIn(BaseModel):
+    enabled: bool = True
+    vendor: Literal["ad", "other"] = "ad"
+    connection_url: str = Field(min_length=8, max_length=500, pattern=r"^ldaps?://\S+$")  # ldap://host:389 or ldaps://host:636
+    start_tls: bool = False
+    bind_dn: str = Field(min_length=3, max_length=500)  # read-only service account
+    bind_password: str = Field("", max_length=500)  # "" = keep the one Keycloak holds; never returned
+    users_dn: str = Field(min_length=3, max_length=500)  # where people are, e.g. OU=Staff,DC=hospital,DC=local
+    username_attr: str = Field("", max_length=60, pattern=r"^[A-Za-z0-9;-]*$")  # "" = sAMAccountName (AD) / uid
+    email_attr: str = Field("mail", max_length=60, pattern=r"^[A-Za-z0-9;-]+$")
+    user_filter: str = Field("", max_length=1000)  # optional LDAP filter, e.g. (memberOf=CN=Medisense,OU=Groups,DC=...)
+    display_name: str = Field("院內帳號", max_length=40)
+
+    @field_validator("user_filter")
+    @classmethod
+    def _filter(cls, v: str) -> str:
+        v = v.strip()
+        if v and not (v.startswith("(") and v.endswith(")")):
+            raise ValueError("LDAP 篩選條件需以括號包住，例如 (memberOf=...)")
+        return v
+
+
+class SsoLdapTestIn(BaseModel):
+    action: Literal["connection", "auth"] = "connection"
+    connection_url: str = Field(min_length=8, max_length=500, pattern=r"^ldaps?://\S+$")
+    start_tls: bool = False
+    bind_dn: str = Field("", max_length=500)
+    bind_password: str = Field("", max_length=500)  # "" = test the stored password

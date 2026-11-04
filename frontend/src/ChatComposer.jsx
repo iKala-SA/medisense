@@ -94,6 +94,24 @@ useEffect(()=>{
 const trigItems=!trig?[]:trig.ch==='/'
   ?(live?(skillList||[]):[{id:'s1',name:'衛教語氣',sub:'用淺白的話說明'}]).filter(x=>!skills.some(k=>k.id===x.id)&&(x.name+x.sub).toLowerCase().includes(trig.q.toLowerCase()))
   :[{name:'Medisense',sub:'預設的企業與醫療 AI 助理',pick:true},...(agents||[]).filter(a=>a.status==='已發布'||a.published)].filter(a=>a.name.toLowerCase().includes(trig.q.toLowerCase())).map(a=>({id:a.id||a.name,name:a.name,sub:a.desc||a.sub||''}));
+useEffect(()=>{if(skills.some(k=>!prompt.includes('/'+k.name)))setSkills(skills.filter(k=>prompt.includes('/'+k.name)))},[prompt]);// eslint-disable-line react-hooks/exhaustive-deps
+/* "/技能名" in the text shows in blue (ChatGPT style). A textarea cannot colour part of its text, so a mirror with the same
+   box and font sits on top of it (pointer-events: none) and draws the text; the textarea's own glyphs are transparent while a
+   skill is present, its caret and selection stay visible. Re-measured on every render, so growth and wrapping follow. */
+const mirror=useRef(null);
+const skillNames=skills.map(k=>k.name).filter(n=>prompt.includes('/'+n));
+const hasSkill=skillNames.length>0;
+useLayoutEffect(()=>{
+  const t=ta.current,m=mirror.current;if(!hasSkill||!t||!m)return;
+  const cs=getComputedStyle(t);
+  Object.assign(m.style,{left:t.offsetLeft+'px',top:t.offsetTop+'px',width:t.offsetWidth+'px',height:t.offsetHeight+'px',
+    fontFamily:cs.fontFamily,fontSize:cs.fontSize,fontWeight:cs.fontWeight,lineHeight:cs.lineHeight,letterSpacing:cs.letterSpacing,
+    paddingTop:cs.paddingTop,paddingRight:cs.paddingRight,paddingBottom:cs.paddingBottom,paddingLeft:cs.paddingLeft,
+    borderTopWidth:cs.borderTopWidth,borderLeftWidth:cs.borderLeftWidth,textAlign:cs.textAlign});
+  m.scrollTop=t.scrollTop;
+});
+const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const mirrorText=!hasSkill?null:prompt.split(new RegExp('(/(?:'+skillNames.map(esc).join('|')+'))','g')).map((p,i)=>i%2?<span key={i} className="ta-skill-tok">{p}</span>:p);
 function detect(el){
   const v=el.value,pos=el.selectionStart??v.length,m=/(^|\s)([\/@])([^\s/@]*)$/.exec(v.slice(0,pos));
   if(!m||(m[2]==='@'&&!agents)){setTrig(null);return}
@@ -104,8 +122,11 @@ function detect(el){
 function chooseTrig(it){
   if(!trig||!it)return;
   const v=prompt,before=v.slice(0,trig.start).replace(/[ \t]+$/,''),after=v.slice(trig.end).replace(/^[ \t]+/,'');
-  setPrompt((before&&after?before+' '+after:before+after));
-  if(trig.ch==='/')setSkills([...skills,{id:it.id,name:it.name}]);else setActiveAgent(it.name);
+  if(trig.ch==='/'){  // the skill stays in the text as "/名稱 " (plain text, no chip), where it was typed
+    const tok='/'+it.name+' ';
+    setPrompt((before?before+' ':'')+tok+after);
+    setSkills([...skills,{id:it.id,name:it.name}]);
+  }else{setPrompt((before&&after?before+' '+after:before+after));setActiveAgent(it.name)}
   setTrig(null);setTimeout(()=>ta.current?.focus(),0);
 }
 const wrap=useRef(null);
@@ -119,7 +140,7 @@ function pickSource(name){setSelectedSources(a=>a.includes(name)?a.filter(x=>x!=
 return <div ref={wrap} className={'quick-composer-wrap pop-'+dir} style={{'--pop-max':room+'px','--agent-w':agentW+'px'}}><input ref={file} hidden type="file" multiple onChange={e=>{onAttach?.([...e.target.files]);e.target.value=''}}/>{pickOpen&&<PickData live={live} picked={picked} onClose={()=>setPickOpen(false)} onSave={v=>{setPicked(v);setPickOpen(false);setKnowledge('具體資料')}}/>}{menu&&<button className="composer-dismiss" aria-label="關閉選單" onClick={()=>setMenu(null)}/>}<div className={'composer'+(tall?' tall':'')+(dropping?' dropping':'')} onDragOver={e=>{if([...(e.dataTransfer?.types||[])].includes('Files')){e.preventDefault();setDropping(true)}}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDropping(false)}} onDrop={e=>{setDropping(false);const fs=[...(e.dataTransfer?.files||[])];if(fs.length){e.preventDefault();onAttach?.(fs)}}}>{canExpand&&<button type="button" className="composer-expand" aria-label={expanded?'縮小輸入框':'展開輸入框'} title={expanded?'縮小':'展開'} onClick={()=>setExpanded(v=>!v)}>{expanded?<ArrowsInSimple size={18}/>:<ArrowsOutSimple size={18}/>}</button>}{attachments.length>0&&<div className="att-row">{attachments.map(a=>a.kind==='image'
   ?<div key={a.key} className={'att-img'+(a.status==='error'?' err':'')} title={a.error||a.name}><img src={a.url} alt={a.name}/>{a.status==='uploading'&&<span className="att-spin"><CircleNotch className="spin" size={16}/></span>}<button type="button" aria-label={'移除 '+a.name} onClick={()=>onRemoveAttachment?.(a)}><X size={12} weight="bold"/></button></div>
   :<div key={a.key} className={'att-file'+(a.status==='error'?' err':'')} title={a.error||a.name}><Paperclip size={14}/><span>{a.name}</span>{a.status==='uploading'&&<CircleNotch className="spin" size={14}/>}<button type="button" aria-label={'移除 '+a.name} onClick={()=>onRemoveAttachment?.(a)}><X size={12} weight="bold"/></button></div>)}
-  {attachments.some(a=>a.kind==='image')&&<small className="att-note">圖片會自動遮蔽姓名、證號等個資（不含臉部與手寫），原圖不會保存。</small>}</div>}{skills.length>0&&<div className="skill-chips">{skills.map(k=><span className="skill-chip" key={k.id}><Lightning size={13}/>{k.name}<button type="button" aria-label={'移除技能 '+k.name} onClick={()=>setSkills(skills.filter(x=>x.id!==k.id))}><X size={11}/></button></span>)}</div>}<textarea ref={ta} onPaste={e=>{const fs=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));if(fs.length){e.preventDefault();onAttach?.(fs)}}} rows={1} aria-label="輸入訊息" placeholder="詢問問題…" value={prompt} onChange={e=>{setPrompt(e.target.value);detect(e.target)}} onBlur={()=>setTimeout(()=>setTrig(null),150)} onKeyDown={e=>{
+  {attachments.some(a=>a.kind==='image')&&<small className="att-note">圖片會自動遮蔽姓名、證號等個資（不含臉部與手寫），原圖不會保存。</small>}</div>}{hasSkill&&<div ref={mirror} className="ta-mirror" aria-hidden="true">{mirrorText}{'\n'}</div>}<textarea ref={ta} className={hasSkill?'ta-skill':undefined} onScroll={e=>{if(mirror.current)mirror.current.scrollTop=e.currentTarget.scrollTop}} onPaste={e=>{const fs=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));if(fs.length){e.preventDefault();onAttach?.(fs)}}} rows={1} aria-label="輸入訊息" placeholder="詢問問題…" value={prompt} onChange={e=>{setPrompt(e.target.value);detect(e.target)}} onBlur={()=>setTimeout(()=>setTrig(null),150)} onKeyDown={e=>{
     if(trig&&!e.nativeEvent.isComposing){
       if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(trigItems.length){e.preventDefault();setTrigIdx(i=>(i+(e.key==='ArrowDown'?1:trigItems.length-1))%trigItems.length)}return}
       if((e.key==='Enter'||e.key==='Tab')&&trigItems.length){e.preventDefault();chooseTrig(trigItems[trigIdx]);return}
@@ -129,6 +150,6 @@ return <div ref={wrap} className={'quick-composer-wrap pop-'+dir} style={{'--pop
     {knowledge==='具體資料'&&<div className="picked-block"><div className="menu-caption db-caption">已選資料</div>{picked.length>0&&<div className="picked-chips">{picked.map(p=><span className="picked-chip" key={p.t+p.id} title={p.name}>{p.t==='db'?<Database size={14}/>:<Atom size={14}/>}<i>{p.name}</i><button type="button" aria-label={'移除 '+p.name} onClick={()=>setPicked(picked.filter(x=>!(x.t===p.t&&x.id===p.id)))}><X size={11}/></button></span>)}</div>}
       <button type="button" className="picked-add" onClick={()=>{setMenu(null);setPickOpen(true)}}><Plus size={15}/>新增</button></div>}</>}
   {agentProfile&&dbRows.length>0&&<><div className="menu-caption db-caption">{agentProfile.name} 的資料庫</div>{dbRows.map(d=><div className="source-option db-opt static" key={d.id}><span className="selection-check">{d.allowed?<Check size={17}/>:<Lock size={15}/>}</span><span><b>{d.name}</b><small>{d.allowed?[d.q&&d.q+' 個查詢',d.v&&d.v+' 個檢視表',d.kind==='bigquery'&&(bqLinked?'BigQuery 已連線（長期）':bqTok?'BigQuery 臨時授權中':'需授權 BigQuery')].filter(Boolean).join(' · ')||'已連結':'你沒有使用權限'}</small></span></div>)}<small className="popover-note">Agent 只會使用自己連結的資料庫，查詢一律唯讀。</small></>}</div>}</div>}{needBq&&(bqConn?<button type="button" className="web-chip bq-chip" disabled={authing===bqConn.id} title="以你的 Google 帳號連線 BigQuery；授權一次，由連接器閘道保存並自動更新，直到你中斷連線" onClick={linkBq}><Database size={12}/>{authing===bqConn.id?'連線中…':bqConn.state==='reauth_required'?'重新授權 BigQuery':'連線 BigQuery 帳號'}</button>
-  :bqTok?<span className="web-chip bq-chip ok" title="BigQuery 以你的 Google 帳號查詢，臨時授權 1 小時內有效"><Check size={12}/>BigQuery 已授權（1 小時）</span>
+  :bqTok?null  /* authorized: nothing to show; the button only appears when authorization is needed */
   :<button type="button" className="web-chip bq-chip" title="以你的 Google 帳號查 BigQuery：臨時授權，1 小時內有效（管理員啟用 Google BigQuery 連接器後可改為一次授權長期有效）" onClick={authBq}><Database size={12}/>授權 BigQuery（1 小時）</button>)}{web&&<span className="web-chip"><Globe size={12}/>{live?'Web 搜尋已開啟':'Web · 模擬'}</span>}<span className="spacer"/><div className="composer-anchor model-anchor"><button className="model-select" aria-expanded={menu==='models'} onClick={e=>toggle('models',e)}>{(options||modelOptions).find(m=>String(m.id).toLowerCase()===String(model).toLowerCase())?.name||model}<CaretDown size={14}/></button>{menu==='models'&&<div className="composer-popover model-menu"><div className="model-options">{(()=>{const all=options||modelOptions,pick=m=>{setModel(m.id);setMenu(null)},isOn=m=>String(model).toLowerCase()===String(m.id).toLowerCase(),auto=all.find(m=>String(m.id).toLowerCase()==='auto');return <>{auto&&<button className={'model-auto'+(isOn(auto)?' chosen':'')} disabled={auto.disabled} onClick={()=>pick(auto)}><span><b>Auto</b><small>系統自動選擇最適合的模型</small></span>{isOn(auto)&&<Check size={15}/>}</button>}{auto&&<hr/>}{all.filter(m=>m!==auto).map(m=><button key={m.id} disabled={m.disabled} className={isOn(m)?'chosen':''} onClick={()=>pick(m)}><ModelIcon m={m}/><span><b>{m.name}</b>{m.note&&<small className="model-note">{m.note}</small>}</span>{isOn(m)&&<Check size={15}/>}</button>)}</>})()}</div><small className="popover-note">{live?'送出前資料一律先去識別化；開啟「僅院內模型」時只用院內模型。':'示範選項，未綁定版本或端點；敏感資料政策優先。'}</small></div>}</div>{voiceOn&&SR&&onVoiceChat&&<button type="button" className="mic-btn" aria-label="語音對話" title="語音對話" onClick={()=>{stopVoice();setMenu(null);onVoiceChat()}}><Waveform size={20}/></button>}{voiceOn&&SR&&<button type="button" className={'mic-btn'+(listening?' on':'')} aria-label={listening?'停止語音輸入':'語音輸入'} aria-pressed={listening} title={listening?'停止':'語音輸入'} onClick={()=>listening?stopVoice():startVoice()}><Microphone size={20} weight={listening?'fill':'regular'}/></button>}
 {busy&&onStop?<button type="button" className="send stop" aria-label="停止回覆" title="停止回覆" onClick={onStop}><Stop size={14} weight="fill"/></button>:<button className="send" aria-label="傳送訊息" disabled={!prompt.trim()||busy} onClick={()=>{stopVoice();setMenu(null);submit()}}><ArrowUp size={20} weight="bold"/></button>}</div></div></div>}

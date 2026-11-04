@@ -254,10 +254,10 @@ def _chunks(*dists):
 
 
 def test_retrieval_is_filtered_by_distance_and_borderline_passages_are_flagged(rig, monkeypatch):
-    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.27, 0.37, 0.44, 0.49))  # smaller = more similar
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.27, 0.47, 0.54, 0.59))  # smaller = more similar
     s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "答案 [1][2]")
     r, _ = rig(s, rag_files=["f"])
-    assert [c.low for c in r.citations] == [False, True] and len(r.citations) == 2  # 0.44 and 0.49 never reach the model
+    assert [c.low for c in r.citations] == [False, True] and len(r.citations) == 2  # 0.54 and 0.59 never reach the model
     k = r.trace[1].summary
     assert "命中 2 段（1 段低相關）" in k and "捨棄 2 段不相關" in k
     tool = [m for m in s.sent[1]["messages"] if m["role"] == "tool"][0]["content"]
@@ -265,17 +265,17 @@ def test_retrieval_is_filtered_by_distance_and_borderline_passages_are_flagged(r
 
 
 def test_when_everything_is_too_far_the_model_hears_there_was_nothing_and_no_citations_exist(rig, monkeypatch):
-    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.439, 0.443))
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.539, 0.543))
     s = Script([call("search_knowledge", {"reason": "r", "query": "今天天氣"})], "院內文件中沒有找到相關依據，以下為一般知識")
     r, _ = rig(s, rag_files=["f"])
     assert not r.citations
-    assert "命中 0 段（最近的一段距離 0.44，超過門檻 0.40，已捨棄）" in r.trace[1].summary
+    assert "命中 0 段（最近的一段距離 0.54，超過門檻 0.50，已捨棄）" in r.trace[1].summary
     assert "沒有找到足夠相關的院內文件" in [m for m in s.sent[1]["messages"] if m["role"] == "tool"][0]["content"]
     assert "非院內依據" in s.sent[0]["system"]  # the standing instruction for exactly this case
 
 
 def test_thresholds_follow_the_admin_setting(rig, monkeypatch):
-    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.44))
+    monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.47))
     monkeypatch.setattr("app.engine.features.rag_thresholds", lambda: (0.30, 0.50))  # admin loosened it
     r, _ = rig(Script([call("search_knowledge", {"reason": "r", "query": "q"})], "ok [1]"), rag_files=["f"])
     assert len(r.citations) == 1 and r.citations[0].low
@@ -285,29 +285,46 @@ def _cites(n):
     return [Citation(source=f"文件{i}.pdf", uri=f"u{i}") for i in range(1, n + 1)]
 
 
-def test_only_cited_sources_survive_and_are_renumbered():
+def test_cited_sources_come_first_renumbered_and_the_rest_stay_listed_as_unused():
     text, cites = rt.prune_citations("甲 [3]，乙 [1][3]，丙 [7]。", _cites(4))
-    assert [c.source for c in cites] == ["文件1.pdf", "文件3.pdf"]  # original order, uncited 2 and 4 gone
+    assert [(c.source, c.cited) for c in cites] == [("文件1.pdf", True), ("文件3.pdf", True), ("文件2.pdf", False), ("文件4.pdf", False)]
     assert text == "甲 [2]，乙 [1][2]，丙 。"  # 3 -> 2, 1 -> 1; [7] pointed at nothing and is removed
 
 
 def test_grouped_markers_are_split_and_code_and_links_are_left_alone():
     text, cites = rt.prune_citations("見 [2, 3]。程式 `x = [1, 2]` 與\n```\ny = [1, 2, 3]\n```\n另見 [連結 1](http://a) 與 [2](http://b)", _cites(3))
-    assert [c.source for c in cites] == ["文件2.pdf", "文件3.pdf"]
+    assert [c.source for c in cites if c.cited] == ["文件2.pdf", "文件3.pdf"] and [c.source for c in cites if not c.cited] == ["文件1.pdf"]
     assert text.startswith("見 [1][2]。") and "`x = [1, 2]`" in text and "y = [1, 2, 3]" in text and "[2](http://b)" in text
 
 
-def test_nothing_cited_means_no_references_and_no_sources_means_untouched_text():
-    assert rt.prune_citations("完全沒引用", _cites(3)) == ("完全沒引用", [])
+def test_nothing_cited_still_lists_what_was_retrieved_and_no_sources_means_untouched_text():
+    text, cites = rt.prune_citations("完全沒引用", _cites(3))
+    assert text == "完全沒引用" and [c.cited for c in cites] == [False, False, False]  # the tab shows what was found, marked 未引用
     assert rt.prune_citations("a [1]", []) == ("a [1]", [])
+    db = Citation(source="門診統計", kind="database", text="{\"n\": 1}")
+    text, cites = rt.prune_citations("共 1 筆 [2]", [*_cites(2), db])
+    assert [(c.source, c.kind, c.cited) for c in cites] == [("文件2.pdf", "document", True), ("門診統計", "database", True), ("文件1.pdf", "document", False)]
 
 
-def test_retrieved_but_unused_passages_do_not_show_up_as_references(rig, monkeypatch):
+def test_a_database_query_becomes_a_reference(fs, rig, monkeypatch):
+    monkeypatch.setattr(rt.db_tools, "tool_specs", lambda ids, email: [{"name": "db_sql_x", "description": "查", "props": {"sql": {"type": "string"}}, "required": ["sql"],
+                                                                         "label": "門診統計", "meta": {"connector_id": "x", "kind": "sql"}}])
+    monkeypatch.setattr(rt.db_tools, "execute", lambda meta, args, **k: ('{"dept": "內科", "n": 12}', "門診統計 · 1 筆"))
+    ag = AgentIn.model_validate({"name": "A", "capabilities": {"db_connectors": ["x"]}})
+    r, ev = rig(Script([call("db_sql_x", {"reason": "r", "sql": "SELECT 1"})], "內科 12 人"), ag)
+    assert [(c.kind, c.source, c.cited) for c in r.citations] == [("database", "門診統計", True)] and "內科" in r.citations[0].text
+    assert "1 次資料庫查詢" in r.trace[-1].summary and "citations" in [e["event"] for e in ev]
+    monkeypatch.setattr(rt.db_tools, "execute", lambda meta, args, **k: ("[資料庫] 需要授權", "門診統計 · 需要 BigQuery 授權"))
+    r, _ = rig(Script([call("db_sql_x", {"reason": "r", "sql": "SELECT 1"})], "無法查詢"), ag)
+    assert not r.citations  # an error is not a source
+
+
+def test_retrieved_but_unused_passages_stay_listed_after_the_cited_ones(rig, monkeypatch):
     monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.20, 0.25, 0.30))
     s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "只有第二段有用 [2]")
     r, _ = rig(s, rag_files=["f"])
-    assert [c.source for c in r.citations] == ["文件1.pdf"] and r.reply == "只有第二段有用 [1]"
-    assert "引用 1/3 個來源" in r.trace[-1].summary
+    assert [(c.source, c.cited) for c in r.citations] == [("文件1.pdf", True), ("文件0.pdf", False), ("文件2.pdf", False)]
+    assert r.reply == "只有第二段有用 [1]" and "引用 1/3 個來源" in r.trace[-1].summary
 
 
 def test_passages_of_one_file_share_one_reference(rig, monkeypatch):
@@ -386,3 +403,26 @@ def test_structured_arguments_reach_the_connector_as_json_not_strings(fs, rig, m
     assert params["required"] == ["reason", "calendarId", "event"] and tool.spec["function"]["description"].endswith("：Create")
     rig(Script([call(tool.name, {"reason": "r", "calendarId": "primary", "event": {"summary": "門診會議"}})], "done"), ag)
     assert seen == {"calendarId": "primary", "event": {"summary": "門診會議"}}
+
+
+def test_a_source_cited_by_file_name_counts_as_cited_and_becomes_its_number():
+    cites = [Citation(source="胃鏡檢查前後注意事項.pdf"), Citation(source="電腦斷層與顯影劑注意事項.pdf"), Citation(source="其他.pdf")]
+    text, out = rt.prune_citations("請禁食 (資料來源：[電腦斷層與顯影劑注意事項.pdf]、[胃鏡檢查前後注意事項])。程式 `[其他.pdf]`，連結 [其他](http://x)", cites)
+    assert text.startswith("請禁食 (資料來源：[2]、[1])") and "`[其他.pdf]`" in text and "[其他](http://x)" in text
+    assert [(c.source, c.cited) for c in out] == [("胃鏡檢查前後注意事項.pdf", True), ("電腦斷層與顯影劑注意事項.pdf", True), ("其他.pdf", False)]
+
+
+def test_an_agent_can_answer_with_its_own_model(rig, monkeypatch):
+    monkeypatch.setattr(llm, "model_catalog", lambda: [{"id": "gemini-2.5-pro", "model": "gemini-2.5-pro"}])
+    s = Script("ok")
+    r, _ = rig(s, AgentIn(name="A", model="gemini-2.5-pro"), msg="hi")
+    assert s.sent[0]["model"] == "gemini-2.5-pro" and "Agent 指定模型" in r.trace[-1].summary
+    s2 = Script("ok")  # the person's pick in the chat box wins
+    rig(s2, AgentIn(name="A", model="gemini-2.5-pro"), msg="hi", pin_model="gemini-3-flash")
+    assert s2.sent[0]["model"] == "gemini-3-flash"
+    s3 = Script("ok")  # a model the gateway no longer serves: back to routing
+    rig(s3, AgentIn(name="A", model="retired-model"), msg="hi")
+    assert s3.sent[0]["model"] is None
+    s4 = Script("ok")  # 僅院內模型 outranks the agent's model
+    rig(s4, AgentIn(name="A", model="gemini-2.5-pro", routing={"sovereign_only": True}), msg="hi")
+    assert s4.sent[0]["model"] is None and s4.sent[0]["group"] == "sovereign"

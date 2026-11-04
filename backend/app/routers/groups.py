@@ -8,7 +8,7 @@ from google.cloud import firestore
 
 from .. import db
 from ..auth import User, current_user, require_permission
-from ..config import settings
+from ..engine import sso
 from ..schemas import (
     DirectoryGroup,
     DirectoryOut,
@@ -55,6 +55,18 @@ def _load(group_id: str):
 def _member_emails(group_id: str) -> list[str]:
     q = _users().where(filter=firestore.FieldFilter("groups", "array_contains", group_id))
     return sorted(d.id for d in q.stream())
+
+
+def members_of(group_id: str) -> tuple[set[str], set[str]]:
+    """(lower-case e-mails, uids) of a group's members, for filtering audit entries and usage by the people in a group.
+    Unknown group -> 404, so a stale filter is an error rather than silently "everyone"."""
+    _load(group_id)
+    emails, uids = set(), set()
+    for d in _users().where(filter=firestore.FieldFilter("groups", "array_contains", group_id)).stream():
+        emails.add(d.id.lower())
+        if (uid := (d.to_dict() or {}).get("uid")):
+            uids.add(uid)
+    return emails, uids
 
 
 def _member_map() -> dict[str, list[str]]:
@@ -104,7 +116,7 @@ def _valid_email(email: str) -> bool:
 
 
 def _domain_allowed(email: str) -> bool:
-    allowed = settings().allowed_domain_list
+    allowed = sso.allowed_domains()
     return not allowed or email.rsplit("@", 1)[-1] in allowed
 
 

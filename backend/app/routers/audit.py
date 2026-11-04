@@ -141,7 +141,12 @@ def _between(start: datetime, end: datetime):
             .where(filter=firestore.FieldFilter("at", "<", end)))
 
 
-def _matcher(cat: str, sev: str, department: str, q: str) -> Callable[[AuditEntry], bool]:
+def _matcher(cat: str, sev: str, department: str, q: str, group: str = "") -> Callable[[AuditEntry], bool]:
+    """`group`: only entries made by members of that group (群組管理), matched on the actor's e-mail or uid."""
+    members = None
+    if group:
+        from .groups import members_of
+        members = members_of(group)
     if cat and cat != "alerts" and cat not in CATEGORIES:
         raise HTTPException(422, f"unknown category {cat}")
     if sev and sev not in SEVERITIES:
@@ -154,6 +159,8 @@ def _matcher(cat: str, sev: str, department: str, q: str) -> Callable[[AuditEntr
         if cat and cat != "alerts" and e.category != cat:
             return False
         if (sev and e.severity != sev) or (department and e.department != department):
+            return False
+        if members is not None and (e.actor_email or "").lower() not in members[0] and e.actor not in members[1]:
             return False
         if needle:
             hay = " ".join([e.id, e.actor_email, e.action, e.target_id, e.target_label, e.agent_label, e.department,
@@ -179,8 +186,8 @@ def _scan(frm: str | None, to: str | None, cursor: str | None, cap: int) -> Iter
 @router.get("", response_model=AuditPage)
 def list_audit(frm: str | None = Query(None, alias="from"), to: str | None = None, category: str = "",
                severity: str = "", department: str = "", q: str = "", cursor: str | None = None,
-               limit: int = Query(25, ge=1, le=100)):
-    match, lk = _matcher(category, severity, department, q), _Lookups()
+               limit: int = Query(25, ge=1, le=100), group: str = ""):
+    match, lk = _matcher(category, severity, department, q, group), _Lookups()
     items: list[AuditEntry] = []
     scanned, last = 0, None
     for doc_id, r in _scan(frm, to, cursor, SCAN_CAP):
@@ -242,8 +249,8 @@ def summary():
 
 @router.get("/export.csv")
 def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = None, category: str = "",
-               severity: str = "", department: str = "", q: str = "", user: User = Depends(require_admin)):
-    match, lk = _matcher(category, severity, department, q), _Lookups()
+               severity: str = "", department: str = "", q: str = "", group: str = "", user: User = Depends(require_admin)):
+    match, lk = _matcher(category, severity, department, q, group), _Lookups()
     _, _, d_from, d_to = _window(frm, to)
     rows: list[AuditEntry] = []
     for doc_id, r in _scan(frm, to, None, EXPORT_SCAN_CAP):
@@ -263,7 +270,7 @@ def export_csv(frm: str | None = Query(None, alias="from"), to: str | None = Non
                     e.target_label, e.agent_label, e.department, json.dumps(e.details, ensure_ascii=False, default=str)])
     # Exporting the trail is itself an auditable data access, same as monitoring.export.
     db.audit(user.uid, "audit.export", user.email, range_from=d_from.isoformat(), range_to=d_to.isoformat(),
-             category=category, severity=severity, department=department, q=q, rows=len(rows))
+             category=category, severity=severity, department=department, group=group, q=q, rows=len(rows))
     name = f"tcvgh-audit_{d_from.isoformat()}_{d_to.isoformat()}.csv"
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{name}"'})

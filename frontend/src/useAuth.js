@@ -13,7 +13,7 @@ export function useAuth({onSignedIn,onSignedOut}){
     return onAuthStateChanged(auth,async u=>{
       if(!u){setMe(null);setChecking(false);onSignedOut?.();return}
       try{const m=await api.me();setMe(m);setAuthError('');onSignedIn?.(m)}
-      catch(e){setMe(null);setAuthError(e.message.includes('403')?'此帳號無法使用（可能已停用或不在允許的網域）。':e.message);onSignedOut?.()}
+      catch(e){setMe(null);setAuthError(e.message.startsWith('409')?e.message.slice(4):e.message.includes('登入方式已被管理員關閉')?'這個登入方式已被管理員關閉，請改用其他方式登入。':e.message.includes('403')?'此帳號無法使用（可能已停用或不在允許的網域）。':e.message);onSignedOut?.()}
       finally{setChecking(false)}
     });
   },[]);
