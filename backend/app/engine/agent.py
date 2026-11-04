@@ -44,7 +44,8 @@ LANG_GUIDE = ("Language: always answer in the language of the user's latest mess
               "results are in another language: translate what you use. Keep citation numbers and code unchanged. The `reason` you write for each tool call is shown to the user too, so write it in that same language.")
 REASON = {"type": "string", "description": "One short sentence explaining why you take this step, in the USER's language (it is shown to them as written)."}
 GUIDE = ("你可以呼叫工具來完成任務。只有在確實需要時才呼叫：寒暄、一般常識或不需要院內資料的問題請直接回答，不要搜尋。"
-         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]。"
+         "搜尋結果若與問題無關，請忽略它、不要引用。引用搜尋結果時請在句尾標註來源編號，每個編號各自用方括號，例如 [1][2]，不要寫成 [1, 2]，"
+         "也不要用檔名代替編號（不要寫「資料來源：[某某.pdf]」）。"
          "呼叫工具時務必填寫 reason。"
          "若有連接器工具（例如 Google 日曆、Google 文件、Slack）而使用者要求建立、修改或傳送外部資料，請直接呼叫對應的工具，"
          "不要回答你做不到；寫入動作會先請使用者確認後才真正執行。")
@@ -68,6 +69,27 @@ WEB_SYSTEM = "You are a web research assistant. Summarise the facts found briefl
 _CITE = re.compile(r"\[(\d{1,2}(?:\s*[,，、]\s*\d{1,2})*)\](?!\()")  # [1] / [1, 2] (not a markdown link)
 _CODE = re.compile(r"(```.*?```|`[^`\n]*`)", re.S)  # code is left alone: [1, 2, 3] there is a list, not a citation
 _SPLIT = re.compile(r"\s*[,，、]\s*")
+_NAMED = re.compile(r"\[([^\[\]\n]{2,160})\](?!\()")  # [胃鏡檢查前後注意事項.pdf] — a source cited by name (not a link)
+_EXT = re.compile(r"\.(pdf|docx?|pptx?|txt|md|html?|csv|json)$", re.I)
+
+
+def _norm_source(name: str) -> str:
+    return _EXT.sub("", re.sub(r"\s+", "", name or "")).casefold()
+
+
+def _name_markers(text: str, citations: list[Citation]) -> str:
+    """Models sometimes cite by file name ("資料來源：[電腦斷層與顯影劑注意事項.pdf]") instead of by number. Turn such a
+    bracketed name into that source's [n] so it counts as cited and renders as a chip. Code spans are left alone."""
+    by_name = {_norm_source(c.source): i for i, c in enumerate(citations, 1) if c.source}
+    if not by_name:
+        return text
+
+    def repl(m):
+        key = _norm_source(m.group(1))
+        n = by_name.get(key) or next((i for k, i in by_name.items() if len(key) >= 4 and (k.startswith(key) or key.startswith(k))), None)
+        return f"[{n}]" if n else m.group(0)
+    parts = _CODE.split(text)
+    return "".join(p if i % 2 else _NAMED.sub(repl, p) for i, p in enumerate(parts))
 
 
 def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Citation]]:
@@ -77,6 +99,7 @@ def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Cit
     No sources at all: the text is left untouched."""
     if not citations:
         return text, citations
+    text = _name_markers(text, citations)
     nums = lambda m: [int(n) for n in _SPLIT.split(m.group(1))]  # noqa: E731
     parts = _CODE.split(text)  # odd items are code
     used = sorted({n for i, p in enumerate(parts) if i % 2 == 0 for m in _CITE.finditer(p) for n in nums(m) if 1 <= n <= len(citations)})

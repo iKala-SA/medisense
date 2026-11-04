@@ -403,3 +403,10 @@ def test_structured_arguments_reach_the_connector_as_json_not_strings(fs, rig, m
     assert params["required"] == ["reason", "calendarId", "event"] and tool.spec["function"]["description"].endswith("：Create")
     rig(Script([call(tool.name, {"reason": "r", "calendarId": "primary", "event": {"summary": "門診會議"}})], "done"), ag)
     assert seen == {"calendarId": "primary", "event": {"summary": "門診會議"}}
+
+
+def test_a_source_cited_by_file_name_counts_as_cited_and_becomes_its_number():
+    cites = [Citation(source="胃鏡檢查前後注意事項.pdf"), Citation(source="電腦斷層與顯影劑注意事項.pdf"), Citation(source="其他.pdf")]
+    text, out = rt.prune_citations("請禁食 (資料來源：[電腦斷層與顯影劑注意事項.pdf]、[胃鏡檢查前後注意事項])。程式 `[其他.pdf]`，連結 [其他](http://x)", cites)
+    assert text.startswith("請禁食 (資料來源：[2]、[1])") and "`[其他.pdf]`" in text and "[其他](http://x)" in text
+    assert [(c.source, c.cited) for c in out] == [("胃鏡檢查前後注意事項.pdf", True), ("電腦斷層與顯影劑注意事項.pdf", True), ("其他.pdf", False)]
