@@ -285,29 +285,46 @@ def _cites(n):
     return [Citation(source=f"文件{i}.pdf", uri=f"u{i}") for i in range(1, n + 1)]
 
 
-def test_only_cited_sources_survive_and_are_renumbered():
+def test_cited_sources_come_first_renumbered_and_the_rest_stay_listed_as_unused():
     text, cites = rt.prune_citations("甲 [3]，乙 [1][3]，丙 [7]。", _cites(4))
-    assert [c.source for c in cites] == ["文件1.pdf", "文件3.pdf"]  # original order, uncited 2 and 4 gone
+    assert [(c.source, c.cited) for c in cites] == [("文件1.pdf", True), ("文件3.pdf", True), ("文件2.pdf", False), ("文件4.pdf", False)]
     assert text == "甲 [2]，乙 [1][2]，丙 。"  # 3 -> 2, 1 -> 1; [7] pointed at nothing and is removed
 
 
 def test_grouped_markers_are_split_and_code_and_links_are_left_alone():
     text, cites = rt.prune_citations("見 [2, 3]。程式 `x = [1, 2]` 與\n```\ny = [1, 2, 3]\n```\n另見 [連結 1](http://a) 與 [2](http://b)", _cites(3))
-    assert [c.source for c in cites] == ["文件2.pdf", "文件3.pdf"]
+    assert [c.source for c in cites if c.cited] == ["文件2.pdf", "文件3.pdf"] and [c.source for c in cites if not c.cited] == ["文件1.pdf"]
     assert text.startswith("見 [1][2]。") and "`x = [1, 2]`" in text and "y = [1, 2, 3]" in text and "[2](http://b)" in text
 
 
-def test_nothing_cited_means_no_references_and_no_sources_means_untouched_text():
-    assert rt.prune_citations("完全沒引用", _cites(3)) == ("完全沒引用", [])
+def test_nothing_cited_still_lists_what_was_retrieved_and_no_sources_means_untouched_text():
+    text, cites = rt.prune_citations("完全沒引用", _cites(3))
+    assert text == "完全沒引用" and [c.cited for c in cites] == [False, False, False]  # the tab shows what was found, marked 未引用
     assert rt.prune_citations("a [1]", []) == ("a [1]", [])
+    db = Citation(source="門診統計", kind="database", text="{\"n\": 1}")
+    text, cites = rt.prune_citations("共 1 筆 [2]", [*_cites(2), db])
+    assert [(c.source, c.kind, c.cited) for c in cites] == [("文件2.pdf", "document", True), ("門診統計", "database", True), ("文件1.pdf", "document", False)]
 
 
-def test_retrieved_but_unused_passages_do_not_show_up_as_references(rig, monkeypatch):
+def test_a_database_query_becomes_a_reference(fs, rig, monkeypatch):
+    monkeypatch.setattr(rt.db_tools, "tool_specs", lambda ids, email: [{"name": "db_sql_x", "description": "查", "props": {"sql": {"type": "string"}}, "required": ["sql"],
+                                                                         "label": "門診統計", "meta": {"connector_id": "x", "kind": "sql"}}])
+    monkeypatch.setattr(rt.db_tools, "execute", lambda meta, args, **k: ('{"dept": "內科", "n": 12}', "門診統計 · 1 筆"))
+    ag = AgentIn.model_validate({"name": "A", "capabilities": {"db_connectors": ["x"]}})
+    r, ev = rig(Script([call("db_sql_x", {"reason": "r", "sql": "SELECT 1"})], "內科 12 人"), ag)
+    assert [(c.kind, c.source, c.cited) for c in r.citations] == [("database", "門診統計", True)] and "內科" in r.citations[0].text
+    assert "1 次資料庫查詢" in r.trace[-1].summary and "citations" in [e["event"] for e in ev]
+    monkeypatch.setattr(rt.db_tools, "execute", lambda meta, args, **k: ("[資料庫] 需要授權", "門診統計 · 需要 BigQuery 授權"))
+    r, _ = rig(Script([call("db_sql_x", {"reason": "r", "sql": "SELECT 1"})], "無法查詢"), ag)
+    assert not r.citations  # an error is not a source
+
+
+def test_retrieved_but_unused_passages_stay_listed_after_the_cited_ones(rig, monkeypatch):
     monkeypatch.setattr(rag, "retrieve", lambda *a, **k: _chunks(0.20, 0.25, 0.30))
     s = Script([call("search_knowledge", {"reason": "r", "query": "q"})], "只有第二段有用 [2]")
     r, _ = rig(s, rag_files=["f"])
-    assert [c.source for c in r.citations] == ["文件1.pdf"] and r.reply == "只有第二段有用 [1]"
-    assert "引用 1/3 個來源" in r.trace[-1].summary
+    assert [(c.source, c.cited) for c in r.citations] == [("文件1.pdf", True), ("文件0.pdf", False), ("文件2.pdf", False)]
+    assert r.reply == "只有第二段有用 [1]" and "引用 1/3 個來源" in r.trace[-1].summary
 
 
 def test_passages_of_one_file_share_one_reference(rig, monkeypatch):

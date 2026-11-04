@@ -71,8 +71,10 @@ _SPLIT = re.compile(r"\s*[,，、]\s*")
 
 
 def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Citation]]:
-    """Keep only the sources the answer really cites, renumbered 1..k in their original order, and rewrite the [n]
-    markers to match. A marker that points at no source is removed. No sources at all: the text is left untouched."""
+    """Order the sources for the 參考文件 tab: the ones the answer cites first, renumbered 1..k in their original order
+    (the [n] markers are rewritten to match; a marker pointing at no source is removed), then database results, then
+    every retrieved document the answer did not cite, marked `cited=False`. Nothing the answer drew on is hidden.
+    No sources at all: the text is left untouched."""
     if not citations:
         return text, citations
     nums = lambda m: [int(n) for n in _SPLIT.split(m.group(1))]  # noqa: E731
@@ -81,7 +83,11 @@ def prune_citations(text: str, citations: list[Citation]) -> tuple[str, list[Cit
     remap = {old: new for new, old in enumerate(used, 1)}
     rewrite = lambda m: "".join(f"[{n}]" for n in dict.fromkeys(remap[x] for x in nums(m) if x in remap))  # noqa: E731
     out = "".join(p if i % 2 else _CITE.sub(rewrite, p) for i, p in enumerate(parts))
-    return out, [citations[o - 1] for o in used]
+    cited = [citations[o - 1].model_copy(update={"cited": True}) for o in used]
+    rest = [c for i, c in enumerate(citations, 1) if i not in remap]
+    dbs = [c for c in rest if c.kind == "database"]
+    unused = [c.model_copy(update={"cited": False}) for c in rest if c.kind != "database"]
+    return out, [*cited, *dbs, *unused]
 
 
 class _Trace(list):
@@ -341,7 +347,13 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
                 q = str(args.get("query", ""))
                 return f"[HIS/EMR 尚未串接] 查詢條件：{q}", "HIS/EMR 閘道未啟用（stub）"
             if tool.db:
-                return db_tools.execute(tool.db, args, user_id=user_id, email=user_email, agent_id=agent_id)
+                text, facts = db_tools.execute(tool.db, args, user_id=user_id, email=user_email, agent_id=agent_id)
+                if not text.startswith("["):  # a query result (de-identified rows), not an error: it is a source of the answer
+                    res.citations.append(Citation(kind="database", source=tool.label, text=text[:600], cited=True,
+                                                  passages=[CitationPassage(text=text[:600])]))
+                    if emit:
+                        emit({"event": "citations", "citations": [x.model_dump() for x in res.citations]})
+                return text, facts
             call_args = {**tool.fixed}
             if tool.raw_args:
                 try:
@@ -442,9 +454,11 @@ def run_agent(agent: AgentIn, *, agent_id: str, user_id: str, user_message: str,
         if not text:  # some models return nothing after a tool result: ask once more without tools
             c2 = _complete(agent, agent_id, user_id, group, system=system, messages=messages, think=think, model=pin_model)
             text = c2.text.strip() or "（模型沒有產生回覆，請重新提問。）"
-        retrieved = len(res.citations)
-        text, res.citations = prune_citations(text, res.citations)  # the references tab shows what the answer used, not everything found
-        cited = f"，引用 {len(res.citations)}/{retrieved} 個來源" if retrieved else ""
+        text, res.citations = prune_citations(text, res.citations)  # cited first; everything retrieved or queried stays listed
+        docs = [c for c in res.citations if c.kind != "database"]
+        cited = f"，引用 {sum(c.cited for c in docs)}/{len(docs)} 個來源" if docs else ""
+        if (n_db := sum(c.kind == "database" for c in res.citations)):
+            cited += f"，{n_db} 次資料庫查詢"
         res.trace.append(StepTrace(node_id=node_id, type="llm", model=c.model, group=group, ms=c.ms, prompt_tokens=c.prompt_tokens,
                                    completion_tokens=c.completion_tokens, cost_usd=c.cost_usd, thinking=c.reasoning or None,
                                    summary=f"{len(text)} 字{cited}" + (f"（{note}）" if note else "") + ("（已達工具呼叫上限）" if turn == MAX_ROUNDS else "")))

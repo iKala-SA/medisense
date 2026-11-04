@@ -328,6 +328,8 @@ class Citation(BaseModel):
     text: str = ""  # chunk excerpt
     doc_id: str = ""  # library document this chunk came from (opens the viewer); empty when it cannot be resolved
     page: int | None = None  # first page of the chunk for paged files (PDF), when the retriever reports it
+    kind: str = "document"  # document | web | database: what the answer drew on
+    cited: bool = True  # False = retrieved (or queried) but the answer never cited it; still listed under 參考文件
     # One Citation per FILE: every retrieved passage of that file, best (smallest distance) first. The fields above
     # mirror passages[0], so older readers and saved conversations keep working.
     passages: list[CitationPassage] = Field(default_factory=list)
