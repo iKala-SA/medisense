@@ -175,6 +175,8 @@ def update_user(email: str, body: UserPatch, user: User = Depends(manage)):
         raise HTTPException(422, f"unknown department {body.department}")
     roles_change = body.roles is not None and body.roles != list(data.get("roles") or [])
     if roles_change:
+        if email == user.email:  # assigned roles grant permissions: nobody widens their own
+            raise HTTPException(409, "you cannot change your own roles")
         _check_roles(body.roles)
     view_change = body.original_view is not None and body.original_view != bool(data.get("original_view", False))
     if view_change:

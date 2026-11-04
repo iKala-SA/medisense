@@ -38,9 +38,9 @@ const GREETINGS=['讓我們深入探討。','今天想聊些什麼？','準備�
 let lastGreeting='';
 const pickGreeting=()=>{const pool=GREETINGS.filter(g=>g!==lastGreeting);return lastGreeting=pool[Math.floor(Math.random()*pool.length)]};
 const navGroups=[{items:[['對話','新對話',PencilSimple],['我的工作台','我的工作台',House],['連接器','Connectors',Plugs],['空間','空間',Atom]]},{title:'Agent Hub',items:[['Agent','Agent Hub',Cube],['流程','Flows',TreeStructure],['技能','Skill',Lightning],['排程','Schedule',CalendarBlank]]}];
-const adminPages=['管理帳戶','Model','Model Routing','Security Control','稽核記錄','Users','Roles','Groups','Monitoring'];
-const adminGroups=[{items:[['總覽','管理帳戶',Gear]]},{title:'模型',items:[['模型','Model',Cpu],['路由','Model Routing',ArrowsSplit]]},{title:'治理',items:[['安全控管','Security Control',ShieldCheck],['稽核記錄','稽核記錄',ClockCounterClockwise]]}];
-const adminNav=[['使用者管理','Users',Users],['角色管理','Roles',IdentificationBadge],['群組管理','Groups',Users],['用量與成本','Monitoring',Lightning]];
+const adminPages=['管理帳戶','Model','Model Routing','稽核記錄','Users','Roles','Groups','Monitoring'];
+const adminGroups=[{items:[['總覽','管理帳戶',Gear]]},{title:'模型',items:[['模型','Model',Cpu],['路由','Model Routing',ArrowsSplit]]},{title:'治理',items:[['稽核記錄','稽核記錄',ClockCounterClockwise]]}];
+const adminNav=[['使用者管理','Users',Users],['群組管理','Groups',Users],['角色管理','Roles',IdentificationBadge],['用量與成本','Monitoring',Lightning]];
 const demoNames=['登入與身分','切換模型','Auto Routing','敏感資料路由','院內知識問答','稽核查詢與匯出','Agent 發布治理'];
 const baseAgents=[{name:'藥劑部用藥資訊助理',dept:'藥劑部',desc:'彙整院內藥品資訊，協助查找用藥規範與文件來源。',status:'已發布',version:'1.1',model:'院內模型'},{name:'心臟科研究助理',dept:'心臟科',desc:'檢索授權研究資料，整理文獻與院內指引。',status:'已發布',version:'2.0',model:'Auto'},{name:'交班摘要助理',dept:'護理部',desc:'以授權文件協助整理交班格式與待確認事項。',status:'草稿',version:'0.1',model:'院內模型'}];
 const connectorNames=['Gmail','Google Calendar','Google Drive','Microsoft Teams','OneDrive','Slack','Notion','Remote MCP','Webhook','HIS 核心系統','Outlook Calendar'];
