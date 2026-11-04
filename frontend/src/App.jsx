@@ -87,7 +87,7 @@ useEffect(()=>{
 const chatAgents=agents.filter(a=>a.id&&a.kind!=='flow'); // the very same list the Agent page shows; unpublished ones are listed but cannot be picked
 useEffect(()=>{if(!MOCK&&activeAgent!=='Medisense'&&agents.length&&!chatAgents.some(a=>a.name===activeAgent&&a.status==='已發布'))setActiveAgentRaw('Medisense')},[agents]);// eslint-disable-line react-hooks/exhaustive-deps
 useEffect(()=>{if(!MOCK&&(logged||PREVIEW)&&page==='新對話')loadAgents()},[page]);// eslint-disable-line react-hooks/exhaustive-deps
-const recents=useRecents({MOCK,chats:recentChats,setChats:setRecentChats,projects,setProjects,notify,onDeleted:id=>{if(id===liveSession||id===threadId)go('新對話')},onProjectDeleted:id=>{if(projectId===id){setProjectId(null);if(page==='專案')go('新對話')}}});
+const recents=useRecents({MOCK,chats:recentChats,setChats:setRecentChats,projects,setProjects,notify,onDeleted:id=>{if(id===liveSession||id===threadId)go('新對話')},onDeletedAll:()=>{setLiveSession(null);setMessages([]);setThreadId(crypto.randomUUID());go('新對話')},onProjectDeleted:id=>{if(projectId===id){setProjectId(null);if(page==='專案')go('新對話')}}});
 useEffect(()=>{
   if(MOCK||(!logged&&!PREVIEW))return;
   api.listSessions(100).then(r=>setRecentChats(r.items.map(i=>({id:i.id,title:i.title||'對話',messages:null,agent:'Medisense',model:'Auto',project_id:i.project_id||'',created_at:i.created_at,updated_at:i.updated_at,pinned:!!i.pinned,locked:!!i.locked,archived:!!i.archived})))).catch(()=>{});

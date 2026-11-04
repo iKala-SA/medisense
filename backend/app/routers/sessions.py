@@ -101,14 +101,35 @@ def update_session(session_id: str, body: SessionPatch, user: User = Depends(cur
     return _summary(snap.id, {**(snap.to_dict() or {}), **upd})
 
 
+def _purge(snap) -> None:
+    """Delete one conversation with what hangs off it: its images in the bucket and its share links."""
+    from ..engine import chat_images
+    from .shares import delete_for_session
+
+    chat_images.delete([a["blob"] for a in (snap.to_dict() or {}).get("attachments") or [] if a.get("blob")])
+    snap.reference.delete()
+    delete_for_session(snap.id)
+
+
+@router.delete("")
+def delete_all_sessions(user: User = Depends(current_user)):
+    """Delete every conversation of the caller (recent, archived, in projects, sandbox tests). Locked conversations are
+    kept: the lock is the person's own "do not delete" mark; unlock them first. -> {deleted, kept_locked}."""
+    deleted = kept = 0
+    for snap in _col().where(filter=firestore.FieldFilter("uid", "==", user.uid)).stream():
+        if (snap.to_dict() or {}).get("locked"):
+            kept += 1
+            continue
+        _purge(snap)
+        deleted += 1
+    db.audit(user.uid, "session.delete_all", user.email, deleted=deleted, kept_locked=kept)
+    return {"deleted": deleted, "kept_locked": kept}
+
+
 @router.delete("/{session_id}", status_code=204)
 def delete_session(session_id: str, user: User = Depends(current_user)):
     snap = _own(session_id, user)
     if (snap.to_dict() or {}).get("locked"):
         raise HTTPException(409, "conversation is locked")
-    from ..engine import chat_images
-    chat_images.delete([a["blob"] for a in (snap.to_dict() or {}).get("attachments") or [] if a.get("blob")])
-    snap.reference.delete()
-    from .shares import delete_for_session
-    delete_for_session(session_id)  # its share link goes with it
+    _purge(snap)  # its images and share link go with it
     db.audit(user.uid, "session.delete", user.email, session_id=session_id)

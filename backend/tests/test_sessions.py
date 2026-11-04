@@ -363,3 +363,18 @@ def test_save_to_space_creates_a_library_document_inside_the_space(fs, as_user, 
     assert md["filename"] == "單張.md" and seen["ctype"] == "text/markdown"
     assert as_user(PLAIN).post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "x.md", "content": "x"}).status_code == 403  # library is builder-only
     assert as_user(BUILDER2).post("/api/chat/save-to-space", json={"space_id": space["id"], "filename": "x.md", "content": "x"}).status_code == 403  # not their space
+
+
+def test_delete_all_removes_my_conversations_but_keeps_locked_ones_and_other_peoples(fs, as_user, audit_log):
+    seed(fs, "a", BUILDER.uid, 2, 1, title="a")
+    seed(fs, "b", BUILDER.uid, 2, 2, title="b")
+    seed(fs, "kept", BUILDER.uid, 2, 3, title="kept")
+    fs.store["sessions/kept"]["locked"] = True
+    seed(fs, "theirs", BUILDER2.uid, 2, 1, title="t")
+    fs.put("shares/sh1", {"session_id": "a", "uid": BUILDER.uid})
+    r = as_user(BUILDER).delete("/api/sessions")
+    assert r.status_code == 200 and r.json() == {"deleted": 2, "kept_locked": 1}
+    assert "sessions/a" not in fs.store and "sessions/b" not in fs.store and "shares/sh1" not in fs.store
+    assert "sessions/kept" in fs.store and "sessions/theirs" in fs.store
+    assert any(a["action"] == "session.delete_all" and a.get("deleted") == 2 for a in audit_log())
+    assert as_user(BUILDER).delete("/api/sessions").json() == {"deleted": 0, "kept_locked": 1}

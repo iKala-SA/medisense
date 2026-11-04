@@ -162,6 +162,11 @@ Prices in the registry are used for cost when a served model is not in the built
   reject = "已取消此動作，流程停止。"). `approver: "owner"`: a canvas approval node; only the agent owner / an admin may decide (`POST /api/agents/{id}/approve`; `/api/chat/approve` returns 403).
   Audit `agent.approve` / `agent.reject` carry `by_user: true` for user confirmations. Draft (sandbox) runs never pause: writes are simulated there.
 
+## Sessions: delete all
+
+- `DELETE /api/sessions` -> `{deleted, kept_locked}`: every conversation of the caller (recent, archived, in projects, sandbox tests) with its images
+  and share links; locked conversations are kept (unlock first). Audit `session.delete_all`. Projects are untouched.
+
 ## Calendar
 
 `GET /api/calendar/status` -> `{ "connected": false, "reason": "Google Calendar OAuth consent screen not approved yet" }`.

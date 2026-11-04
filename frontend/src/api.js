@@ -162,6 +162,7 @@ export const api={
   getSession:id=>call(`/api/sessions/${id}`),
   renameSession:(id,title)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({title})}),
   deleteSession:id=>call(`/api/sessions/${id}`,{method:'DELETE'}),
+  deleteAllSessions:()=>call('/api/sessions',{method:'DELETE'}),
   updateSession:(id,patch)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body(patch)}),
   moveSession:(id,project_id)=>call(`/api/sessions/${id}`,{method:'PATCH',body:body({project_id})}),
   // 分享: de-identified snapshot link (routers/shares.py)
