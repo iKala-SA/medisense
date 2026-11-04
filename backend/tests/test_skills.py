@@ -65,3 +65,27 @@ def test_prefix_reaches_system_prompt(fs, monkeypatch):
                       skill_prefix="## Skill: S\nDO X")
     assert r.reply == "ok"
     assert seen["system"].startswith("## Skill: S\nDO X") and "BASE" in seen["system"]
+
+
+def test_a_skill_picked_with_slash_reaches_the_model_in_chat(fs, as_user, monkeypatch):
+    """End to end: the chat request's skill_ids (picked with / in the composer) put the skill's instructions first in the
+    system prompt; a disabled skill is ignored."""
+    from app.engine import llm
+
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return llm.Completion("ok", "gemini-3-flash", 1, 1, 0.0, 1)
+
+    monkeypatch.setattr("app.engine.deid.deidentify", lambda t: t)
+    monkeypatch.setattr(llm, "complete", fake)
+    monkeypatch.setattr("app.engine.usage.record", lambda **k: None)
+    c = as_user(BUILDER)
+    sid = c.post("/api/skills", json={"name": "白話衛教單張", "description": "d", "instructions": "用國小程度的用字回答，最後加一段「什麼時候要回診」。"}).json()["id"]
+    assert c.post("/api/chat", json={"message": "普拿疼怎麼吃", "skill_ids": [sid]}).status_code == 200
+    assert seen["system"].startswith("## Skill: 白話衛教單張\n用國小程度的用字回答")
+    c.patch(f"/api/skills/{sid}/enabled", json={"enabled": False})
+    seen.clear()
+    c.post("/api/chat", json={"message": "普拿疼怎麼吃", "skill_ids": [sid]})
+    assert "白話衛教單張" not in seen["system"]
