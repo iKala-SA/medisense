@@ -20,7 +20,6 @@ const SORTS = [
   { id: "fallbacks", label: "\u964D\u7D1A\u6700\u591A (Fallbacks)" }
 ];
 const SERIES = ["#1e6242", "#8fd1b0", "#239660", "#cdeadb", "#5d6068", "#c9ced6"];
-const PAGE = 10;
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const shift = (d, days) => {
   const x = new Date(d);
@@ -59,7 +58,6 @@ function Monitoring() {
   const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState(null);
   const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -74,7 +72,6 @@ function Monitoring() {
     }).catch((e) => setErr(String(e))).finally(() => setBusy(false));
   }, [query, sort]);
   useEffect(load, [load]);
-  useEffect(() => setPage(1), [query, sort, q]);
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -96,9 +93,8 @@ function Monitoring() {
     ...Object.fromEntries(d.by_model.map((m) => [m.model, m.tokens]))
   })), [summary]);
   const needle = q.trim().toLowerCase();
-  const shown = useMemo(() => (rows ?? []).filter((r) => !needle || [r.name, r.owner_email, r.department, r.main_model, r.agent_id].some((s) => s?.toLowerCase().includes(needle))), [rows, needle]);
-  const pages = Math.max(1, Math.ceil(shown.length / PAGE));
-  const pageRows = shown.slice((page - 1) * PAGE, page * PAGE);
+  // Deleted agents are left out for now (their usage still counts in the totals above).
+  const shown = useMemo(() => (rows ?? []).filter((r) => r.status !== "deleted").filter((r) => !needle || [r.name, r.owner_email, r.department, r.main_model, r.agent_id].some((s) => s?.toLowerCase().includes(needle))), [rows, needle]);
   const tokens = (summary?.prompt_tokens ?? 0) + (summary?.completion_tokens ?? 0);
   const budgetPct = summary && summary.monthly_budget_usd > 0 ? summary.month_cost_usd / summary.monthly_budget_usd * 100 : 0;
   const budgetTone = budgetPct >= 100 ? "error" : budgetPct >= 85 ? "warning" : "primary";
@@ -224,13 +220,13 @@ function Monitoring() {
               <Icon name="search" className="absolute left-3 top-2 text-[20px] text-outline" />
               <input className="pl-10" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋 Agent 名稱、建立者、所屬科別或服務模型…" />
             </div>
-            {rows === null ? <div className="grid place-items-center py-16"><Spinner /></div> : shown.length === 0 ? <div className="py-6"><Empty icon="smart_toy" title="沒有符合條件的 Agent" /></div> : <table className="mt-4 w-full text-sm">
-                <thead className="bg-surface-container-low text-xs text-outline-variant">
+            {rows === null ? <div className="grid place-items-center py-16"><Spinner /></div> : shown.length === 0 ? <div className="py-6"><Empty icon="smart_toy" title="沒有符合條件的 Agent" /></div> : <div className="mon-scroll mt-4 border-t border-hairline"><table className="w-full text-sm">
+                <thead className="sticky top-0 z-[1] bg-surface-container-low text-xs text-outline-variant">
                   <tr><Th>排名</Th><Th>Agent 資訊 / 科別</Th><Th>建立者</Th><Th>主要模型</Th><Th right>請求次數</Th><Th right>Token 用量</Th><Th right>累積花費 (USD)</Th><Th right>平均響應</Th><Th right>失敗 / 降級</Th><Th>操作</Th></tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((r, i) => {
-    const rank = (page - 1) * PAGE + i + 1;
+                  {shown.map((r, i) => {
+    const rank = i + 1;
     const maxReq = rows[0]?.requests || 1;
     return <tr key={r.agent_id} className="border-t border-surface-container-high align-middle">
                         <td className="px-4 py-2"><span className={`pill ${rank <= 3 ? "bg-primary-tint text-primary" : "bg-surface-container-low text-on-surface-variant"}`}>#{rank}</span></td>
@@ -249,15 +245,7 @@ function Monitoring() {
                       </tr>;
   })}
                 </tbody>
-              </table>}
-            {shown.length > PAGE && <div className="flex items-center justify-between border-t border-hairline px-6 py-3 text-xs text-on-surface-variant">
-                <span>顯示第 {(page - 1) * PAGE + 1} 至 {Math.min(page * PAGE, shown.length)} 項，共 {shown.length} 個 Agent</span>
-                <div className="flex items-center gap-1">
-                  <button className="btn-soft py-1" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>上一頁</button>
-                  <span className="px-2 font-mono">{page} / {pages}</span>
-                  <button className="btn-soft py-1" disabled={page === pages} onClick={() => setPage((p) => p + 1)}>下一頁</button>
-                </div>
-              </div>}
+              </table></div>}
           </section>
         </>}
       </>}
@@ -277,26 +265,27 @@ function UsageRanking({ kind, query }) {
       .then((r) => live && setRows(r || [])).catch((e) => live && setErr(String(e)));
     return () => { live = false; };
   }, [kind, query]);
-  const max = Math.max(0.0001, ...(rows || []).map((r) => r.cost_usd));
   const title = kind === "users" ? "使用者用量排行榜" : "群組使用量排行榜";
   return <section className="card mt-3 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
-        <h2 className="section-title"><Icon name={kind === "users" ? "person" : "group"} className="text-primary" />{title} {rows && <span className="chip">{rows.length}</span>}</h2>
+        <h2 className="section-title"><Icon name={kind === "users" ? "person" : "groups"} className="text-primary" />{title} {rows && <span className="chip">{rows.length}</span>}</h2>
       </div>
       <ErrorBox msg={err} />
-      {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon={kind === "users" ? "person" : "group"} title="這段期間沒有用量" hint="調整日期範圍、環境或篩選後再試" /> :
-      <div className="max-h-[440px] overflow-auto"><table className="w-full">
-        <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant"><tr>
-          <Th>#</Th><Th>{kind === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th><Th>占比</Th></tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={r.id} className="border-t border-hairline">
-          <td className="px-4 py-2.5 font-mono text-on-surface-variant">{i + 1}</td>
-          <td className="px-4 py-2.5"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-on-surface-variant mon-sub">{kind === "users" ? r.email : `${r.members} 位成員`}</p></td>
-          <td className="px-4 py-2.5 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-error mon-sub">({r.failed} 失敗)</span>}</td>
-          <td className="px-4 py-2.5 text-right font-mono">{fmtTokens(r.tokens)}</td>
-          <td className="px-4 py-2.5 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
-          <td className="px-4 py-2.5">{r.main_model || "—"}</td>
-          <td className="px-4 py-2.5"><div className="h-2.5 w-32 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, r.cost_usd / max * 100)}%` }} /></div></td>
-        </tr>)}</tbody></table></div>}
+      {rows === null ? <div className="grid place-items-center py-10"><Spinner /></div> : !rows.length ? <Empty icon={kind === "users" ? "person" : "groups"} title="這段期間沒有用量" hint="調整日期範圍、環境或篩選後再試" /> :
+      <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <RankingChart rows={rows.slice(0, 10)} />
+        <div className="mon-scroll border-t border-hairline lg:border-l lg:border-t-0"><table className="w-full">
+          <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant"><tr>
+            <Th>#</Th><Th>{kind === "users" ? "使用者" : "群組"}</Th><Th right>呼叫次數</Th><Th right>Tokens</Th><Th right>費用</Th><Th>主要模型</Th></tr></thead>
+          <tbody>{rows.map((r, i) => <tr key={r.id} className="border-t border-hairline">
+            <td className="px-4 py-2.5 font-mono text-on-surface-variant">{i + 1}</td>
+            <td className="px-4 py-2.5"><p className="font-semibold">{r.name || r.email || r.id}</p><p className="text-on-surface-variant mon-sub">{kind === "users" ? r.email : `${r.members} 位成員`}</p></td>
+            <td className="px-4 py-2.5 text-right font-mono">{fmtInt(r.requests)}{r.failed > 0 && <span className="ml-1 text-error mon-sub">({r.failed} 失敗)</span>}</td>
+            <td className="px-4 py-2.5 text-right font-mono">{fmtTokens(r.tokens)}</td>
+            <td className="px-4 py-2.5 text-right font-mono font-semibold text-primary-dark">{fmtUsd(r.cost_usd, 4)}</td>
+            <td className="px-4 py-2.5">{r.main_model || "—"}</td>
+          </tr>)}</tbody></table></div>
+      </div>}
     </section>;
 }
 
@@ -305,6 +294,33 @@ const PERIODS = [["day", "每日"], ["month", "每月"]];
 const fmtMetric = (v, m) => m === "cost_usd" ? fmtUsd(v) : m === "tokens" ? fmtTokens(v) : fmtInt(Math.round(v));
 const BLANK = { scope: "group", target: "", period: "month", metric: "cost_usd", limit: "", enabled: true, note: "" };
 
+/* Top 10 by cost, beside the full table. */
+function RankingChart({ rows }) {
+  const data = rows.map((r) => ({ ...r, label: r.name || r.email || r.id }));
+  const short = (v) => v.length > 10 ? `${v.slice(0, 10)}…` : v;
+  return <div className="px-4 py-4">
+      <p className="mb-2 text-xs font-semibold text-on-surface-variant">費用前 {data.length} 名 (USD)</p>
+      <div style={{ height: Math.max(120, data.length * 36 + 24) }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }} barCategoryGap="28%">
+            <CartesianGrid horizontal={false} stroke="#eef2f0" />
+            <XAxis type="number" tickFormatter={(v) => fmtUsd(v, v && v < 0.1 ? 3 : 2)} tick={{ fontSize: 11, fontFamily: "JetBrains Mono", fill: "#74747e" }} axisLine={false} tickLine={false} />
+            <YAxis type="category" dataKey="label" tickFormatter={short} width={110} tick={{ fontSize: 12, fill: "#3b3d43" }} axisLine={false} tickLine={false} interval={0} />
+            <Tooltip cursor={{ fill: "#f7faf9" }} content={<RankingTip />} />
+            <Bar dataKey="cost_usd" fill="#239660" radius={[0, 3, 3, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>;
+}
+function RankingTip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const r = payload[0].payload;
+  return <div className="rounded-lg border border-hairline bg-white px-3 py-2 text-xs shadow-float">
+      <p className="font-semibold">{r.label}</p>
+      <p className="font-mono text-[11px] text-on-surface-variant">{fmtInt(r.requests)} 次呼叫 · {fmtTokens(r.tokens)} tokens · <b className="text-primary-dark">{fmtUsd(r.cost_usd, 4)}</b></p>
+    </div>;
+}
 /* 用量上限: per group or per model, daily or monthly. A used-up limit stops new model calls for it. */
 function UsageLimits({ orgGroups }) {
   const [items, setItems] = useState(null);
@@ -346,7 +362,7 @@ function UsageLimits({ orgGroups }) {
   const valid = form && form.target && Number(form.limit) > 0;
   return <section className="card mt-3 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-5 py-3">
-        <div><h2 className="section-title"><Icon name="speed" className="text-primary" />用量上限</h2>
+        <div><h2 className="section-title"><Icon name="hourglass_top" className="text-primary" />用量上限</h2>
           <p className="mt-0.5 text-xs text-on-surface-variant">超過上限後，該群組成員或該模型的新呼叫會被拒絕，直到下一個期間或調高上限。</p></div>
         {supported && <button className="btn-primary" onClick={() => setForm({ ...BLANK })}><Icon name="add" className="text-[18px]" />新增上限</button>}
       </div>
@@ -370,7 +386,7 @@ function UsageLimits({ orgGroups }) {
           <button className="btn-soft" onClick={() => setForm(null)}>取消</button>
           <button className="btn-primary" disabled={!valid || busy} onClick={save}>{busy ? <Spinner /> : null}{form.id ? "儲存" : "新增"}</button></div>
       </div>}
-      {items === null ? <div className="grid place-items-center py-8"><Spinner /></div> : !items.length ? <Empty icon="speed" title={supported ? "尚未設定用量上限" : "預覽模式不支援用量上限"} hint={supported ? "可依群組或模型設定每日或每月的費用、Tokens 或呼叫次數上限" : ""} /> :
+      {items === null ? <div className="grid place-items-center py-8"><Spinner /></div> : !items.length ? <Empty icon="hourglass_top" title={supported ? "尚未設定用量上限" : "預覽模式不支援用量上限"} hint={supported ? "可依群組或模型設定每日或每月的費用、Tokens 或呼叫次數上限" : ""} /> :
       <div className="divide-y divide-hairline">{items.map((l) => {
         const pct = Math.min(100, l.pct || 0), tone = l.exceeded ? "bg-error" : pct >= 85 ? "bg-warning" : "bg-primary";
         return <div key={l.id} className={`flex flex-wrap items-center gap-4 px-5 py-3 ${l.enabled ? "" : "opacity-60"}`}>

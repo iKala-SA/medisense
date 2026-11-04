@@ -238,6 +238,12 @@ export const api={
   chatImage:(sid,aid)=>blob(`/api/chat/attachments/${sid}/${aid}/image`), // the stored (redacted) copy; 410 once expired
   chatAttach:(file,session_id)=>{const fd=new FormData();fd.append('file',file);if(session_id)fd.append('session_id',session_id);return call('/api/chat/attachments',{method:'POST',body:fd},false)},
   calendarStatus:()=>call('/api/calendar/status'),
+  workbenchBrief:now=>call('/api/workbench/brief',{method:'POST',body:body({now})}),
+  workbenchSources:()=>call('/api/workbench/sources'),
+  todos:()=>call('/api/workbench/todos'),
+  addTodo:t=>call('/api/workbench/todos',{method:'POST',body:body(t)}),
+  updateTodo:(id,patch)=>call(`/api/workbench/todos/${id}`,{method:'PATCH',body:body(patch)}),
+  deleteTodo:id=>call(`/api/workbench/todos/${id}`,{method:'DELETE'}),
   calendarEvents:(from,to,max=50)=>call(`/api/calendar/events?${query({from,to,max})}`),
   calendarFreebusy:(from,to)=>call(`/api/calendar/freebusy?${query({from,to})}`),
   // database connectors (admin)

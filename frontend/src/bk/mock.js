@@ -377,6 +377,15 @@ const monitoringAgents = (q, sort) => {
   const key = { requests: (r) => -r.requests, tokens: (r) => -r.tokens, cost_usd: (r) => -r.cost_usd, fallbacks: (r) => -r.fallbacks, cost_per_call: (r) => r.requests ? r.cost_usd / r.requests : 1e9, avg_latency_ms: (r) => r.avg_latency_ms || 1e9 };
   return rows.sort((x, y) => key[sort](x) - key[sort](y));
 };
+/* 使用者 / 群組 leaderboards: the agents' totals split across seeded people and groups by fixed shares. */
+const MON_USERS = [["林志明", 22], ["陳怡君", 17], ["王建宏", 13], ["張雅婷", 10], ["李宗翰", 8], ["黃淑芬", 7], ["吳俊傑", 6], ["劉美玲", 5], ["蔡明哲", 4], ["楊佩珊", 3], ["許家豪", 2.5], ["鄭心怡", 1.5], ["謝承恩", 1]];
+const MON_GROUPS = [["心臟內科", 31, 18], ["急診部", 24, 26], ["資訊室", 16, 9], ["護理部", 12, 42], ["放射科", 9, 11], ["智慧醫療組", 5, 6], ["藥劑部", 3, 8]];
+const monitoringSplit = (q, list, row) => {
+  const agents = monitoringAgents(q, "cost_usd");
+  const tot = agents.reduce((t, a) => ({ requests: t.requests + a.requests, tokens: t.tokens + a.tokens, cost: t.cost + a.cost_usd }), { requests: 0, tokens: 0, cost: 0 });
+  const sum = list.reduce((s, x) => s + x[1], 0);
+  return list.map((x, i) => { const f = x[1] / sum; return { ...row(x, i), requests: Math.round(tot.requests * f), failed: 0, tokens: Math.round(tot.tokens * f), cost_usd: tot.cost * f, main_model: agents[i % Math.max(1, agents.length)]?.main_model || "" }; }).filter((r) => r.requests > 0);
+};
 const delay = (v, ms = 150) => new Promise((r) => setTimeout(() => r(v), ms));
 const now = () => (/* @__PURE__ */ new Date()).toISOString();
 const mockRole = () => new URLSearchParams(window.location.search).get("role") ?? "admin";
@@ -573,6 +582,8 @@ ${auditFilter(q).map((e) => [e.at, e.id, e.actor_email, e.action, e.category, e.
   },
   monitoringSummary: (q) => delay(monitoringSummary(q), 400),
   monitoringAgents: (q, sort) => delay(monitoringAgents(q, sort), 300),
+  monitoringUsers: (q) => delay(monitoringSplit(q, MON_USERS, ([name], i) => ({ id: `u-${i}`, name, email: `user${i + 1}@vghtc.gov.tw` })), 300),
+  monitoringGroups: (q) => delay(monitoringSplit(q, MON_GROUPS, ([name, , members], i) => ({ id: `g-${i}`, name, members })), 300),
   monitoringCsv: (q) => delay(new Blob([`\uFEFFagent_id,name,requests,cost_usd
 ${monitoringAgents(q, "cost_usd").map((r) => `${r.agent_id},${r.name},${r.requests},${r.cost_usd.toFixed(4)}`).join("\n")}`], { type: "text/csv" })),
   listUsers: () => delay({ users, domains: [{ domain: "vghtc.gov.tw", users: users.length }] }),

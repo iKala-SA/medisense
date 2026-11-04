@@ -227,3 +227,5 @@ main.card-page .bk .section-title{font-size:14px;font-weight:600}
 main.card-page .bk input:not([type=checkbox]):not([type=radio]):not([type=range]),main.card-page .bk select{height:34px;border-radius:10px;border-color:var(--pg-ctl);font-size:13px}
 main.card-page .bk table td{color:var(--pg-text)}
 main.card-page .bk .font-mono{font-variant-numeric:tabular-nums}
+/* 流程 / 排程 are still being built: a small "preview" tag after the label (2026-11-04) */
+aside nav button .nav-beta{margin-left:6px;font-size:10px;font-weight:500;letter-spacing:.2px;color:#7b828d;border:1px solid #e6e8eb;border-radius:6px;padding:0 5px;line-height:16px;vertical-align:1px}

@@ -6,8 +6,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 /* Per-user OAuth: open the provider consent page in a popup, then poll the connector status until connected.
    The popup is opened synchronously (inside the click handler) so browsers do not block it.
-   Resolves with the final status item when connected, otherwise null. */
-export async function connectAccount(id,notify){
+   Resolves with the final status item when connected, otherwise null.
+   `untilClosed`: the gateway still reports the old grant as connected (an expired token is only found out when it is used), so
+   the status means nothing until the user has finished in the popup and it closed. */
+export async function connectAccount(id,notify,{untilClosed=false}={}){
   const w=520,h=680,left=Math.max(0,Math.round(window.screenX+(window.outerWidth-w)/2)),top=Math.max(0,Math.round(window.screenY+(window.outerHeight-h)/2));
   const popup=window.open('about:blank','medisense_oauth',`width=${w},height=${h},left=${left},top=${top},popup=yes`);
   if(!popup){notify('瀏覽器封鎖了彈出視窗，請允許此網站的彈出視窗後再試一次');return null}
@@ -22,6 +24,7 @@ export async function connectAccount(id,notify){
   while(Date.now()<deadline){
     await sleep(2000);
     const closed=popup.closed;
+    if(untilClosed&&!closed)continue;
     try{
       const s=await api.myConnectorStatus(id);
       if(s?.state==='connected'){try{popup.close()}catch{/* */}notify('已連線'+(s.account_label?'：'+s.account_label:''));return s}

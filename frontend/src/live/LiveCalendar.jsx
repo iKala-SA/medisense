@@ -48,7 +48,7 @@ function Hero({title,children,action}){
 
 export default function LiveCalendar({notify,go}){
   const [status,setStatus]=useState(null),[mine,setMine]=useState(null),[busy,setBusy]=useState(false);
-  const [picked,setPicked]=useState(null),[view,setView]=useState('week'),[anchor,setAnchor]=useState(()=>new Date()),[data,setData]=useState(null),[loading,setLoading]=useState(false);
+  const [expired,setExpired]=useState(false),[picked,setPicked]=useState(null),[view,setView]=useState('week'),[anchor,setAnchor]=useState(()=>new Date()),[data,setData]=useState(null),[loading,setLoading]=useState(false);
 
   const init=useCallback(async()=>{
     setStatus(null);
@@ -67,27 +67,31 @@ export default function LiveCalendar({notify,go}){
     try{setData(await api.calendarEvents(start.toISOString(),addDays(start,count).toISOString(),view==='month'?250:100))}
     catch(e){
       const m=connectErr(e);
-      if(String(e?.message).startsWith('409')){notify('行事曆尚未連線：'+m);init()}else notify('無法載入行事曆：'+m);
+      // 409 = the gateway refused the grant (expired or revoked): show the reconnect page instead of asking again and again
+      if(String(e?.message).startsWith('409')){
+        setExpired(true);
+        try{const c=(await api.myConnectors()||[]).find(x=>x.type==='calendar');setMine(c?{...c,state:'reauth_required'}:false)}catch{setMine(false)}
+      }else notify('無法載入行事曆：'+m);
     }finally{setLoading(false)}
-  },[startMs,count,notify,init]);// eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>{if(connected)loadEvents()},[connected,loadEvents]);
+  },[startMs,count,notify]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(connected&&!expired)loadEvents()},[connected,expired,loadEvents]);
 
   const connect=async()=>{
     if(!mine)return;
     setBusy(true);
-    try{if(await connectAccount(mine.id,notify))await init()}finally{setBusy(false)}
+    try{if(await connectAccount(mine.id,notify,{untilClosed:expired})){setExpired(false);setData(null);await init()}}finally{setBusy(false)}
   };
 
   if(!status)return <Loading/>;
-  if(!connected){
+  if(!connected||expired){
     if(mine===null)return <Loading/>;
     if(!mine)return <Hero title="尚未有分享給您的 Google 日曆" action={go&&<button className="btn" onClick={()=>go('Connectors')}><Plugs size={15}/>前往連接器</button>}>
       管理員需先建立 Google Calendar 連接器並分享給您，您才能在這裡連線自己的日曆。</Hero>;
     const unavailable=mine.state==='unavailable';
-    return <Hero title="連線我的 Google 日曆" action={<div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center'}}>
+    return <Hero title={mine.state==='reauth_required'?'Google 日曆授權已過期':'連線我的 Google 日曆'} action={<div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center'}}>
       {!unavailable&&<button className="btn primary" disabled={busy} onClick={connect}>{busy?'等待授權…':mine.state==='reauth_required'?'重新授權':'連線我的 Google 日曆'}</button>}
       {go&&<button className="btn" onClick={()=>go('Connectors')}>前往連接器</button>}</div>}>
-      {mine.state==='reauth_required'?'授權已過期，請重新授權。':unavailable?(mine.problem||'連接器暫時無法使用，請聯絡管理員。'):'授權後，Medisense 只會以您自己的帳號讀取日曆，其他人看不到您的內容。'}</Hero>;
+      {mine.state==='reauth_required'?'Medisense 已無法讀取您的日曆。請重新授權，完成後關閉授權視窗即可回到這裡。':unavailable?(mine.problem||'連接器暫時無法使用，請聯絡管理員。'):'授權後，Medisense 只會以您自己的帳號讀取日曆，其他人看不到您的內容。'}</Hero>;
   }
 
   const evs=data?.events||[];
