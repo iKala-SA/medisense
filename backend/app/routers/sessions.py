@@ -78,7 +78,8 @@ def get_session(session_id: str, user: User = Depends(current_user)):
     from .runs import _public_pending
     imgs = chat_images.message_images(d)
     return SessionDetail(**_summary(snap.id, d, _agent_names([d])).model_dump(),
-                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []))
+                         messages=[SessionMessage(role=m.get("role", ""), content=m.get("content", ""), meta=m.get("meta"), images=imgs.get(i, []),
+                                                  skills=m.get("skills") or [])
                                    for i, m in enumerate(d.get("messages") or [])],
                          attachments=[{"id": a.get("id"), "name": a.get("name"), "chars": a.get("chars", 0), "kind": a.get("kind", "text")}
                                       for a in d.get("attachments") or []],

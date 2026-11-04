@@ -129,6 +129,19 @@ def general_agent(user: User) -> tuple[AgentIn, str, list[str]]:
     return agent, agent_id, rag_files
 
 
+def _skill_names(ids: list[str], user: User) -> list[str]:
+    """Names of the skills picked with / that exist, are enabled and the caller may see (the ones that really apply)."""
+    from .. import sharing
+
+    out = []
+    for i in dict.fromkeys(ids or []):
+        snap = db.client().collection("skills").document(i).get()
+        d = snap.to_dict() if snap.exists else None
+        if d and d.get("enabled", True) and sharing.can_view(user, d):
+            out.append(d.get("name", ""))
+    return [n for n in out if n]
+
+
 def _chat_context(body: ChatRequest, chosen: bool) -> dict:
     """The composer settings of this turn, kept on the session so reopening it (even after a reload) shows the same agent,
     data scope, picked spaces / databases (with their names), web search and model. Names are looked up once here."""
@@ -201,7 +214,7 @@ def _prepare(body: ChatRequest, user: User) -> dict:
                              "attachments": len(existing.get("attachments") or []), "images": len(images)},
                 extra_context=_attachment_context(existing) + (VOICE_HINT if body.voice else ""), session_extra=extra,
                 pin_model=body.model, web_search=(agent.capabilities.web_search if chosen else body.web_search), images=images or None,
-                message_images=chat_images.unsent_ids(existing))
+                message_images=chat_images.unsent_ids(existing), message_skills=_skill_names(body.skill_ids, user))
 
 
 @router.get("/agents/{agent_id}")

@@ -124,3 +124,6 @@ main.card-page,.card-page{padding-top:0!important}
 /* Connector rows in the + menu: a quiet "重新授權" next to the check of a connected account; the row's second line shows the account or why it needs renewing. */
 .tools-menu .tool-submenu .conn-link.quiet{color:#7b828d;font-weight:500;font-size:12px}
 .tools-menu .tool-submenu .conn-row:hover .conn-link.quiet{color:#239660}
+
+/* a skill invoked with /: plain green text inside the user message, not a chip */
+.user-message .um-skill{color:#17623f;font-weight:600}
