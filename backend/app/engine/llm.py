@@ -8,11 +8,10 @@ Locally (http://localhost:4000) the ID token step is skipped.
 """
 import time
 from dataclasses import dataclass
-from functools import lru_cache
 
 import google.auth.transport.requests
 import google.oauth2.id_token
-from openai import OpenAI
+from openai import APIStatusError, OpenAI
 
 from ..config import settings
 from . import routing
@@ -145,15 +144,27 @@ def _id_token(audience: str) -> str | None:
     return google.oauth2.id_token.fetch_id_token(req, audience)
 
 
-@lru_cache
+# The client carries a Cloud Run ID token for LiteLLM's IAM layer. Google ID tokens expire after 1 h, and a client built once
+# per instance (the old @lru_cache) answered every model call with Cloud Run's HTML "401 Unauthorized" from then on. Rebuild
+# well before expiry instead.
+CLIENT_TTL = 45 * 60.0
+_client_cache: tuple[float, OpenAI] | None = None
+
+
 def _client() -> OpenAI:
+    global _client_cache
+    now = time.monotonic()
+    if _client_cache and now - _client_cache[0] < CLIENT_TTL:
+        return _client_cache[1]
     s = settings()
     headers = {}
     tok = _id_token(s.litellm_base_url)
     if tok:
         headers["X-Serverless-Authorization"] = f"Bearer {tok}"
-    return OpenAI(base_url=f"{s.litellm_base_url.rstrip('/')}/v1", api_key=s.litellm_api_key,
-                  default_headers=headers, timeout=120)
+    client = OpenAI(base_url=f"{s.litellm_base_url.rstrip('/')}/v1", api_key=s.litellm_api_key,
+                    default_headers=headers, timeout=120)
+    _client_cache = (now, client)
+    return client
 
 
 MAX_THINKING_CHARS = 8000
@@ -200,6 +211,16 @@ def complete(*, group: str, system: str, messages: list[dict], agent_id: str, us
         extra_body=extra,
         **kwargs,
     )
+    try:
+        return _send(client, request, on_delta, search, target, t0)
+    except APIStatusError as e:
+        if e.status_code != 401:
+            raise
+        reset_client_cache()  # a token Cloud Run no longer accepts: fetch a fresh one and try once more
+        return _send(_client(), request, on_delta, search, target, t0)
+
+
+def _send(client: OpenAI, request: dict, on_delta, search: bool, target: str, t0: float) -> Completion:
     if on_delta:
         text, reasoning, served, usage, calls = _stream(client, request, on_delta)
         sources, queries = (), ()
@@ -268,8 +289,9 @@ def _stream(client: OpenAI, request: dict, on_delta) -> tuple[str, str, str | No
 
 
 def reset_client_cache() -> None:
-    """ID tokens expire after 1h; call when a 401 comes back from Cloud Run."""
-    _client.cache_clear()
+    """Drop the client so the next call fetches a fresh ID token (also done automatically every CLIENT_TTL)."""
+    global _client_cache
+    _client_cache = None
 
 
 GROUPS = ("fast", "reasoning", "budget", "sovereign")  # real LiteLLM model_name aliases
