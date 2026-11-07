@@ -1,15 +1,6 @@
 # Rendered from the model registry by the Agent Platform admin UI. Do not hand-edit: apply a new
 # registry version instead. Secrets are env references; mount them from Secret Manager (see platform docs).
 model_list:
-- model_name: gemini-2.5-flash
-  litellm_params:
-    model: vertex_ai/gemini-2.5-flash
-    vertex_project: os.environ/VERTEX_PROJECT
-    vertex_location: os.environ/VERTEX_LOCATION
-  model_info:
-    deploy: cloud
-    group: fast
-    provider: vertex_ai
 - model_name: gemini-3-flash
   litellm_params:
     model: vertex_ai/gemini-3-flash-preview
@@ -18,7 +9,7 @@ model_list:
   model_info:
     deploy: cloud
     group: fast
-    provider: vertex_ai
+    provider: Google
 - model_name: gemini-3.1-pro
   litellm_params:
     model: vertex_ai/gemini-3.1-pro-preview
@@ -27,17 +18,8 @@ model_list:
   model_info:
     deploy: cloud
     group: reasoning
-    provider: vertex_ai
-- model_name: gemini-3-flash-budget
-  litellm_params:
-    model: vertex_ai/gemini-3-flash-preview
-    vertex_project: os.environ/VERTEX_PROJECT
-    vertex_location: os.environ/VERTEX_LOCATION
-  model_info:
-    deploy: cloud
-    group: budget
-    provider: vertex_ai
-- model_name: nova-2-lite
+    provider: Google
+- model_name: amazon-nova-2-lite
   litellm_params:
     model: bedrock/jp.amazon.nova-2-lite-v1:0
     aws_region_name: os.environ/BEDROCK_REGION
@@ -48,17 +30,26 @@ model_list:
     deploy: cloud
     group: budget
     provider: bedrock
+- model_name: gemini-2.5-flash
+  litellm_params:
+    model: vertex_ai/gemini-2.5-flash
+    vertex_project: os.environ/VERTEX_PROJECT
+    vertex_location: os.environ/VERTEX_LOCATION
+  model_info:
+    deploy: cloud
+    group: budget
+    provider: Google
 - model_name: gemma-4-12b
   litellm_params:
     model: ollama_chat/gemma4:12b
-    api_base: os.environ/OLLAMA_API_BASE
+    api_base: http://10.140.15.240:11434
   model_info:
     deploy: onprem
     group: sovereign
     provider: ollama
 - model_name: fast
   litellm_params:
-    model: vertex_ai/gemini-2.5-flash
+    model: vertex_ai/gemini-3-flash-preview
     vertex_project: os.environ/VERTEX_PROJECT
     vertex_location: os.environ/VERTEX_LOCATION
 - model_name: reasoning
@@ -68,24 +59,15 @@ model_list:
     vertex_location: os.environ/VERTEX_LOCATION
 - model_name: budget
   litellm_params:
-    model: vertex_ai/gemini-3-flash-preview
-    vertex_project: os.environ/VERTEX_PROJECT
-    vertex_location: os.environ/VERTEX_LOCATION
+    model: bedrock/jp.amazon.nova-2-lite-v1:0
+    aws_region_name: os.environ/BEDROCK_REGION
+    aws_role_name: os.environ/BEDROCK_ROLE_ARN
+    aws_web_identity_token: os.environ/BEDROCK_WEB_IDENTITY_TOKEN
+    aws_session_name: tcvgh-litellm
 - model_name: sovereign
   litellm_params:
     model: ollama_chat/gemma4:12b
-    api_base: os.environ/OLLAMA_API_BASE
-- model_name: smart-router
-  litellm_params:
-    model: auto_router/complexity_router
-    complexity_router_config:
-      tiers:
-        SIMPLE: gemini-3-flash
-        MEDIUM: gemini-2.5-flash
-        COMPLEX: gemini-2.5-flash
-        REASONING: gemini-3-flash
-      classifier_type: heuristic
-    complexity_router_default_model: gemini-2.5-flash
+    api_base: http://10.140.15.240:11434
 router_settings:
   routing_strategy: simple-shuffle
   num_retries: 2
@@ -93,12 +75,10 @@ router_settings:
   allowed_fails: 3
   cooldown_time: 60
   fallbacks:
-  - fast:
-    - gemini-3-flash
   - reasoning:
     - fast
   - budget:
-    - nova-2-lite
+    - gemini-2.5-flash
     - fast
   context_window_fallbacks:
   - fast:
