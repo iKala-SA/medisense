@@ -1,5 +1,15 @@
 # On-prem stand-in for the `sovereign` model group (infra/12): Ollama on an L4 VM, internal IP only.
 # Off by default: new projects usually have 0 NVIDIA L4 quota (request GPUS_ALL_REGIONS + NVIDIA_L4_GPUS first).
+# Reserved so Cloud Run Direct VPC egress (which picks unreserved subnet IPs) cannot take it first.
+resource "google_compute_address" "ollama" {
+  count        = var.enable_ollama_vm ? 1 : 0
+  name         = "tcvgh-ollama-internal-ip"
+  region       = var.region
+  subnetwork   = google_compute_subnetwork.main.id
+  address_type = "INTERNAL"
+  address      = var.ollama_ip
+}
+
 resource "google_compute_instance" "ollama" {
   count        = var.enable_ollama_vm ? 1 : 0
   name         = "tcvgh-onprem-gemma"
@@ -31,7 +41,7 @@ resource "google_compute_instance" "ollama" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.main.id
-    network_ip = var.ollama_ip # LiteLLM's OLLAMA_API_BASE points here
+    network_ip = google_compute_address.ollama[0].address # LiteLLM's OLLAMA_API_BASE points here
   }
 
   metadata = {

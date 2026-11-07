@@ -14,7 +14,7 @@ export MODEL_ARMOR_LOCATION="us-central1"
 export MODEL_ARMOR_TEMPLATE_ID="medisense-prompt-guard"
 export DLP_INSPECT_TEMPLATE="projects/${PROJECT_ID}/locations/global/inspectTemplates/medisense-phi-inspect"
 export UPLOAD_KMS_KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/medisense/cryptoKeys/upload-key"
-export OLLAMA_API_BASE="http://10.140.0.31:11434"
+export OLLAMA_API_BASE="http://10.140.15.240:11434"
 # Must match the Cloud Scheduler job Terraform created.
 export SCHEDULER_TOKEN="$(terraform -chdir="$_here/terraform" output -raw scheduler_token 2>/dev/null)"
 unset _here

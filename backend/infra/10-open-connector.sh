@@ -5,7 +5,7 @@
 set -euo pipefail
 : "${PROJECT_ID:?run: source infra/env.sh}"
 OC_VERSION="${OC_VERSION:-v1.9.4}"
-SITE_ORIGIN="${SITE_ORIGIN:-https://medisense-portal.web.app}"   # public site; the gateway is mounted at <site>/api/oc
+SITE_ORIGIN="${SITE_ORIGIN:-https://medisense-ai-portal.web.app}"   # public site; the gateway is mounted at <site>/api/oc
 OC_SA="medisense-oc-sa"; OC_SQL="medisense-oc-db"; OC_DB="open_connector"; OC_DB_USER="oc"
 OC_SERVICE="medisense-open-connector"; OC_JOB="medisense-oc-migrate"
 SRC="ghcr.io/oomol-lab/open-connector:${OC_VERSION}"

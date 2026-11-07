@@ -30,7 +30,7 @@ variable "subnet_name" {
 
 variable "subnet_cidr" {
   type    = string
-  default = "10.140.0.0/20" # same range as the sandbox default subnet, so OLLAMA_API_BASE can keep 10.140.0.31
+  default = "10.140.0.0/20" # same range as the sandbox default subnet
 }
 
 # --- Data ------------------------------------------------------------------------------------------------------------
@@ -168,8 +168,9 @@ variable "enable_ollama_vm" {
 }
 
 variable "ollama_ip" {
-  type    = string
-  default = "10.140.0.31"
+  type        = string
+  default     = "10.140.15.240"
+  description = "Reserved static internal IP. Kept at the top of the subnet: Cloud Run Direct VPC egress takes unreserved IPs from the low end (10.140.0.31 was taken that way)."
 }
 
 variable "ollama_models" {
