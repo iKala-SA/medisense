@@ -1,5 +1,5 @@
-# Build the Vite frontend (frontend/) and deploy it to Firebase Hosting (site: medisense-portal, see frontend/firebase.json).
-# - push to main  -> live channel (https://medisense-portal.web.app)
+# Build the Vite frontend (frontend/) and deploy it to Firebase Hosting (site: medisense-ai-portal, see frontend/firebase.json).
+# - push to main  -> live channel (https://medisense-ai-portal.web.app)
 # - pull request  -> temporary preview channel, URL posted on the PR
 # Secrets (GitHub repo settings -> Secrets and variables -> Actions):
 #   FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1  JSON key of github-firebase-deploy@medisense-ai-portal-project
