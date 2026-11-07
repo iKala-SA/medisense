@@ -32,7 +32,7 @@ export BACKEND_SA="tcvgh-backend-sa"
 # prompts leave Taiwan for the check; TCVGH should use a template in asia-east1.
 export MODEL_ARMOR_PROJECT="$PROJECT_ID"
 export MODEL_ARMOR_LOCATION="us-central1"
-export MODEL_ARMOR_TEMPLATE_ID="esther-modelArmor"
+export MODEL_ARMOR_TEMPLATE_ID="medisense-prompt-guard"
 
 
 # Who may sign in. Comma-separated Google Workspace domains.
@@ -42,10 +42,10 @@ export ALLOWED_DOMAINS="ikala.ai,cloud.ikala.tv"  # cloud.ikala.tv: non-admin te
 # De-identification is always on (no flag; decided 2026-10-26): findings are replaced with [INFO_TYPE], no
 # recovery, no KMS. The inspect template holds the infoTypes; the backend SA needs
 # roles/dlp.user + roles/dlp.inspectTemplatesReader.
-export DLP_INSPECT_TEMPLATE="projects/${PROJECT_ID}/locations/global/inspectTemplates/esther-inspect-test"
+export DLP_INSPECT_TEMPLATE="projects/${PROJECT_ID}/locations/global/inspectTemplates/medisense-phi-inspect"
 # CMEK for the upload bucket (original knowledge files keep their PHI). The GCS service agent needs
 # roles/cloudkms.cryptoKeyEncrypterDecrypter on this key.
-export UPLOAD_KMS_KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/esther-key/cryptoKeys/esther-tcvgh-upload-key"
+export UPLOAD_KMS_KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/medisense/cryptoKeys/upload-key"
 # Admin dashboard (Agent 監控與成本): who is admin, hospital-wide monthly cap (USD), NT$ display rate.
 export ADMIN_EMAILS="esther.shih@ikala.ai,paggie.chen@ikala.ai"
 export MONTHLY_BUDGET_USD="5000"

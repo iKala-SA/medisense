@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "medisense-portal",
+    "site": "medisense-ai-portal",
     "public": "dist/client",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
