@@ -51,7 +51,7 @@ Overflow for fast / budget groups spills to cloud; sovereign traffic queues or f
 
 ## 4b. Verified in the sandbox (2026-10-23)
 
-- **Gemini is not served from asia-east1.** Probing Vertex AI `generateContent` from project `cloud-sa-sandbox-1`: every Gemini ID returns 404 on the asia-east1 regional endpoint. `gemini-3-flash-preview` and `gemini-3.1-pro-preview` answer only on the `global` endpoint; `gemini-2.5-flash` / `gemini-2.5-pro` answer on `global` and `us-central1`. LiteLLM therefore uses `VERTEX_LOCATION=global`. Because option B pseudonymizes everything first, this is acceptable, but the diagram no longer claims in-region Gemini inference and TCVGH must be told. Re-check regional availability before go-live; Claude on Vertex and on-prem remain the Taiwan-resident options.
+- **Gemini is not served from asia-east1.** Probing Vertex AI `generateContent` from project `medisense-ai-portal-project`: every Gemini ID returns 404 on the asia-east1 regional endpoint. `gemini-3-flash-preview` and `gemini-3.1-pro-preview` answer only on the `global` endpoint; `gemini-2.5-flash` / `gemini-2.5-pro` answer on `global` and `us-central1`. LiteLLM therefore uses `VERTEX_LOCATION=global`. Because option B pseudonymizes everything first, this is acceptable, but the diagram no longer claims in-region Gemini inference and TCVGH must be told. Re-check regional availability before go-live; Claude on Vertex and on-prem remain the Taiwan-resident options.
 - The sandbox's `(default)` Firestore database is in `nam5` (US) and shared; the platform uses a dedicated named database `tcvgh-agent-platform` in asia-east1.
 - LiteLLM `model_info.tier` is reserved (free/paid); custom metadata must use another key.
 - Cloud Run's frontend answers `/healthz` itself, so the app health route is `/api/health`.
@@ -75,7 +75,7 @@ Red: tokens or API keys in Firestore; agent write actions without approval polic
 
 ## 6. Phasing
 
-- Phase 1 (MVP, sandbox project `cloud-sa-sandbox-1`): Google sign-in, builder with six node types, Vertex Gemini via LiteLLM, de-identification on uploads and prompts, web chat, Gmail + Calendar + Drive connectors with approvals, spend dashboards, audit logs. On-prem and Azure / Bedrock entries pre-configured in LiteLLM but disabled until credentials and VPN exist.
+- Phase 1 (MVP, sandbox project `medisense-ai-portal-project`): Google sign-in, builder with six node types, Vertex Gemini via LiteLLM, de-identification on uploads and prompts, web chat, Gmail + Calendar + Drive connectors with approvals, spend dashboards, audit logs. On-prem and Azure / Bedrock entries pre-configured in LiteLLM but disabled until credentials and VPN exist.
 - Phase 2: Google Chat channel, on-prem `sovereign` group over VPN, Azure + Bedrock providers, RAG knowledge bases, scheduled agents, Model Armor, VPC Service Controls, Slack / LINE / Microsoft 365.
 - Phase 3: agent evaluation in BigQuery, templates and department budgets, Vertex self-deployed open models if on-prem capacity runs out.
 

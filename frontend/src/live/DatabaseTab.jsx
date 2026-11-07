@@ -21,7 +21,7 @@ export const DB_KINDS={
   postgres:{label:'PostgreSQL',fields:[['host','主機（IP 或網域）'],['port','連接埠','5432'],['database','資料庫名稱']]},
   mysql:{label:'MySQL',fields:[['host','主機（IP 或網域）'],['port','連接埠','3306'],['database','資料庫名稱']]},
   mssql:{label:'SQL Server',fields:[['host','主機（IP 或網域）'],['port','連接埠','1433'],['database','資料庫名稱']]},
-  bigquery:{label:'BigQuery',fields:[['project','專案 ID','','例：cloud-sa-sandbox-1'],['location','區域（region）','asia-east1'],['datasets','資料集（多個用逗號分隔）','','例：esther_dataset']]},
+  bigquery:{label:'BigQuery',fields:[['project','專案 ID','','例：medisense-ai-portal-project'],['location','區域（region）','asia-east1'],['datasets','資料集（多個用逗號分隔）','','例：esther_dataset']]},
 };
 const nice=m=>{ // FastAPI validation errors arrive as a JSON list
   const i=m.indexOf('[');if(i<0)return m;

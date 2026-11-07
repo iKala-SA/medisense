@@ -60,7 +60,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - "適用範圍" is replaced by 分享 (ShareKit.jsx): specific users, groups, or the whole account, with 可使用 / 可編輯. Agents have no 部門 field in the UI (the backend still requires one; it is set from the signed-in user).
 
 ## Backend integration (2026-10-27)
-- Backend = `tcvgh-agent-platform` (FastAPI on Cloud Run, Firestore, LiteLLM, Firebase Auth) in project `cloud-sa-sandbox-1`. Do not build a parallel backend; extend that repo on branch `medisense-integration` and deploy only after user review.
+- Backend = `tcvgh-agent-platform` (FastAPI on Cloud Run, Firestore, LiteLLM, Firebase Auth) in project `medisense-ai-portal-project`. Do not build a parallel backend; extend that repo on branch `medisense-integration` and deploy only after user review.
 - Roles follow the backend: admin | builder | user, from `/api/me`. The prototype role toggle exists only in mock mode.
 - Sensitive data follows the backend: always de-identify, then any model; only the `sovereign` group is on-prem only. The prototype's "force on-prem" rule is dropped in live mode.
 - Hosting: a new Firebase Hosting site `medisense-portal` (firebase.json) with `/api/**` rewritten to Cloud Run `tcvgh-platform-api`. Do not touch `tcvgh-agent-builder`.

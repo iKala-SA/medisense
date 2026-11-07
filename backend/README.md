@@ -1,4 +1,4 @@
-# TCVGH Agent Platform — MVP build (sandbox: `cloud-sa-sandbox-1`)
+# TCVGH Agent Platform — MVP build (sandbox: `medisense-ai-portal-project`)
 
 This folder is the runnable MVP that matches diagram v0.3. It is deliberately small:
 three deployables and a handful of `gcloud` scripts, no Terraform.
@@ -58,7 +58,7 @@ npx firebase-tools deploy --only hosting --project "$PROJECT_ID"
 | LiteLLM | Cloud Run `tcvgh-litellm`, asia-east1, **internal ingress**, backend reaches it via Direct VPC egress + ID token |
 | Firestore | named database `tcvgh-agent-platform` in asia-east1 (the project's `(default)` DB is nam5/US and shared) |
 | Vertex AI | `global` endpoint: `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, fallback `gemini-2.5-flash` (no Gemini in asia-east1) |
-| Uploads | `gs://cloud-sa-sandbox-1-tcvgh-agent-uploads` (asia-east1, versioned, no public access) |
+| Uploads | `gs://medisense-ai-portal-project-tcvgh-agent-uploads` (asia-east1, versioned, no public access) |
 
 Verified end-to-end with a temporary test user: create agent → condition node → `fast` or `reasoning` group → Gemini → publish → run published → delete.
 Idle cost is close to zero (Cloud Run min-instances 0, no Cloud SQL / Redis yet).

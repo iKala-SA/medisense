@@ -24,7 +24,7 @@ def body(**kw):
             "connection": {"host": "10.0.0.5", "port": "5432", "database": "pharm"}, "user": "ro_pharm", "password": "s3cret", **kw}
 
 
-BQ = {"name": "門診統計", "kind": "bigquery", "connection": {"project": "cloud-sa-sandbox-1", "location": "asia-east1", "datasets": "esther_dataset"}}
+BQ = {"name": "門診統計", "kind": "bigquery", "connection": {"project": "medisense-ai-portal-project", "location": "asia-east1", "datasets": "esther_dataset"}}
 
 
 def test_only_admins_manage_and_the_password_never_comes_back(fs, as_user, secrets, audit_log):

@@ -3,7 +3,7 @@
 # commits the deployed backend/litellm/config.yaml to main so git matches what is running.
 # The backend matches its run by run-name, so keep "LiteLLM apply v<version>" in sync with engine/github_actions.py.
 # Secrets (GitHub repo settings -> Secrets and variables -> Actions):
-#   LITELLM_DEPLOY_SA_KEY  JSON key of github-litellm-deploy@cloud-sa-sandbox-1 (infra/10-litellm-apply-cicd.sh)
+#   LITELLM_DEPLOY_SA_KEY  JSON key of github-litellm-deploy@medisense-ai-portal-project (infra/10-litellm-apply-cicd.sh)
 name: Apply LiteLLM config
 run-name: LiteLLM apply v${{ inputs.version }}
 
