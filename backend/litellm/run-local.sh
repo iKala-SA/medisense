@@ -10,10 +10,10 @@ export PATH="$HOME/.local/bin:$PATH"
 # Master key must match LITELLM_API_KEY in ../.env
 KEY="$(grep -E '^LITELLM_API_KEY=' ../.env | cut -d= -f2- | awk '{print $1}')"
 export LITELLM_MASTER_KEY="$KEY"
-export VERTEX_PROJECT="${VERTEX_PROJECT:-cloud-sa-sandbox-1}"
+export VERTEX_PROJECT="${VERTEX_PROJECT:-medisense-ai-portal-project}"
 export VERTEX_LOCATION="${VERTEX_LOCATION:-global}"
 # Model Armor guardrail template (same defaults as infra/env.sh); without these every screened request fails closed.
-export MODEL_ARMOR_PROJECT="${MODEL_ARMOR_PROJECT:-cloud-sa-sandbox-1}"
+export MODEL_ARMOR_PROJECT="${MODEL_ARMOR_PROJECT:-medisense-ai-portal-project}"
 export MODEL_ARMOR_LOCATION="${MODEL_ARMOR_LOCATION:-us-central1}"
 export MODEL_ARMOR_TEMPLATE_ID="${MODEL_ARMOR_TEMPLATE_ID:-esther-modelArmor}"
 # nova-2-lite region (role/token env stay unset locally so LiteLLM uses AWS_PROFILE_NAME).

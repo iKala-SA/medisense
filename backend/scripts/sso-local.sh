@@ -45,10 +45,10 @@ LDIF
 
 cat > .env.sso-local <<ENV
 # Written by scripts/sso-local.sh (gitignored). Local backend against the sandbox Firestore + local Keycloak.
-GOOGLE_CLOUD_PROJECT=cloud-sa-sandbox-1
+GOOGLE_CLOUD_PROJECT=medisense-ai-portal-project
 REGION=asia-east1
 FIRESTORE_DATABASE=tcvgh-agent-platform
-UPLOAD_BUCKET=cloud-sa-sandbox-1-tcvgh-agent-uploads
+UPLOAD_BUCKET=medisense-ai-portal-project-tcvgh-agent-uploads
 LITELLM_BASE_URL=http://localhost:4000
 LITELLM_API_KEY=local-dev-no-chat
 ALLOWED_DOMAINS=ikala.ai,cloud.ikala.tv

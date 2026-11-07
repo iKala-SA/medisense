@@ -1,7 +1,7 @@
 # Medisense
 
 Enterprise AI portal for hospitals: a React front end on Firebase Hosting and the TCVGH Agent Platform back end
-(FastAPI on Cloud Run, Firestore, LiteLLM, Firebase Auth) in Google Cloud project `cloud-sa-sandbox-1`.
+(FastAPI on Cloud Run, Firestore, LiteLLM, Firebase Auth) in Google Cloud project `medisense-ai-portal-project`.
 
 ```
 frontend/   React 19 + Vite portal (Qwen-style UI, Medisense jellyfish). Deploys to Firebase Hosting site `medisense-portal`.
@@ -20,7 +20,7 @@ npm run dev           # mock mode: self-contained prototype, no backend or sign-
 npm run dev:preview   # live pages with seeded in-memory data, no sign-in (design review)
 npm run dev:live      # real platform: needs frontend/.env.live (see .env.example) and a Google Workspace sign-in
 npm run build         # + npm run test:sites
-npm run build:live && firebase deploy --only hosting:medisense-portal --project cloud-sa-sandbox-1
+npm run build:live && firebase deploy --only hosting:medisense-portal --project medisense-ai-portal-project
 ```
 
 Mock mode is the default. Real mode needs `VITE_MOCK_API=0` and the `VITE_FIREBASE_*` values. Notes for contributors are in

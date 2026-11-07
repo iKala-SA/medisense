@@ -1,7 +1,7 @@
 # Source this file: `source infra/env.sh`
 # Everything below is a name or a knob; nothing here creates resources.
 
-export PROJECT_ID="cloud-sa-sandbox-1"
+export PROJECT_ID="medisense-ai-portal-project"
 export REGION="asia-east1"                      # Taiwan; matches diagram
 # Vertex AI Gemini is NOT served from asia-east1 (verified 2026-10-23); use the global endpoint.
 export VERTEX_LOCATION="global"

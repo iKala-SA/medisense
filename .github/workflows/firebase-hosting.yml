@@ -2,7 +2,7 @@
 # - push to main  -> live channel (https://medisense-portal.web.app)
 # - pull request  -> temporary preview channel, URL posted on the PR
 # Secrets (GitHub repo settings -> Secrets and variables -> Actions):
-#   FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1  JSON key of github-firebase-deploy@cloud-sa-sandbox-1
+#   FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1  JSON key of github-firebase-deploy@medisense-ai-portal-project
 #   VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID   from `firebase apps:sdkconfig WEB`
 name: Deploy frontend to Firebase Hosting
 
@@ -43,8 +43,8 @@ jobs:
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_AUTH_DOMAIN: cloud-sa-sandbox-1.firebaseapp.com
-          VITE_FIREBASE_PROJECT_ID: cloud-sa-sandbox-1
+          VITE_FIREBASE_AUTH_DOMAIN: medisense-ai-portal-project.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: medisense-ai-portal-project
           VITE_ALLOWED_DOMAIN: ikala.ai
           # The portal defaults to mock mode (fake login, seeded data); 0 = real platform API
           VITE_MOCK_API: "0"
@@ -53,7 +53,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLOUD_SA_SANDBOX_1 }}
-          projectId: cloud-sa-sandbox-1
+          projectId: medisense-ai-portal-project
           entryPoint: frontend
           # push / manual run -> live site; pull_request -> auto-named preview channel
           channelId: ${{ github.event_name == 'pull_request' && '' || 'live' }}
